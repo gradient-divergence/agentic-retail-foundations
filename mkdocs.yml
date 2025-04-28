@@ -1,0 +1,84 @@
+site_name: Agentic Retail Foundations
+site_url: https://gradient-divergence.github.io/agentic-retail-foundations
+site_author: Fatih Nayebi
+site_description: >
+  A collection of foundational tools for building agentic retail systems.
+copyright: Copyright &copy; 2025 Fatih Nayebi
+
+# Repository links
+repo_url: https://github.com/gradient-divergence/agentic-retail-foundations
+repo_name: gradient-divergence/agentic-retail-foundations
+edit_uri: edit/main/docs/
+
+# Theme Configuration
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  palette:
+    - scheme: default # Light mode
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate # Dark mode
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  # logo: assets/logo.png
+  # favicon: assets/favicon.png
+
+# Navigation Structure (Create corresponding files in docs/)
+nav:
+  - Home: index.md
+  - Introduction: introduction.md
+  - Setup & Usage: setup.md
+  - Core Concepts:
+    - Agents: concepts/agents.md
+    - Data Models: concepts/models.md
+  - API Reference:
+    - Agents API: reference/agents.md
+    - Models API: reference/models.md
+  - Examples & Notebooks:
+    - Overview: examples/index.md
+    # - Shelf Monitoring: examples/shelf_monitoring.md # Link or embed notebook
+  - Contributing: contributing.md
+
+# Plugins
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          setup_commands:
+            - import sys
+            - sys.path.append('.') # Add project root to Python path
+          options:
+            show_root_heading: yes
+            show_source: no # Keep it cleaner initially
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: date
+
+# Markdown Extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - toc:
+      permalink: true

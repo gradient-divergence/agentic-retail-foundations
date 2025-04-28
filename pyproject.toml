@@ -1,0 +1,181 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-retail-foundations"
+version = "0.1.0"
+description = "Code examples for Foundations of Agentic AI for Retail Book."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "Fatih Nayebi", email = "f.nayebi@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# List your core runtime dependencies here
+dependencies = [
+    "marimo>=0.13.1",
+    "pandas>=2.1.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "scikit-learn>=1.3.0",
+    "openai>=1.76.0",
+    "python-dotenv>=1.0.0",
+    "tiktoken>=0.5.1",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.2",
+    "langchain>=0.0.335",
+    "ipywidgets>=8.1.1", 
+    "ipykernel>=6.26.0", 
+    "nest_asyncio>=1.5.8",
+    "pydantic>=2.4.2",
+    "typing-extensions>=4.8.0",
+    "typing_inspect>=0.9.0",
+    "aiohttp>=3.9.0",
+    "tenacity>=8.2.3",
+    "sentence-transformers>=2.2.2",
+    "unstructured>=0.10.29",
+    "pdfminer.six>=20221105",
+    "pymupdf>=1.23.7",
+    "python-magic>=0.4.27",
+    "python-multipart>=0.0.6",
+    "fastapi>=0.104.1",
+    "uvicorn>=0.24.0.post1",
+    "httpx>=0.25.1",
+    "sse-starlette>=1.6.1",
+    "pydantic-settings>=2.1.0",
+    "langserve>=0.0.30",
+    "langsmith>=0.0.63",
+    "altair>=5.5.0",
+    "vega-datasets>=0.9.0",
+    "pyarrow>=19.0.1",
+    "tensorflow~=2.16.0",
+    "opencv-python-headless>=4.9.0",
+]
+
+[project.optional-dependencies]
+# Development dependencies: linters, formatters, testing, docs
+dev = [
+    "ruff>=0.4.0", # Linter, formatter, and more
+    "mypy>=1.8.0", # Static type checker
+    "pytest>=7.0",
+    "pytest-cov>=4.0", # For coverage with pytest
+    "coverage[toml]>=7.0",
+    "pre-commit>=4.2.0",
+    "uv>=0.1.20",
+]
+
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.18",
+    "mkdocs-git-revision-date-localized-plugin>=1.4.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/gradient-divergence/agentic-retail-foundations"
+Repository = "https://github.com/gradient-divergence/agentic-retail-foundations"
+
+# --- Tool Configurations ---
+
+# Add setuptools configuration to specify packages
+[tool.setuptools.packages.find]
+# Define where to look for packages ('.' means the root directory)
+where = ["."]
+# Explicitly list the directories that are Python packages
+include = ["agents*", "connectors*", "models*", "utils*", "config*", "environments*"]
+# Exclude directories that are definitely not packages
+exclude = ["notebooks*", "tests*", "docs*", "qmd*", "demos*"]
+
+[tool.ruff]
+# See https://docs.astral.sh/ruff/configuration/
+target-version = "py310" # Minimum Python version to target for compatibility
+line-length = 88
+# Select rule codes to enable. Add more as needed (e.g., "I" for isort)
+# Start with defaults and gradually add more. `ruff check --select ALL .` shows available.
+select = ["E", "F", "W", "C90", "UP"] # Common subset: pyflakes, pycodestyle, mccabe, flake8-bugbear, pyupgrade
+ignore = [] # Rule codes to ignore (e.g., "E501" if you don't enforce line length strictly)
+# Exclude common directories
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+[tool.ruff.format]
+# See https://docs.astral.sh/ruff/formatter/
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+# See https://mypy.readthedocs.io/en/stable/config_file.html
+python_version = "3.10" # Match your project's minimum Python version
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = false
+exclude = [
+    "build/",
+    ".venv/",
+]
+
+
+[tool.pytest.ini_options]
+# See https://docs.pytest.org/en/stable/reference/customize.html#pyproject-toml
+minversion = "6.0"
+addopts = "-ra -q --cov --cov-report=term-missing" # Basic options: report reasons for skip/fail, quiet, enable coverage
+testpaths = [
+    "tests", # Directory where tests are located
+]
+pythonpath = "." # Add project root to PYTHONPATH for imports
+
+[tool.coverage.run]
+# See https://coverage.readthedocs.io/en/latest/config.html
+branch = true # Measure branch coverage
+source = ["agents", "connectors", "models", "utils", "demos", "config", "environments"]
+# omit = ["*/tests/*", "*/__main__.py"] # Files/patterns to exclude from coverage
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 80 # Optional: Fail if coverage is below this percentage
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"

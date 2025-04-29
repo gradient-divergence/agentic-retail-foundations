@@ -92,9 +92,9 @@ Repository = "https://github.com/gradient-divergence/agentic-retail-foundations"
 # Define where to look for packages ('.' means the root directory)
 where = ["."]
 # Explicitly list the directories that are Python packages
-include = ["agents*", "connectors*", "models*", "utils*", "config*", "environments*"]
+include = ["agents*", "connectors*", "models*", "utils*", "config*", "environments*", "demos*", "notebooks*"]
 # Exclude directories that are definitely not packages
-exclude = ["notebooks*", "tests*", "docs*", "qmd*", "demos*"]
+exclude = ["tests*", "docs*", "qmd*"]
 
 [tool.ruff]
 # See https://docs.astral.sh/ruff/configuration/

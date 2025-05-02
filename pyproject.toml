@@ -34,8 +34,8 @@ dependencies = [
     "requests>=2.31.0",
     "beautifulsoup4>=4.12.2",
     "langchain>=0.0.335",
-    "ipywidgets>=8.1.1", 
-    "ipykernel>=6.26.0", 
+    "ipywidgets>=8.1.1",
+    "ipykernel>=6.26.0",
     "nest_asyncio>=1.5.8",
     "pydantic>=2.4.2",
     "typing-extensions>=4.8.0",
@@ -60,6 +60,11 @@ dependencies = [
     "pyarrow>=19.0.1",
     "tensorflow~=2.16.0",
     "opencv-python-headless>=4.9.0",
+    "rdflib>=7.1.4",
+    "dowhy",
+    "econml",
+    "doubleml>=0.9.3",
+    "networkx>=3.4.2",
 ]
 
 [project.optional-dependencies]

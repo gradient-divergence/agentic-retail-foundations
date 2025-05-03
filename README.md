@@ -13,9 +13,9 @@ A modular, extensible framework for building, simulating, and analyzing agent-ba
       <strong>Purchase on Amazon:</strong> <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">US</a> | <a href="https://www.amazon.ca/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">CA</a> | <a href="https://www.amazon.co.jp/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">JP</a> | <a href="https://www.amazon.co.uk/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">UK</a> | <a href="https://www.amazon.de/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">DE</a> | <a href="https://www.amazon.fr/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">FR</a> | <a href="https://www.amazon.in/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IN</a> | <a href="https://www.amazon.it/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IT</a> | <a href="https://www.amazon.es/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">ES</a>
       <br>
     </td>
-    <td width="40%" align="center" valign="top">
+    <td width="40%" align="center" valign="center">
       <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">
-        <img src="https://github.com/gradient-divergence/.github/blob/main/book-cover.png" alt="Book Cover: Foundations of Agentic AI for Retail" width="150"/>
+        <img src="https://github.com/gradient-divergence/.github/blob/main/book-cover.png" alt="Book Cover: Foundations of Agentic AI for Retail" width="300"/>
       </a>
     </td>
   </tr>

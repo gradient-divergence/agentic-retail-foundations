@@ -4,7 +4,7 @@ Module: agents.cv
 Contains the ShelfMonitoringAgent class for computer vision-based shelf monitoring in retail.
 """
 
-from typing import Any
+from typing import Any, Dict, List
 import asyncio
 import time
 from datetime import datetime
@@ -63,11 +63,11 @@ class ShelfMonitoringAgent:
         self.planogram_db = planogram_database
         self.inventory_system = inventory_system
         self.camera_streams = camera_stream_urls
-        self.active_streams = {}
+        self.active_streams: Dict[str, cv2.VideoCapture] = {}
         self.confidence_threshold = confidence_threshold
         self.check_frequency = check_frequency_seconds
-        self.last_check_times = {}
-        self.detected_issues = {}
+        self.last_check_times: Dict[str, float] = {}
+        self.detected_issues: Dict[str, List[Dict[str, Any]]] = {}
 
     async def start_monitoring_section(self, location_id: str, section_id: str):
         """Begin monitoring a specific shelf section at a location."""
@@ -197,8 +197,8 @@ class ShelfMonitoringAgent:
     ) -> list[dict[str, Any]]:
         """Compare detected products with expected planogram."""
         issues = []
-        product_counts = {}
-        product_positions = {}
+        product_counts: Dict[str, int] = {}
+        product_positions: Dict[str, List[Dict[str, float]]] = {}
         for product in detected_products:
             product_id = product["product_id"]
             if product_id in product_counts:

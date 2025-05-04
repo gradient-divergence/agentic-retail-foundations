@@ -4,6 +4,7 @@ A modular, extensible Python framework for building, simulating, and analyzing a
 
 ## Table of Contents
 
+- [Featured Book: Foundations of Agentic AI for Retail](#featured-book:-foundations-of-agentic-ai-for-retail)
 - [Key Features](#key-features)
 - [Directory Structure](#directory-structure)
 - [Setup Instructions](#setup-instructions)
@@ -13,10 +14,11 @@ A modular, extensible Python framework for building, simulating, and analyzing a
 - [Documentation Website](#documentation-website)
 - [GitHub Repository](#github-repository)
 
+## Featured Book: Foundations of Agentic AI for Retail
+
 <table>
   <tr>
     <td width="60%">
-      <strong>Featured Book:</strong><br>
       <a href="https://github.com/gradient-divergence/agentic-retail-foundations"><strong>Foundations of Agentic AI for Retail: Concepts, Technologies, and Architectures for Autonomous Retail Systems</strong></a> by Dr. Fatih Nayebi.
       <br><br>
       <em>Explore the future of retail powered by autonomous AI systems.</em>

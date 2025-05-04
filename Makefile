@@ -128,9 +128,13 @@ coverage: venv ## Generate test coverage report
 # Documentation (Targets assume venv is active or run via make)
 ###############################################################################
 
+# Add variable for configurable port
+MKDOCS_PORT ?= 8000
+
 docs-serve: venv ## Serve docs locally with live reload
 	@echo "--> Serving documentation locally ($(MKDOCS))..."
-	$(MKDOCS) serve
+	# Use the variable for the address
+	$(MKDOCS) serve -a localhost:$(MKDOCS_PORT)
 
 docs-build: venv ## Build static documentation site
 	@echo "--> Building documentation ($(MKDOCS))..."

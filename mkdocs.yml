@@ -43,9 +43,11 @@ nav:
   - Core Concepts:
     - Agents: concepts/agents.md
     - Data Models: concepts/models.md
+    - Utilities: concepts/utils.md
   - API Reference:
     - Agents API: reference/agents.md
     - Models API: reference/models.md
+    - Utilities API: reference/utils.md
   - Examples & Notebooks:
     - Overview: examples/index.md
     # - Shelf Monitoring: examples/shelf_monitoring.md # Link or embed notebook

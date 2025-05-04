@@ -261,5 +261,5 @@ class BayesianRecommendationAgent:
             f"Preference Distributions for Customer {customer_id} (Top {num_plots})",
             fontsize=16,
         )
-        plt.tight_layout(rect=[0, 0.03, 1, 0.97])
+        plt.tight_layout(rect=(0, 0.03, 1, 0.97))
         return fig

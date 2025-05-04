@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
+
 def generate_synthetic_retail_data(
     start_date_str: str = "2023-01-01",
     end_date_str: str = "2023-06-30",
@@ -20,13 +21,13 @@ def generate_synthetic_retail_data(
     weekend_sales_effect: float = 0.15,
     promo_base_prob: float = 0.05,
     promo_weekend_add_prob: float = 0.15,
-    promo_cat2_add_prob: float = 0.05, # Example: Cat2 more likely promoted
-    promo_store1_add_prob: float = 0.05, # Example: Store S01 more likely promotes
+    promo_cat2_add_prob: float = 0.05,  # Example: Cat2 more likely promoted
+    promo_store1_add_prob: float = 0.05,  # Example: Store S01 more likely promotes
     true_promo_effect_multiplier: float = 1.5,
     promo_price_discount: float = 0.20,
     noise_std_dev: float = 0.1,
     traffic_sales_effect_divisor: float = 2000.0,
-    store_traffic_noise_std_dev: float = 0.1
+    store_traffic_noise_std_dev: float = 0.1,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Generates synthetic retail sales data with confounding factors.
@@ -79,7 +80,9 @@ def generate_synthetic_retail_data(
         is_weekend = day_of_week >= 5
         # Simulate overall store traffic (higher on weekends, slight month trend)
         base_traffic = np.random.poisson(base_traffic_lambda) + month * 5
-        store_traffic_day = base_traffic * (1 + (weekend_traffic_multiplier - 1) * is_weekend)
+        store_traffic_day = base_traffic * (
+            1 + (weekend_traffic_multiplier - 1) * is_weekend
+        )
 
         for store_id in stores:
             store_num = int(store_id[1:])
@@ -96,25 +99,32 @@ def generate_synthetic_retail_data(
 
                 # Baseline sales and price influenced by category and product ID variation
                 product_base_sales = np.random.poisson(
-                    product_base_sales_lambda_base + cat_num * product_category_sales_mult
+                    product_base_sales_lambda_base
+                    + cat_num * product_category_sales_mult
                 )
                 product_base_price = (
                     product_base_price_start
                     + cat_num * product_category_price_add
-                    + (prod_num % 5) * product_id_price_add # Small variation within category
+                    + (prod_num % 5)
+                    * product_id_price_add  # Small variation within category
                 )
 
                 # Time effects on sales (seasonal sine wave + weekend boost)
                 month_effect = (
-                    1.0 + np.sin((month - 1) / 12 * 2 * np.pi) * seasonal_effect_amplitude
+                    1.0
+                    + np.sin((month - 1) / 12 * 2 * np.pi) * seasonal_effect_amplitude
                 )
                 dow_effect = 1.0 + weekend_sales_effect * is_weekend
 
                 # Promotion Decision Logic (Confounding!) - depends on weekend, category, store
                 promo_prob = promo_base_prob
                 promo_prob += promo_weekend_add_prob * is_weekend
-                promo_prob += promo_cat2_add_prob * (cat_num == 2) # Example: Cat 2 bias
-                promo_prob += promo_store1_add_prob * (store_id == "S01") # Example: Store S01 bias
+                promo_prob += promo_cat2_add_prob * (
+                    cat_num == 2
+                )  # Example: Cat 2 bias
+                promo_prob += promo_store1_add_prob * (
+                    store_id == "S01"
+                )  # Example: Store S01 bias
                 # Ensure probability is valid
                 promo_prob = np.clip(promo_prob, 0.0, 1.0)
                 on_promotion = np.random.binomial(1, promo_prob)
@@ -139,7 +149,9 @@ def generate_synthetic_retail_data(
                     sales *= true_promo_effect_multiplier
 
                 # Add effect of store traffic (higher traffic slightly boosts sales)
-                traffic_effect = 1.0 + (store_traffic_day / traffic_sales_effect_divisor)
+                traffic_effect = 1.0 + (
+                    store_traffic_day / traffic_sales_effect_divisor
+                )
                 sales *= traffic_effect
 
                 # Ensure sales are non-negative and use Poisson distribution for final count
@@ -148,7 +160,11 @@ def generate_synthetic_retail_data(
 
                 # Add noisy store traffic for the record
                 noisy_store_traffic = int(
-                    max(0, store_traffic_day * (1 + np.random.normal(0, store_traffic_noise_std_dev)))
+                    max(
+                        0,
+                        store_traffic_day
+                        * (1 + np.random.normal(0, store_traffic_noise_std_dev)),
+                    )
                 )
 
                 data.append(
@@ -158,7 +174,7 @@ def generate_synthetic_retail_data(
                         "product_id": product_id,
                         "sales_units": final_sales_units,
                         "price": round(price, 2),
-                        "on_promotion": bool(on_promotion), # Keep as bool for clarity
+                        "on_promotion": bool(on_promotion),  # Keep as bool for clarity
                         "store_traffic": noisy_store_traffic,
                         "product_category": product_category,
                         # Store tier is added via merge later
@@ -167,13 +183,14 @@ def generate_synthetic_retail_data(
 
     sales_df = pd.DataFrame(data)
 
-    # --- Create metadata dataframes --- 
+    # --- Create metadata dataframes ---
     product_ids = [f"P{i:03d}" for i in range(1, num_products + 1)]
     product_df = pd.DataFrame(
         {
             "product_id": product_ids,
             "product_category": [
-                f"Cat{(int(p[1:]) - 1) // max(1, num_products // 4) + 1}" for p in product_ids
+                f"Cat{(int(p[1:]) - 1) // max(1, num_products // 4) + 1}"
+                for p in product_ids
             ],
             # Add other product attributes if needed, e.g., base_price
             # "base_price": [product_base_price_start + ... for p in product_ids]
@@ -184,9 +201,7 @@ def generate_synthetic_retail_data(
     store_df = pd.DataFrame(
         {
             "store_id": store_ids,
-            "store_tier": [
-                f"Tier{(int(s[1:]) % 3)}" for s in store_ids
-            ],
+            "store_tier": [f"Tier{(int(s[1:]) % 3)}" for s in store_ids],
             # Add other store attributes if needed, e.g., region, size
         }
     )
@@ -194,10 +209,13 @@ def generate_synthetic_retail_data(
     # Add store tier to sales_df using a merge for consistency
     # Ensure 'store_tier' column exists before merge if sales_df could be empty
     if not sales_df.empty:
-        sales_df = pd.merge(sales_df, store_df[['store_id', 'store_tier']], on="store_id", how="left")
+        sales_df = pd.merge(
+            sales_df, store_df[["store_id", "store_tier"]], on="store_id", how="left"
+        )
     else:
-        sales_df['store_tier'] = pd.Series(dtype='object') # Add empty column if no data
-
+        sales_df["store_tier"] = pd.Series(
+            dtype="object"
+        )  # Add empty column if no data
 
     print(f"Generated {len(sales_df)} sample sales records.")
-    return sales_df, product_df, store_df 
+    return sales_df, product_df, store_df

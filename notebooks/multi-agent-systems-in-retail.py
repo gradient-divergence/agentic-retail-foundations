@@ -48,11 +48,6 @@ def _():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     logger = logging.getLogger(__name__)
 
-    # <<< REMOVED LOCAL CLASS/FUNCTION DEFINITIONS HERE >>>
-    # (AgentMessage, Performative, MessageBroker, Task, etc., 
-    #  StoreAgent, RetailCoordinator, Supplier, etc., 
-    #  Store, InventoryCollaborationNetwork, cross-functional agents, 
-    #  calculate_remediation_timeline)
 
     # Return all imported names needed by subsequent cells
     return (

@@ -1,5 +1,3 @@
-
-
 import marimo
 
 __generated_with = "0.13.2"
@@ -67,11 +65,13 @@ def _(mo):
 @app.cell
 def _(mo):
     # --- BDI Agent Class ---
-    mo.md("""
+    mo.md(
+        """
     **InventoryBDIAgent**
 
     Belief-Desire-Intention agent for inventory management. Encapsulates the BDI cycle for retail decision-making. Imported from `agents.bdi`.
-    """)
+    """
+    )
     return
 
 
@@ -90,11 +90,13 @@ def _(mo):
 @app.cell
 def _(mo):
     # --- OODA Agent Class ---
-    mo.md("""
+    mo.md(
+        """
     **OODAPricingAgent**
 
     OODA (Observe-Orient-Decide-Act) agent for dynamic pricing. Implements the OODA loop for retail pricing. Imported from `agents.ooda`.
-    """)
+    """
+    )
     return
 
 
@@ -125,11 +127,13 @@ def _(mo):
 @app.cell
 def _(mo):
     # --- Data Models for BDI Agent ---
-    mo.md("""
+    mo.md(
+        """
     **ProductInfo, InventoryItem, SalesData**
 
     Core data models for inventory, product, and sales information. Used as beliefs in the BDI agent. Imported from `models.inventory`.
-    """)
+    """
+    )
     from models.inventory import ProductInfo, InventoryItem, SalesData
 
     return InventoryItem, ProductInfo, SalesData
@@ -625,11 +629,13 @@ def _(mo):
 @app.cell
 def _(mo):
     # --- Data Model for OODA Agent ---
-    mo.md("""
+    mo.md(
+        """
     **PricingProduct**
 
     Data model for products used in dynamic pricing. Imported from `models.pricing`.
-    """)
+    """
+    )
     from models.pricing import PricingProduct
 
     return (PricingProduct,)

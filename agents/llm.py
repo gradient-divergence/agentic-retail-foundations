@@ -4,7 +4,7 @@ Module: agents.llm
 Contains the RetailCustomerServiceAgent class for LLM-powered customer service in retail.
 """
 
-from typing import Any
+from typing import Any, Dict, List, Set, Optional
 from datetime import datetime
 import logging
 import asyncio
@@ -12,7 +12,7 @@ import os
 import re
 from collections import defaultdict, deque
 
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 from utils.openai_utils import safe_chat_completion
 
 # NLP helpers
@@ -39,6 +39,8 @@ class RetailCustomerServiceAgent:
       requests arrive for the same customer concurrently.
     - Response and utility model names are now configurable (default: gpt‑4o and gpt‑4o‑mini).
     """
+
+    client: Optional[AsyncOpenAI] = None
 
     def __init__(
         self,
@@ -71,16 +73,14 @@ class RetailCustomerServiceAgent:
         resolved_key = api_key or os.getenv("OPENAI_API_KEY")
         if resolved_key and resolved_key != "YOUR_API_KEY_HERE":
             try:
-                self.client = OpenAI(api_key=resolved_key)
-                self.logger.info("OpenAI client initialized successfully.")
+                self.client = AsyncOpenAI(api_key=resolved_key)
+                self.logger.info("AsyncOpenAI client initialized successfully.")
             except Exception as e:
                 self.logger.error("Failed to initialize OpenAI client: %s", e)
-                self.client = None
         else:
             self.logger.warning(
                 "OpenAI API key missing or placeholder. LLM features will be disabled."
             )
-            self.client = None
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def process_customer_inquiry(
@@ -143,9 +143,9 @@ class RetailCustomerServiceAgent:
                     self.logger.debug(
                         f"Extracted order ID: {order_id} for order_status intent."
                     )
-                    context_data[
-                        "order_details"
-                    ] = await self.order_system.get_order_details(order_id)
+                    context_data["order_details"] = (
+                        await self.order_system.get_order_details(order_id)
+                    )
                     if context_data["order_details"]:
                         self.logger.debug(f"Retrieved order details for {order_id}.")
                     else:
@@ -167,9 +167,9 @@ class RetailCustomerServiceAgent:
                         product_identifier
                     )
                     if product_id:
-                        context_data[
-                            "product_details"
-                        ] = await self.product_db.get_product(product_id)
+                        context_data["product_details"] = (
+                            await self.product_db.get_product(product_id)
+                        )
                         context_data["inventory"] = await self.product_db.get_inventory(
                             product_id
                         )
@@ -197,12 +197,12 @@ class RetailCustomerServiceAgent:
                     self.logger.debug(
                         f"Extracted order ID: {order_id} for return_request intent."
                     )
-                    context_data[
-                        "order_details"
-                    ] = await self.order_system.get_order_details(order_id)
-                    context_data[
-                        "return_eligibility"
-                    ] = await self.order_system.check_return_eligibility(order_id)
+                    context_data["order_details"] = (
+                        await self.order_system.get_order_details(order_id)
+                    )
+                    context_data["return_eligibility"] = (
+                        await self.order_system.check_return_eligibility(order_id)
+                    )
                     context_data["return_policy"] = self.policies.get("returns", {})
                     if (
                         context_data["order_details"]
@@ -345,10 +345,10 @@ class RetailCustomerServiceAgent:
                 retry_backoff=self.retry_backoff,
             )
             self.logger.debug(f"LLM product identifier extraction result: '{result}'")
-            return result
+            return result # type: ignore[no-any-return]
         except Exception as e:
             self.logger.error(f"LLM product identifier extraction failed: {e}")
-            return None
+            return None # type: ignore[no-any-return]
 
     async def _generate_response(
         self,
@@ -375,10 +375,11 @@ class RetailCustomerServiceAgent:
             conversation_history=conversation_history,
         )
         try:
+            # Revert to using messages for chat completions
             completion = await safe_chat_completion(
                 self.client,
                 model=self.response_model,
-                messages=[{"role": "system", "content": final_system_prompt}],
+                messages=[{"role": "system", "content": final_system_prompt}], # Use messages
                 logger=self.logger,
                 retry_attempts=self.retry_attempts,
                 retry_backoff=self.retry_backoff,
@@ -386,8 +387,10 @@ class RetailCustomerServiceAgent:
                 temperature=0.7,
                 stop=None,
             )
-            generated_message = completion.choices[0].message.content.strip()
+            # Use choices[0].message.content
+            generated_message = completion.choices[0].message.content.strip() if completion.choices[0].message.content else ""
             self.logger.debug(f"LLM generated response: '{generated_message[:100]}...'")
+            
             actions = await extract_actions(
                 self.client,
                 intent=intent,

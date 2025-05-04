@@ -4,7 +4,9 @@ Includes Item and Order classes.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
+from datetime import datetime
+from .enums import FulfillmentMethod, OrderStatus, AgentType
 
 @dataclass
 class Item:
@@ -20,20 +22,59 @@ class Item:
     fragility: float = 0.0 # 0.0 (not fragile) to 1.0 (very fragile)
 
 @dataclass
+class OrderLineItem:
+    """Individual item in an order (Extracted from notebook)"""
+    product_id: str
+    quantity: int
+    price: float
+    fulfillment_method: Optional[FulfillmentMethod] = None
+    fulfillment_location_id: str | None = None
+    status: OrderStatus = OrderStatus.CREATED
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class Order:
     """Represents a customer order to be fulfilled."""
     order_id: str
-    items: List[Item]
-    priority: int = 1 # Lower number means higher priority
-    due_time: Optional[float] = None # Time limit for fulfillment in minutes from now
-    status: str = "pending" # e.g., pending, assigned, picking, completed
+    items: List[OrderLineItem]
+    customer_id: str
+    created_at: datetime = field(default_factory=datetime.now)
+    store_id: Optional[str] = None
+    status: OrderStatus = OrderStatus.CREATED
+    preferred_fulfillment_method: Optional[FulfillmentMethod] = None
+    delivery_address: Optional[Dict[str, str]] = None
+    pickup_store_id: Optional[str] = None
+    payment_details: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    history: List[Dict[str, Any]] = field(default_factory=list)
 
-    def estimate_picking_time(self, associate_efficiency: float = 1.0) -> float:
-        """Estimate the time to pick all items in the order."""
-        # Placeholder: more sophisticated estimation needed
-        # Consider handling_time per item, travel time (needs layout)
-        base_time = sum(item.handling_time for item in self.items)
-        return base_time / associate_efficiency
+    def add_event(
+        self, agent_type: AgentType, action: str, details: dict[str, Any]
+    ) -> None:
+        """Add an event to the order history"""
+        self.history.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "agent": agent_type.value,
+                "action": action,
+                "details": details,
+            }
+        )
+
+    def update_status(
+        self,
+        new_status: OrderStatus,
+        agent_type: AgentType,
+        details: dict[str, Any],
+    ) -> None:
+        """Update order status with tracking"""
+        old_status = self.status
+        self.status = new_status
+        self.add_event(
+            agent_type,
+            f"status_change_{old_status.value}_to_{new_status.value}",
+            details,
+        )
 
 @dataclass
 class Associate:
@@ -48,8 +89,3 @@ class Associate:
     shift_end_time: Optional[float] = None # Time remaining in shift (minutes)
     current_task_completion_time: float = 0.0 # When current task is expected to end
     current_order_ids: List[str] = field(default_factory=list)
-
-    def __repr__(self):
-        return (
-            f"Order({self.order_id}: {len(self.items)} items, priority {self.priority})"
-        )

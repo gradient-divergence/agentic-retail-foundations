@@ -1,6 +1,17 @@
-# Agentic Retail Foundations
+# Foundations of Agentic AI for Retail
 
 A modular, extensible Python framework for building, simulating, and analyzing agent-based AI architectures tailored for the retail sector. This project provides reusable agent models (BDI, OODA), coordination protocols (Contract Net, Auctions), data models, utility functions (NLP, planning, monitoring), and interactive Marimo notebooks for rapid experimentation, research, and development of autonomous retail systems.
+
+## Table of Contents
+
+- [Key Features](#key-features)
+- [Directory Structure](#directory-structure)
+- [Setup Instructions](#setup-instructions)
+- [Usage](#usage)
+- [Development Best Practices](#development-best-practices)
+- [Contribution Guidelines](#contribution-guidelines)
+- [Documentation Website](#documentation-website)
+- [GitHub Repository](#github-repository)
 
 <table>
   <tr>

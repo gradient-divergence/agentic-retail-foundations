@@ -1,0 +1,41 @@
+# See https://pre-commit.com/ for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+# Standard file checks
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0 # Use a specific tag or commit hash
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-toml
+    -   id: check-added-large-files
+
+# Ruff for formatting and linting
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version specified in pyproject.toml's [dev] dependencies
+    # Use the same version to avoid conflicts
+    rev: 'v0.4.10' # Choose a version compatible with your pyproject.toml
+    hooks:
+    # Run the formatter first
+    -   id: ruff-format
+    # Then run the linter, applying fixes
+    -   id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+# MyPy for static type checking
+# Note: MyPy can be slow, consider running it primarily in CI if commit times are an issue
+# -   repo: https://github.com/pre-commit/mirrors-mypy
+#     rev: 'v1.10.1' # Choose a version compatible with your pyproject.toml
+#     hooks:
+#     -   id: mypy
+#         # Pass configuration via pyproject.toml
+#         # args: [--config-file=pyproject.toml] # Usually not needed if config is at root
+#         # Consider excluding files/folders if needed
+#         # exclude: 'notebooks/'
+#         additional_dependencies:
+#             # Add any types-* dependencies required by mypy that are in your project
+#             - types-requests
+#             - types-redis
+#             - pandas-stubs
+#             # Add others from your [dev] dependencies if needed 

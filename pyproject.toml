@@ -119,6 +119,11 @@ line-length = 88
 # Start with defaults and gradually add more. `ruff check --select ALL .` shows available.
 select = ["E", "F", "W", "C90", "UP"] # Common subset: pyflakes, pycodestyle, mccabe, flake8-bugbear, pyupgrade
 ignore = [] # Rule codes to ignore (e.g., "E501" if you don't enforce line length strictly)
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/ethical-considerations-and-governance.py" = ["E501"]
+
+[tool.ruff.lint]
 # Exclude common directories
 exclude = [
     ".bzr",
@@ -179,9 +184,14 @@ module = [
     "kafka.*",
     "graphviz.*",
     "pyspark.*",
+    "shap.*",
     # Add other problematic libraries here
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "notebooks.ethical_considerations_and_governance"
+disable_error_code = ["name-defined", "no-redef"]
 
 [tool.pytest.ini_options]
 # See https://docs.pytest.org/en/stable/reference/customize.html#pyproject-toml

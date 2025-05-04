@@ -7,7 +7,7 @@ Contains the SensorDataProcessor class, which ingests, processes, and manages se
 import asyncio
 import json
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Dict, List, Set, Optional
 from fastapi import FastAPI, WebSocket
 
 # Note: inventory_system and alert_system must be provided by the user of this class.
@@ -19,7 +19,7 @@ class SensorDataProcessor:
         store_id: str,
         inventory_system,
         alert_system,
-        confidence_thresholds: dict[str, float] | None = None,
+        confidence_thresholds: Optional[dict[str, float]] = None,
     ):
         """
         Initialize the sensor data processor for a given store.
@@ -37,12 +37,12 @@ class SensorDataProcessor:
             "smart_shelf": 0.75,
             "computer_vision": 0.80,
         }
-        self.recent_readings = {}  # Raw recent sensor readings
-        self.product_state = {}  # Current believed state of products
-        self.discrepancies = {}  # Tracking inventory discrepancies
+        self.recent_readings: Dict[str, List[Dict[str, Any]]] = {}  # Raw recent sensor readings
+        self.product_state: Dict[str, Dict[str, Any]] = {}  # Current believed state of products
+        self.discrepancies: Dict[str, Dict[str, Any]] = {}  # Tracking inventory discrepancies
         self.app = FastAPI()
         self.setup_routes()
-        self.active_connections = set()
+        self.active_connections: Set[WebSocket] = set()
 
     def setup_routes(self):
         """Configure API endpoints for sensor data ingestion."""
@@ -71,6 +71,9 @@ class SensorDataProcessor:
         """Process an incoming sensor reading."""
         sensor_id = message.get("sensor_id")
         sensor_type = message.get("sensor_type")
+        if not isinstance(sensor_id, str):
+            print(f"Warning: Invalid or missing sensor_id in message: {message}")
+            return
         location = message.get("location", {})
         timestamp = message.get("timestamp")
         if sensor_id not in self.recent_readings:
@@ -135,38 +138,47 @@ class SensorDataProcessor:
         current_weight = message.get("current_weight_grams")
         expected_weight = message.get("expected_weight_grams")
         product_info = message.get("product_info", {})
-        weight_diff = abs(current_weight - expected_weight)
-        weight_threshold = product_info.get("unit_weight_grams", 0) * 0.5
-        if weight_diff > weight_threshold:
-            estimated_units = max(
-                0, round(current_weight / product_info.get("unit_weight_grams", 1))
-            )
-            expected_units = max(
-                0, round(expected_weight / product_info.get("unit_weight_grams", 1))
-            )
-            if estimated_units < expected_units:
-                discrepancy_type = (
-                    "low_stock" if estimated_units > 0 else "out_of_stock"
+        
+        # Check if weights are valid numbers before comparing
+        if isinstance(current_weight, (int, float)) and isinstance(expected_weight, (int, float)):
+            weight_diff = abs(current_weight - expected_weight)
+            unit_weight = product_info.get("unit_weight_grams", 1) # Default to 1 to avoid division by zero
+            if not isinstance(unit_weight, (int, float)) or unit_weight <= 0:
+                 unit_weight = 1 # Ensure unit_weight is a positive number
+            
+            weight_threshold = unit_weight * 0.5
+            if weight_diff > weight_threshold:
+                estimated_units = max(
+                    0, round(current_weight / unit_weight)
                 )
-                await self._handle_inventory_discrepancy(
+                expected_units = max(
+                    0, round(expected_weight / unit_weight)
+                )
+                if estimated_units < expected_units:
+                    discrepancy_type = (
+                        "low_stock" if estimated_units > 0 else "out_of_stock"
+                    )
+                    await self._handle_inventory_discrepancy(
+                        f"{location.get('zone')}.{location.get('section')}.{shelf_id}",
+                        [product_info.get("product_id")],
+                        discrepancy_type,
+                        "smart_shelf",
+                        {
+                            "expected_units": expected_units,
+                            "estimated_units": estimated_units,
+                            "confidence": 0.9,
+                        },
+                    )
+                await self.inventory_system.update_product_quantity(
+                    self.store_id,
+                    product_info.get("product_id"),
+                    estimated_units,
                     f"{location.get('zone')}.{location.get('section')}.{shelf_id}",
-                    [product_info.get("product_id")],
-                    discrepancy_type,
-                    "smart_shelf",
-                    {
-                        "expected_units": expected_units,
-                        "estimated_units": estimated_units,
-                        "confidence": 0.9,
-                    },
+                    message.get("timestamp"),
+                    source="smart_shelf",
                 )
-            await self.inventory_system.update_product_quantity(
-                self.store_id,
-                product_info.get("product_id"),
-                estimated_units,
-                f"{location.get('zone')}.{location.get('section')}.{shelf_id}",
-                message.get("timestamp"),
-                source="smart_shelf",
-            )
+        else:
+            print(f"Warning: Invalid weight values for smart shelf {shelf_id}: current={current_weight}, expected={expected_weight}")
 
     async def _process_environmental_reading(self, message: dict[str, Any]):
         """Process environmental sensor data."""
@@ -176,18 +188,24 @@ class SensorDataProcessor:
         location = message.get("location", {})
         threshold_exceeded = False
         alert_priority = "info"
-        if sensor_type == "temperature":
-            zone_type = location.get("zone_type", "ambient")
-            if zone_type == "refrigerated" and value > 5:
-                threshold_exceeded = True
-                alert_priority = "high" if value > 8 else "medium"
-            elif zone_type == "frozen" and value > -15:
-                threshold_exceeded = True
-                alert_priority = "high" if value > -10 else "medium"
-        elif sensor_type == "humidity":
-            if location.get("zone_type") == "produce" and (value < 80 or value > 95):
-                threshold_exceeded = True
-                alert_priority = "medium"
+        
+        # Check if value is a valid number before comparing
+        if isinstance(value, (int, float)):
+            if sensor_type == "temperature":
+                zone_type = location.get("zone_type", "ambient")
+                if zone_type == "refrigerated" and value > 5:
+                    threshold_exceeded = True
+                    alert_priority = "high" if value > 8 else "medium"
+                elif zone_type == "frozen" and value > -15:
+                    threshold_exceeded = True
+                    alert_priority = "high" if value > -10 else "medium"
+            elif sensor_type == "humidity":
+                if location.get("zone_type") == "produce" and (value < 80 or value > 95):
+                    threshold_exceeded = True
+                    alert_priority = "medium"
+        else:
+             print(f"Warning: Invalid or missing numeric value for environmental sensor {message.get('sensor_id')}: {value}")
+
         if threshold_exceeded:
             await self.alert_system.send_alert(
                 alert_type="environmental",
@@ -234,19 +252,25 @@ class SensorDataProcessor:
         expected_price = await self.inventory_system.get_current_price(
             self.store_id, product_id
         )
-        if price_displayed != expected_price:
-            await self.alert_system.send_alert(
-                alert_type="price_discrepancy",
-                priority="medium",
-                location=f"{location.get('zone')}.{location.get('section')}",
-                details={
-                    "product_id": product_id,
-                    "displayed_price": price_displayed,
-                    "expected_price": expected_price,
-                    "tag_id": tag_id,
-                },
-            )
-            await self._request_price_tag_update(tag_id, product_id, expected_price)
+        if isinstance(price_displayed, (int, float)) and isinstance(expected_price, (int, float)):
+            if price_displayed != expected_price:
+                await self.alert_system.send_alert(
+                    alert_type="price_discrepancy",
+                    priority="medium",
+                    location=f"{location.get('zone')}.{location.get('section')}",
+                    details={
+                        "product_id": product_id,
+                        "displayed_price": price_displayed,
+                        "expected_price": expected_price,
+                        "tag_id": tag_id,
+                    },
+                )
+                if isinstance(tag_id, str) and isinstance(product_id, str):
+                    await self._request_price_tag_update(tag_id, product_id, expected_price)
+                else:
+                    print(f"Warning: Invalid tag_id ({tag_id}) or product_id ({product_id}) for price update.")
+        elif expected_price is not None:
+            print(f"Warning: Could not compare prices for tag {tag_id}. Displayed: {price_displayed}, Expected: {expected_price}")
 
     async def _handle_inventory_discrepancy(
         self,

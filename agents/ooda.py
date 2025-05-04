@@ -190,7 +190,7 @@ class OODAPricingAgent:
             "sales": abs(sales_component * self.sales_weight),
         }
         main_driver = (
-            max(comps, key=comps.get) if any(v > 0 for v in comps.values()) else "none"
+            max(comps, key=lambda k: comps[k]) if any(v > 0 for v in comps.values()) else "none"
         )
 
         decision = {

@@ -18,12 +18,6 @@ from datetime import datetime
 from rdflib import Graph, Literal, BNode, Namespace, RDF, URIRef
 from rdflib.namespace import RDFS, XSD
 
-# Remove the try/except block here, we'll handle it in __init__
-# try:
-#     from SPARQLWrapper import SPARQLWrapper, JSON
-# except ImportError:
-#     SPARQLWrapper = None # This line caused the mypy error
-
 
 class RetailKnowledgeGraph:
     """

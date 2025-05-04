@@ -746,7 +746,7 @@ class PromotionCausalAnalyzer:
 
     def regression_adjustment(self) -> Dict[str, Any]:
         """Estimate promotion impact using regression adjustment for confounders"""
-        import statsmodels.api as sm  # Ensure statsmodels is imported or available
+        import statsmodels.api as sm # type: ignore[import-untyped] # statsmodels lacks stubs
         import numpy as np  # Ensure numpy is imported or available
 
         try:
@@ -806,7 +806,7 @@ class PromotionCausalAnalyzer:
             # Clean column names if necessary after get_dummies
             X.columns = [
                 (
-                    "_".join(x.split())
+                    "_".join(map(str, x)) # Join tuple elements as strings
                     if isinstance(x, tuple)
                     else "".join(c if c.isalnum() else "_" for c in str(x))
                 )
@@ -892,9 +892,7 @@ class PromotionCausalAnalyzer:
         self, caliper: float = 0.05, ratio: int = 1
     ) -> Dict[str, Any]:
         """Estimate promotion impact using propensity score matching"""
-        from sklearn.linear_model import (
-            LogisticRegression,
-        )  # Ensure sklearn is imported or available
+        from sklearn.linear_model import LogisticRegression # type: ignore[import-untyped]
         import numpy as np  # Ensure numpy is imported or available
 
         try:
@@ -1105,7 +1103,7 @@ class PromotionCausalAnalyzer:
             X_actual = sm.add_constant(X_actual, has_constant="add")
             X_actual.columns = [
                 (
-                    "_".join(x.split())
+                    "_".join(map(str, x)) # Join tuple elements as strings
                     if isinstance(x, tuple)
                     else "".join(c if c.isalnum() else "_" for c in str(x))
                 )
@@ -1145,7 +1143,7 @@ class PromotionCausalAnalyzer:
             # Clean column names similarly to X_actual
             X_cf.columns = [
                 (
-                    "_".join(x.split())
+                    "_".join(map(str, x)) # Join tuple elements as strings
                     if isinstance(x, tuple)
                     else "".join(c if c.isalnum() else "_" for c in str(x))
                 )
@@ -1287,39 +1285,38 @@ class PromotionCausalAnalyzer:
             return {"error": f"Error calculating ROI: {e}"}
 
     def interpret_causal_impact(self, roi_results: Dict[str, Any]) -> Union[str, Dict[str, str]]:
-        """Interpret the causal impact of promotions"""
+        """Interpret the causal impact of promotions based on ROI results."""
         try:
             # Check if all required keys are present and not NaN
-            required_keys = ["estimated_ATE", "avg_price_promoted", "incremental_margin_per_instance", "roi_per_instance_percent", "num_promotion_instances", "total_incremental_margin_est", "total_promotion_cost_est", "estimated_ROI_percent", "profitable_estimate"]
+            required_keys = [
+                "estimated_ATE", "avg_price_promoted", "incremental_margin_per_instance", 
+                "roi_per_instance_percent", "num_promotion_instances", 
+                "total_incremental_margin_est", "total_promotion_cost_est", 
+                "estimated_ROI_percent", "profitable_estimate"
+            ]
             for key in required_keys:
                 if key not in roi_results:
                     return {"error": f"Missing key '{key}' in ROI results dict."}
-                if pd.isna(roi_results[key]):
+                # Use pandas isna for robust NaN checking
+                if pd.isna(roi_results[key]): 
                     return {"error": f"NaN value found for '{key}' in ROI results."}
 
-            # Extract effect name if needed (e.g., for title)
-            effect_key = next((k for k in roi_results if k.startswith("effect")), None)
-            title_suffix = ""
-            # Check if effect_key is a string before splitting
-            if effect_key and isinstance(effect_key, str):
-                # Add ignore comment as logic seems sound but mypy complains
-                title_suffix = f" ({effect_key.split('_')[-1].upper()})" # type: ignore[attr-defined]
-
             # Generate interpretation string
-            interpretation = f"The promotion has a significant causal effect on sales.{title_suffix}\n"
-            interpretation += f"The estimated Average Treatment Effect (ATE) is {roi_results['estimated_ATE']:.4f}.\n"
-            interpretation += f"The average price of promoted products is ${roi_results['avg_price_promoted']:.2f}.\n"
-            interpretation += f"The incremental margin per promoted instance is ${roi_results['incremental_margin_per_instance']:.2f}.\n"
-            interpretation += f"The ROI per promoted instance is {roi_results['roi_per_instance_percent']:.2f}%.\n"
-            interpretation += f"The total incremental margin estimated is ${roi_results['total_incremental_margin_est']:.2f}.\n"
-            interpretation += f"The total promotion cost estimated is ${roi_results['total_promotion_cost_est']:.2f}.\n"
-            interpretation += f"The estimated ROI is {roi_results['estimated_ROI_percent']:.2f}%.\n"
-            interpretation += f"The promotion is {'profitable' if roi_results['profitable_estimate'] else 'not profitable'} based on the estimated ROI."
+            interpretation = "Causal Impact Interpretation:\n"
+            interpretation += f"- Estimated Average Treatment Effect (ATE): {roi_results['estimated_ATE']:.4f}\n"
+            interpretation += f"- Average Price of Promoted Items: ${roi_results['avg_price_promoted']:.2f}\n"
+            interpretation += f"- Incremental Margin per Instance: ${roi_results['incremental_margin_per_instance']:.2f}\n"
+            interpretation += f"- ROI per Instance: {roi_results['roi_per_instance_percent']:.2f}%\n"
+            interpretation += f"- Total Instances: {int(roi_results['num_promotion_instances'])}\n"
+            interpretation += f"- Total Estimated Incremental Margin: ${roi_results['total_incremental_margin_est']:.2f}\n"
+            interpretation += f"- Total Estimated Promotion Cost: ${roi_results['total_promotion_cost_est']:.2f}\n"
+            interpretation += f"- Estimated Overall ROI: {roi_results['estimated_ROI_percent']:.2f}%\n"
+            interpretation += f"- Profitability Assessment: The promotion is estimated to be {'profitable' if roi_results['profitable_estimate'] else 'not profitable'}."
 
             return interpretation
+
         except Exception as e:
             import traceback
-
             print(f"--- ERROR interpreting causal impact: Exception caught: {e}")
             print(traceback.format_exc())
             return {"error": f"Error interpreting causal impact: {e}"}

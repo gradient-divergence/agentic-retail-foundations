@@ -22,8 +22,7 @@ __all__ = [
 
 def build_intent_classification_prompt(message: str) -> str:
     """Return the user prompt used for intent classification."""
-    return (
-        f"""
+    return f"""
         Classify the customer's message into one of the following intents:
         - order_status: Customer is asking about an existing order (e.g., 'where is my package?', 'delivery status')
         - product_question: Customer has a question about a specific product (e.g., 'is the yoga mat latex-free?', 'do you have red shoes?')
@@ -33,13 +32,11 @@ def build_intent_classification_prompt(message: str) -> str:
         Customer message: "{message}"
         Intent:
         """
-    )
 
 
 def build_order_id_inference_prompt(message: str, recent_order_ids: list[str]) -> str:
     """Return the user prompt for inferring an order ID from context."""
-    return (
-        f"""
+    return f"""
         Analyze the customer message regarding orders.
         Customer message: "{message}"
         Recent order IDs available for this customer: {recent_order_ids}
@@ -51,13 +48,11 @@ def build_order_id_inference_prompt(message: str, recent_order_ids: list[str]) -
         5. If no order is mentioned or clearly inferable from the context and recent orders, return "not_found".
         Respond ONLY with the exact extracted ID from the list, "ambiguous", "not_recent", or "not_found".
         """
-    )
 
 
 def build_product_identifier_prompt(message: str) -> str:
     """Return the user prompt for extracting a product identifier from the message."""
-    return (
-        f"""
+    return f"""
         Identify the specific product name or product ID the customer is asking about in their message.
         Focus on the main item they are inquiring about.
         Customer message: "{message}"
@@ -67,7 +62,6 @@ def build_product_identifier_prompt(message: str) -> str:
         - If the message is about a general topic (like orders, returns, store hours) and not a specific product, return "not_found".
         Respond ONLY with the extracted product name/ID string or "not_found".
         """
-    )
 
 
 def build_sentiment_prompt(message: str) -> str:
@@ -80,12 +74,10 @@ def build_sentiment_prompt(message: str) -> str:
 
 def build_action_extraction_prompt(response: str) -> str:
     """Return the user prompt for extracting actions from an agent response."""
-    return (
-        f"""
+    return f"""
         Analyze the following customer service agent response. Identify any concrete next steps or actions the agent explicitly stated *they* would take or that the *customer* needs to take next based *only* on the agent's text.
         Agent Response: "{response}"
         Examples: "send_email_confirmation", "check_inventory_further", "escalate_to_manager", "customer_needs_to_click_link", "customer_needs_to_provide_info"
         Instructions: List identified actions as a JSON array of simple descriptive strings (e.g., ["action1", "action2"]). If none, return [].
         Actions mentioned or implied in response:
         """
-    )

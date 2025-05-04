@@ -1,32 +1,42 @@
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Iterable, Union, List, Dict, Optional
 
-from openai import OpenAI
+# Use AsyncOpenAI for async operations
+from openai import AsyncOpenAI, OpenAI
+# Import specific message param types
+from openai.types.chat import (
+    ChatCompletion,
+    ChatCompletionMessageParam, # Use the base MessageParam type hint
+    # ChatCompletionSystemMessageParam,
+    # ChatCompletionUserMessageParam,
+)
+# Define a type alias for the expected message structure
+# ChatMessage = Union[ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam]
 
 __all__ = ["safe_chat_completion"]
 
 
 async def safe_chat_completion(
-    client: OpenAI,
+    client: AsyncOpenAI | OpenAI,
     *,
     model: str,
-    messages: list[dict[str, str]],
+    messages: Iterable[Dict[str, Any]],
     logger: logging.Logger | None = None,
     retry_attempts: int = 3,
     retry_backoff: float = 1.0,
     **kwargs,
-) -> Any:
-    """Safely invoke ``client.chat.responses.create`` with retries.
+) -> ChatCompletion:
+    """Safely invoke OpenAI chat completion endpoint with retries.
 
     Parameters
     ----------
     client:
-        An initialised ``openai.OpenAI`` client instance.
+        An initialised ``openai.OpenAI`` or ``openai.AsyncOpenAI`` client instance.
     model:
         The model name to call (e.g. ``"gpt-4o"``).
     messages:
-        The chat messages payload passed verbatim to the OpenAI endpoint.
+        The messages for the chat completion endpoint.
     logger:
         Optional logger for diagnostics; if omitted a module-level logger is used.
     retry_attempts:
@@ -34,12 +44,12 @@ async def safe_chat_completion(
     retry_backoff:
         Base back-off (in seconds); the delay grows exponentially (``backoff * 2**(attempt-1)``).
     **kwargs:
-        Additional keyword arguments forwarded to ``client.chat.responses.create``.
+        Additional keyword arguments forwarded to ``client.chat.completions.create``.
 
     Returns
     -------
-    Any
-        The raw completion object returned by the OpenAI SDK.
+    ChatCompletion
+        The raw response object returned by the OpenAI SDK.
 
     Raises
     ------
@@ -49,35 +59,34 @@ async def safe_chat_completion(
     if client is None:
         raise RuntimeError("OpenAI client is not initialised.")
 
+    # Ensure client is async for async call
+    if not isinstance(client, AsyncOpenAI):
+        # Handle sync client case - either raise error or use asyncio.to_thread
+        # For now, let's raise an error as this function is async
+        raise TypeError("Sync OpenAI client provided to async safe_chat_completion.")
+
     logger = logger or logging.getLogger(__name__)
     start_ts: float
     last_exc: Exception | None = None
+    # Cast messages just before use
+    typed_messages: Iterable[ChatCompletionMessageParam] = messages # type: ignore[assignment]
+
     for attempt in range(1, retry_attempts + 1):
         try:
             start_ts = asyncio.get_event_loop().time()
-            # Older SDKs expose `chat.responses.create`; newer ones use `chat.completions.create`.
-            # Attempt `responses` first per project preference, then fall back.
-            try:
-                completion = await asyncio.to_thread(
-                    client.chat.responses.create,
-                    model=model,
-                    messages=messages,
-                    **kwargs,
-                )
-            except AttributeError:
-                # Fall back to newer naming
-                completion = await asyncio.to_thread(
-                    client.chat.completions.create,
-                    model=model,
-                    messages=messages,
-                    **kwargs,
-                )
+            # Now we know client is AsyncOpenAI
+            completion = await client.chat.completions.create(
+                model=model,
+                messages=typed_messages, # Use casted messages
+                **kwargs,
+            )
             latency = asyncio.get_event_loop().time() - start_ts
             logger.debug(
-                "OpenAI call succeeded | model=%s | tokens_n/a | latency=%.2fs",
+                "OpenAI completions.create call succeeded | model=%s | latency=%.2fs",
                 model,
                 latency,
             )
+            assert isinstance(completion, ChatCompletion)
             return completion
         except Exception as exc:  # noqa: BLE001
             last_exc = exc

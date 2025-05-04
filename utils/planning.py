@@ -5,10 +5,27 @@ from typing import Optional, Dict, List, Set, Tuple, Any
 import numpy as np
 from collections import defaultdict
 from dataclasses import dataclass
+from models.enums import OrderStatus
 
 # Import models needed by these classes
 from models.fulfillment import Order, Associate, Item
 
+# --- Mock Product Data/Lookup (for planner demo) ---
+# In a real system, planner would access a product database
+MOCK_PRODUCT_DB = {
+    "G0": {"location": (10,10), "handling_time": 1.0, "temperature_zone": "ambient"},
+    "P5": {"location": (25,10), "handling_time": 1.2, "temperature_zone": "refrigerated"},
+    "D2": {"location": (40,10), "handling_time": 1.1, "temperature_zone": "refrigerated"},
+    "F3": {"location": (10,25), "handling_time": 1.3, "temperature_zone": "frozen"},
+    "E1": {"location": (25,25), "handling_time": 1.5, "temperature_zone": "ambient"},
+    "A7": {"location": (40,25), "handling_time": 1.4, "temperature_zone": "ambient"},
+}
+
+def get_mock_item_details(product_id: str) -> Dict[str, Any]:
+    # Simplified lookup, returning defaults if not found
+    return MOCK_PRODUCT_DB.get(product_id[:2], # Use first 2 chars for demo lookup
+                               {"location": (1,1), "handling_time": 1.0, "temperature_zone": "ambient"})
+# ----------------------------------------------------
 
 def calculate_remediation_timeline(steps_by_domain: dict) -> dict:
     """Calculate a timeline for remediation steps based on estimated completion dates."""
@@ -163,11 +180,10 @@ class FulfillmentPlanner:
 
     def plan(self):
         """Create the fulfillment plan: batch orders, assign, find paths."""
-        # 1. Prioritize Orders (example: by due time, then priority)
-        self.orders.sort(key=lambda o: (o.due_time or float('inf'), -o.priority))
+        # 1. Prioritize Orders (Remove priority key)
+        self.orders.sort(key=lambda o: (o.due_time or float('inf')))
 
-        # 2. Simple Assignment (assign orders greedily to first available associate)
-        # More sophisticated batching/assignment could be used here
+        # 2. Simple Assignment
         unassigned_orders = self.orders[:] # Copy list
         self.assignments = defaultdict(list)
         self.picking_paths = {}
@@ -182,15 +198,28 @@ class FulfillmentPlanner:
             # Try assigning orders to this associate
             temp_unassigned = unassigned_orders[:]
             for order in temp_unassigned:
-                # Basic checks: Can associate handle temperature zones?
-                can_handle = all(
-                    item.temperature_zone in associate.authorized_zones for item in order.items
-                )
+                # Get required zones from item details via lookup
+                required_zones = set()
+                items_details = []
+                valid_order = True
+                for line_item in order.items:
+                     item_detail = get_mock_item_details(line_item.product_id)
+                     if not item_detail: # Handle if product not found
+                          print(f"Warning: Details not found for product {line_item.product_id} in order {order.order_id}")
+                          valid_order = False
+                          break
+                     required_zones.add(item_detail["temperature_zone"])
+                     items_details.append(item_detail) # Store for later use
+                
+                if not valid_order:
+                     continue # Skip order if item details missing
+                     
+                can_handle = all(zone in associate.authorized_zones for zone in required_zones)
                 if not can_handle:
                     continue
 
-                # Estimate time for this order (travel + pick)
-                order_path, order_time = self._estimate_order_time(order, current_location, associate.efficiency)
+                # Estimate time for this order using looked-up details
+                order_path, order_time = self._estimate_order_time(order, items_details, current_location, associate.efficiency)
                 if order_path is None:
                     continue # Cannot find path
 
@@ -213,20 +242,19 @@ class FulfillmentPlanner:
 
         # Update status of assigned/unassigned orders
         for order in self.orders:
-            if order not in unassigned_orders:
-                order.status = "assigned"
-            else:
-                order.status = "unassigned"
+            is_assigned = any(order in assigned_list for assigned_list in self.assignments.values())
+            # Use OrderStatus enum correctly
+            order.status = OrderStatus.ALLOCATED if is_assigned else OrderStatus.CREATED
 
-    def _estimate_order_time(self, order: Order, start_location: Tuple[int, int], efficiency: float) -> Tuple[Optional[List[Tuple[int, int]]], float]:
+    def _estimate_order_time(self, order: Order, item_details: List[Dict[str, Any]], start_location: Tuple[int, int], efficiency: float) -> Tuple[Optional[List[Tuple[int, int]]], float]:
         """Estimate the time to pick all items in an order starting from a location."""
         total_time = 0.0
         current_location = start_location
         full_path: List[Tuple[int, int]] = [start_location]
-        pick_locations = [item.location for item in order.items]
+        # Get locations from the passed item_details
+        pick_locations = [detail["location"] for detail in item_details]
 
         # Simple nearest neighbor heuristic for picking order
-        # A better approach would use TSP solvers or optimized routing
         remaining_locations = pick_locations[:]
         while remaining_locations:
             nearest_loc = min(
@@ -238,15 +266,16 @@ class FulfillmentPlanner:
                 return None, float('inf') # Cannot reach item
 
             travel_time = (len(segment_path) - 1) * 0.1 # Example: 0.1 min per step
+            # Get handling time from the passed item_details matching the location
             handling_time = sum(
-                item.handling_time for item in order.items if item.location == nearest_loc
+                detail["handling_time"] for detail in item_details if detail["location"] == nearest_loc
             )
             total_time += (travel_time + handling_time) / efficiency
             full_path.extend(segment_path[1:])
             current_location = nearest_loc
             remaining_locations.remove(nearest_loc)
 
-        # Add time to return to a drop-off point (e.g., back to start)
+        # Add time to return to a drop-off point
         return_path = self.store_layout.shortest_path(current_location, start_location)
         if return_path:
             travel_time = (len(return_path) - 1) * 0.1
@@ -257,7 +286,7 @@ class FulfillmentPlanner:
 
     def explain_plan(self) -> str:
         """Generate a human-readable explanation of the plan."""
-        explanation: List[str] = ["Fulfillment Plan Summary:"] # Explicit type hint
+        explanation: List[str] = ["Fulfillment Plan Summary:"]
         total_orders = len(self.orders)
         assigned_count = sum(len(orders) for orders in self.assignments.values())
         unassigned_count = total_orders - assigned_count
@@ -268,8 +297,6 @@ class FulfillmentPlanner:
 
         explanation.append("\nAssignments Details:")
         for associate_id, assigned_orders in self.assignments.items():
-            if not assigned_orders:
-                continue
             # Add back ignore for persistent assignment error
             associate = next( # type: ignore[assignment]
                 (a for a in self.associates if a.associate_id == associate_id), None
@@ -282,16 +309,19 @@ class FulfillmentPlanner:
                 f"\n- {assoc_name} ({associate_id}): {len(assigned_orders)} orders, Est. Time: {self.estimated_times.get(associate_id, 0):.1f} min"
             )
             for order in assigned_orders:
+                # Remove priority from explanation
                 explanation.append(
-                    f"  - Order {order.order_id} (Priority: {order.priority}, Items: {len(order.items)})"
+                    f"  - Order {order.order_id} (Items: {len(order.items)})"
                 )
 
         if unassigned_count > 0:
             explanation.append("\nUnassigned Orders:")
             for order in self.orders:
-                if order.status == "unassigned":
+                # Check order status enum value
+                if order.status == OrderStatus.CREATED:
+                    # Remove priority from explanation
                     explanation.append(
-                        f"  - {order.order_id} (Priority: {order.priority}, Items: {len(order.items)})"
+                        f"  - Order {order.order_id} (Items: {len(order.items)})"
                     )
 
         return "\n".join(explanation)

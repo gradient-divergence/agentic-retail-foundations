@@ -189,7 +189,7 @@ Common development tasks are streamlined using the `Makefile.mk`. Ensure your vi
 
 ## Contribution Guidelines
 
-Please refer to `CONTRIBUTING.md` (to be added) for details on how to contribute to this project. General expectations include following the development best practices outlined above, ensuring tests pass, and documenting changes.
+Please refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to contribute to this project. General expectations include following the development best practices outlined above, ensuring tests pass, and documenting changes.
 
 ## Documentation Website
 

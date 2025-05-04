@@ -8,8 +8,9 @@ are pure in the sense that they do not mutate external state.
 """
 
 import logging
+from typing import Union, List, Dict, Any, Optional
 
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 
 from utils.openai_utils import safe_chat_completion
 from agents.prompts import (
@@ -28,7 +29,7 @@ __all__ = [
 
 
 async def classify_intent(
-    client: OpenAI,
+    client: AsyncOpenAI | OpenAI,
     *,
     message: str,
     model: str,
@@ -38,19 +39,20 @@ async def classify_intent(
 ) -> str:
     """Return one of the allowed intents inferred by the LLM."""
     prompt = build_intent_classification_prompt(message)
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an intent classification system. Respond with only one of the following intents: "
+                "order_status, product_question, return_request, complaint, general_inquiry"
+            ),
+        },
+        {"role": "user", "content": prompt},
+    ]
     completion = await safe_chat_completion(
         client,
         model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are an intent classification system. Respond with only one of the following intents: "
-                    "order_status, product_question, return_request, complaint, general_inquiry"
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
+        messages=messages,
         logger=logger,
         retry_attempts=retry_attempts,
         retry_backoff=retry_backoff,
@@ -58,7 +60,8 @@ async def classify_intent(
         temperature=0,
         stop=["\n"],
     )
-    intent_result = completion.choices[0].message.content.strip().lower()
+    content = completion.choices[0].message.content
+    intent_result = content.strip().lower() if content else "general_inquiry"
     valid_intents = [
         "order_status",
         "product_question",
@@ -70,7 +73,7 @@ async def classify_intent(
 
 
 async def extract_order_id_via_llm(
-    client: OpenAI,
+    client: AsyncOpenAI | OpenAI,
     *,
     message: str,
     recent_order_ids: list[str],
@@ -81,27 +84,29 @@ async def extract_order_id_via_llm(
 ) -> str:
     """Return best-guess order ID or helper keywords from the LLM."""
     prompt = build_order_id_inference_prompt(message, recent_order_ids)
+    messages = [
+        {
+            "role": "system",
+            "content": "You extract specific order references based on recent orders.",
+        },
+        {"role": "user", "content": prompt},
+    ]
     completion = await safe_chat_completion(
         client,
         model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": "You extract specific order references based on recent orders.",
-            },
-            {"role": "user", "content": prompt},
-        ],
+        messages=messages,
         logger=logger,
         retry_attempts=retry_attempts,
         retry_backoff=retry_backoff,
         max_tokens=25,
         temperature=0,
     )
-    return completion.choices[0].message.content.strip()
+    content = completion.choices[0].message.content
+    return content.strip() if content else ""
 
 
 async def extract_product_identifier(
-    client: OpenAI,
+    client: AsyncOpenAI | OpenAI,
     *,
     message: str,
     model: str,
@@ -111,24 +116,26 @@ async def extract_product_identifier(
 ) -> str | None:
     """Return a product identifier (name or ID) or ``None`` if not found."""
     prompt = build_product_identifier_prompt(message)
+    messages = [
+        {
+            "role": "system",
+            "content": "You extract specific product identifiers from text.",
+        },
+        {"role": "user", "content": prompt},
+    ]
     completion = await safe_chat_completion(
         client,
         model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": "You extract specific product identifiers from text.",
-            },
-            {"role": "user", "content": prompt},
-        ],
+        messages=messages,
         logger=logger,
         retry_attempts=retry_attempts,
         retry_backoff=retry_backoff,
         max_tokens=40,
         temperature=0,
     )
-    result = completion.choices[0].message.content.strip()
-    if result.lower() == "not_found" or len(result) < 2:
+    content = completion.choices[0].message.content
+    result = content.strip() if content else None
+    if not result or result.lower() == "not_found" or len(result) < 2:
         return None
     if result.startswith('"') and result.endswith('"'):
         result = result[1:-1]
@@ -136,7 +143,7 @@ async def extract_product_identifier(
 
 
 async def analyze_sentiment(
-    client: OpenAI,
+    client: AsyncOpenAI | OpenAI,
     *,
     message: str,
     model: str,
@@ -146,27 +153,27 @@ async def analyze_sentiment(
 ) -> str:
     """Classify sentiment as *positive*, *neutral*, or *negative*."""
     prompt = build_sentiment_prompt(message)
+    messages = [
+        {
+            "role": "system",
+            "content": "You classify text sentiment. Respond only: positive, neutral, or negative.",
+        },
+        {"role": "user", "content": prompt},
+    ]
     completion = await safe_chat_completion(
         client,
         model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": "You classify text sentiment. Respond only: positive, neutral, or negative.",
-            },
-            {"role": "user", "content": prompt},
-        ],
+        messages=messages,
         logger=logger,
         retry_attempts=retry_attempts,
         retry_backoff=retry_backoff,
         max_tokens=10,
         temperature=0,
     )
+    content = completion.choices[0].message.content
     sentiment = (
-        completion.choices[0]
-        .message.content.strip()
-        .lower()
-        .replace(".", "")
-        .replace(",", "")
+        content.strip().lower().replace(".", "").replace(",", "")
+        if content
+        else "neutral"
     )
     return sentiment if sentiment in {"positive", "neutral", "negative"} else "neutral"

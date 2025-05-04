@@ -3,6 +3,70 @@ Inventory agent module for agentic-retail-foundations.
 Defines the InventoryAgent class for inventory management using (s, S) policy.
 """
 
+import logging
+from models.messaging import AgentMessage, Performative
+from agents.messaging import MessageBroker  # Assuming MessageBroker is defined here
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+
+async def inventory_agent_handler(
+    msg: AgentMessage, broker: MessageBroker, log_messages: list
+):
+    """Handles messages directed to the inventory agent."""
+    logger.info(f"Inventory agent received: {msg.performative.value} from {msg.sender}")
+    log_messages.append(
+        f"Inventory agent received: {msg.performative.value} from {msg.sender}"
+    )
+
+    if msg.performative == Performative.QUERY:
+        product_id = msg.content.get("product_id")
+        # Simulate stock lookup
+        stock_level = 15 if product_id == "P1001" else 5
+        logger.debug(f"Looked up stock for {product_id}: {stock_level}")
+
+        response = msg.create_reply(
+            Performative.INFORM,
+            {"product_id": product_id, "stock_level": stock_level},
+        )
+        await broker.deliver_message(response)
+        log_messages.append(
+            f"Inventory agent responded with stock level: {stock_level}"
+        )
+        logger.info(
+            f"Inventory agent responded to query for {product_id} with stock level: {stock_level}"
+        )
+
+    elif msg.performative == Performative.SUBSCRIBE:
+        # Assuming broker handles subscription logic
+        topic = msg.content.get(
+            "topic", "inventory_alerts"
+        )  # Get topic from message content or default
+        try:
+            broker.subscribe(msg.sender, topic)
+            log_messages.append(f"Registered {msg.sender} for {topic}")
+            logger.info(f"Registered {msg.sender} for topic '{topic}'")
+        except Exception as e:
+            logger.error(f"Failed to subscribe {msg.sender} to {topic}: {e}")
+            log_messages.append(f"Failed to register {msg.sender} for {topic}.")
+
+    # TODO: Add handling for other performatives if needed
+
+
+# Placeholder for a potential InventoryAgent class if needed later
+# class InventoryAgent:
+#     def __init__(self, agent_id: str, broker: MessageBroker):
+#         self.agent_id = agent_id
+#         self.broker = broker
+#         self.broker.register_agent(self.agent_id, self.handle_message)
+
+#     async def handle_message(self, msg: AgentMessage):
+#         # Wrapper around the handler logic
+#         log_messages = [] # Or manage logging differently
+#         await inventory_agent_handler(msg, self.broker, log_messages)
+#         # Process log_messages if necessary
+
 
 class InventoryAgent:
     """

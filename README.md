@@ -1,6 +1,6 @@
 # Agentic Retail Foundations
 
-A modular, extensible framework for building, simulating, and analyzing agent-based AI architectures for retail. This project provides reusable agent models, data models, and interactive Marimo notebooks for rapid experimentation and research.
+A modular, extensible Python framework for building, simulating, and analyzing agent-based AI architectures tailored for the retail sector. This project provides reusable agent models (BDI, OODA), coordination protocols (Contract Net, Auctions), data models, utility functions (NLP, planning, monitoring), and interactive Marimo notebooks for rapid experimentation, research, and development of autonomous retail systems.
 
 <table>
   <tr>
@@ -21,156 +21,182 @@ A modular, extensible framework for building, simulating, and analyzing agent-ba
   </tr>
 </table>
 
+## Key Features
+
+*   **Modular Agent Architectures:** Implementations of common agent paradigms like Belief-Desire-Intention (BDI) and Observe-Orient-Decide-Act (OODA), adapted for retail scenarios (e.g., `StoreAgent`, `InventoryAgent`, `LLM`-based `RetailCustomerServiceAgent`).
+*   **Coordination Protocols:** Examples of multi-agent coordination mechanisms:
+    *   **Contract Net Protocol (CNP):** For task allocation (e.g., `RetailCoordinator`, `StoreAgent` bidding).
+    *   **Auction Mechanisms:** For procurement and supplier selection (e.g., `ProcurementAuction`).
+    *   **Inventory Sharing:** Collaborative inventory management across locations (`InventoryCollaborationNetwork`).
+*   **Retail-Specific Data Models:** Pydantic models for core retail concepts like `Product`, `InventoryPosition`, `PurchaseOrder`, `Task`, `AgentMessage`, `Store`, `Supplier`, etc. located in the `models/` directory.
+*   **Utility Functions:** Helpers for common tasks:
+    *   **NLP:** Intent classification, entity extraction (order ID, product ID), sentiment analysis using LLMs (`utils/nlp.py`).
+    *   **Planning:** Fulfillment planning, timeline calculation (`utils/planning.py`).
+    *   **Monitoring:** Agent metric tracking and alerting (`utils/monitoring.py`).
+    *   **OpenAI Integration:** Safe and robust wrappers for interacting with OpenAI APIs (`utils/openai_utils.py`).
+    *   **Event Bus:** Simple pub/sub mechanism for inter-agent communication (`utils/event_bus.py`).
+    *   **CRDTs:** Example Conflict-free Replicated Data Type (PN-Counter) for distributed state (`utils/crdt.py`).
+*   **Interactive Notebooks:** Marimo notebooks (`notebooks/`) demonstrating concepts, agent interactions, and framework usage.
+*   **Demo Scripts:** Standalone Python scripts (`demos/`) showcasing specific agent workflows and protocol examples (e.g., task allocation, procurement auction, inventory sharing).
+*   **Testing Framework:** Unit and integration tests using `pytest` (`tests/`).
+*   **Documentation:** Project documentation using MkDocs (`docs/`).
+*   **Standardized Tooling:** Uses `ruff` for formatting/linting and `mypy` for type checking, configured via `pyproject.toml`. Dependency management via `uv`.
+
 ## Directory Structure
 
 ```
 agentic-retail-foundations/
-    agents/           # Agent logic (BDI, OODA, etc.)
-    models/           # Data models (product, inventory, sales, etc.)
-    tests/            # Unit and integration tests
-    notebooks/        # Marimo interactive notebooks
-    docs/             # MkDocs documentation
-    __init__.py       # Package marker
-    README.md         # Project overview and instructions
-    .env              # Environment variables (never commit secrets)
-    pyproject.toml    # Linting, type checking, dependencies
-    requirements.txt  # (Optional) requirements file
-    mkdocs.yml        # Documentation site config
-    PROJECT_PLAN.md   # Living project plan and checklist
-    .gitignore        # Git ignore rules
+├── agents/               # Core agent logic, protocols, and specific agent types
+│   ├── coordinators/     # Coordinator agent implementations
+│   ├── cross_functional/ # Agents spanning multiple business functions
+│   ├── protocols/        # Implementations of coordination protocols (CNP, Auction)
+│   ├── __init__.py
+│   └── ...               # Specific agent files (bdi.py, llm.py, ooda.py, store.py etc.)
+├── connectors/           # Interfaces to external systems (databases, APIs) - currently mocks
+├── demos/                # Standalone demo scripts for specific workflows
+├── docs/                 # MkDocs documentation source files
+├── environments/         # Simulation environments (e.g., MDP for RL)
+├── models/               # Pydantic data models for retail concepts
+├── notebooks/            # Marimo interactive notebooks for exploration and visualization
+├── tests/                # Unit and integration tests (using pytest)
+│   ├── agents/
+│   ├── __init__.py       # Makes 'tests' a package
+│   └── mocks.py          # Mock objects for testing dependencies
+├── utils/                # Common utility functions (NLP, planning, monitoring, etc.)
+├── .env.example          # Example environment variables template
+├── .env                  # Local environment variables (GITIGNORED - add your secrets here)
+├── .gitignore
+├── .pre-commit-config.yaml # Configuration for pre-commit hooks
+├── LICENSE               # Project License (e.g., MIT, Apache 2.0) - Needs to be added
+├── Makefile.mk           # Makefile for common development tasks
+├── PROJECT_PLAN.md       # Phased development plan and task tracking
+├── README.md             # This file
+├── mkdocs.yml            # MkDocs configuration
+├── pyproject.toml        # Project metadata, dependencies, and tool configurations (ruff, mypy, etc.)
+└── requirements.txt      # (Optional) For compatibility or specific deployment needs
 ```
 
 ## Setup Instructions
 
-1.  **Clone the repository:**
+1.  **Prerequisites:**
+    *   Git
+    *   Python 3.10+
+    *   `uv` (recommended for fast environment/package management)
+
+2.  **Clone the repository:**
     ```sh
     git clone https://github.com/gradient-divergence/agentic-retail-foundations.git
     cd agentic-retail-foundations
     ```
 
-2.  **Install `uv` (if you don't have it):**
-    Follow the instructions at https://github.com/astral-sh/uv for installation. `uv` is used for fast Python package management and is required to create the virtual environment.
+3.  **Install `uv` (if not already installed):**
+    Follow the official instructions: https://github.com/astral-sh/uv
 
-3.  **Create Virtual Environment and Install Dependencies:**
-    Use the Makefile target which utilizes `uv` to create a `.venv` directory and install all project dependencies defined in `pyproject.toml`.
+4.  **Create Virtual Environment & Install Dependencies:**
+    This command uses `uv` to create a virtual environment named `.venv` in the project root and install all dependencies listed in `pyproject.toml`.
     ```sh
-    make venv
-    # or make install
+    make install
+    # or: uv venv && uv sync
     ```
-    This installs both runtime and development dependencies into the `.venv` directory.
 
-4.  **Activate the Virtual Environment (Choose one):**
-
-    *   **Option A (Manual Activation - Recommended for interactive use):** Activate the environment in your current shell session. You'll need to do this each time you open a new terminal.
-        ```sh
-        source .venv/bin/activate
-        ```
-        Your prompt should now show `(.venv)` or similar.
-
-    *   **Option B (Makefile Shell - Convenient shortcut):** Launch a *new* shell session with the environment already activated and the project name in the prompt.
-        ```sh
-        make shell
-        ```
-        Type `exit` to leave this specialized shell and return to your original terminal.
-
-5.  **Set up Environment Variables:**
-    - Copy `.env.example` to `.env`.
-      ```sh
-      cp .env.example .env
-      ```
-    - Edit `.env` and fill in required secrets/API keys (e.g., `OPENAI_API_KEY`). **Never commit the `.env` file.**
-
-6.  **Download Models (if applicable):**
-    - If the project requires specific pre-trained models (like for the `ShelfMonitoringAgent`), follow instructions provided separately to download and place them in the expected location (e.g., update `model_path` in the relevant notebook/script).
-
-7.  **Install Pre-commit Hooks (Optional but Recommended):**
-    This helps ensure code quality before commits. Activate your environment first if using the manual command.
+5.  **Activate the Virtual Environment:**
+    You need to activate the environment to use the installed packages and tools directly in your shell.
     ```sh
+    source .venv/bin/activate
+    ```
+    Your shell prompt should now indicate the active environment (e.g., `(.venv) ...`). Alternatively, use `make shell` to start a new sub-shell with the environment automatically activated.
+
+6.  **Set up Environment Variables:**
+    *   Copy the example environment file:
+        ```sh
+        cp .env.example .env
+        ```
+    *   Edit the `.env` file and add your necessary API keys or configuration secrets (e.g., `OPENAI_API_KEY`).
+    *   **Important:** The `.env` file is listed in `.gitignore` and should **never** be committed to version control.
+
+7.  **Install Pre-commit Hooks (Recommended):**
+    This ensures code quality checks (like formatting and linting) run automatically before each commit.
+    ```sh
+    # Ensure your virtual environment is active
     make precommit
-    # Or, after activating: pre-commit install
+    # or: pre-commit install
     ```
 
 ## Usage
 
-Common development tasks are managed via the `Makefile.mk`.
+Common development tasks are streamlined using the `Makefile.mk`. Ensure your virtual environment is active (`source .venv/bin/activate` or `make shell`) when running Python scripts or tools like `marimo` directly.
 
-**Important:**
-*   Most `make` commands (like `make lint`, `make test`) will automatically use the tools within the `.venv` directory.
-*   If you need to run commands like `python`, `marimo`, or `pip` directly, ensure your virtual environment is activated first (either via `source .venv/bin/activate` or by using `make shell`).
-
--   **Launch an Activated Shell:**
+*   **Run Marimo Notebooks:**
     ```sh
-    make shell         # Starts a new shell session with the venv active
+    # Make sure venv is active!
+    marimo edit notebooks/<notebook_name>.py
+    # e.g., marimo edit notebooks/multi-agent-systems-in-retail.py
+    ```
+    Use `marimo run ...` for a read-only view.
+
+*   **Run Demo Scripts:**
+    ```sh
+    # Make sure venv is active!
+    python demos/<demo_name>.py
+    # e.g., python demos/task_allocation_cnp_demo.py
     ```
 
--   **Run Marimo Notebooks (ensure venv is active):**
+*   **Run Linters / Formatters / Type Checks:**
     ```sh
-    # First, activate: source .venv/bin/activate OR use 'make shell'
-    marimo edit notebooks/core-technologies-enabling-agentic-retail.py
-    # Or use 'marimo run ...' for a read-only view
-    ```
-
--   **Run Linters and Formatters:**
-    ```sh
-    make lint          # Check code style and quality with Ruff
-    make format        # Auto-format code with Ruff
-    make format-check  # Check formatting without applying changes (for CI)
-    ```
-
--   **Run Type Checks:**
-    ```sh
+    make lint          # Run Ruff linter
+    make format        # Run Ruff formatter
+    make format-check  # Check formatting without making changes (for CI)
     make type-check    # Run MyPy static type checker
     ```
 
--   **Run Tests:**
+*   **Run Tests:**
     ```sh
-    make test          # Run tests with pytest
-    make coverage      # Run tests and generate a coverage report
+    make test          # Run pytest test suite
+    make coverage      # Run tests and generate coverage report
+    make ci            # Run format-check, lint, type-check, and test (CI pipeline simulation)
     ```
 
--   **Build/Serve Documentation:**
+*   **Build / Serve Documentation:**
     ```sh
-    make docs-build    # Build the documentation site (outputs to 'site/')
-    make docs-serve    # Serve documentation locally with live reload
+    make docs-build    # Build MkDocs site (outputs to site/)
+    make docs-serve    # Serve docs locally with live reload (http://127.0.0.1:8000)
     ```
 
--   **Clean Project:**
+*   **Manage Environment:**
     ```sh
-    make clean         # Remove cache files, build artifacts, etc.
-    make clean-venv    # Remove the entire .venv directory
+    make shell         # Start a new shell with venv activated
+    make clean         # Remove cache files (__pycache__), build artifacts
+    make clean-venv    # Remove the .venv directory entirely
+    make venv          # Recreate the virtual environment (if deleted)
+    make install       # Sync dependencies into the existing venv
     ```
 
--   **See All Commands:**
+*   **List All Commands:**
     ```sh
     make help
     ```
 
 ## Development Best Practices
 
--   Use descriptive names and docstrings for all public classes/functions.
--   Encapsulate logic in modules (`agents/`, `connectors/`, etc.); avoid complex logic directly in notebooks.
--   Configure tools (`ruff`, `mypy`, `pytest`, `coverage`) in `pyproject.toml`.
--   Use the Makefile targets (`make lint`, `make type-check`, `make test`) regularly.
--   Write idempotent, reactive Marimo cells where possible.
--   Store secrets and environment-specific configurations in `.env` (and ensure `.env` is in `.gitignore`).
--   Follow the project plan in `PROJECT_PLAN.md` for phased development.
+*   **Modularity:** Keep agent logic, data models, utility functions, and connectors in their respective directories. Avoid complex logic directly within notebooks; use them primarily for demonstration, visualization, and orchestration of underlying modules.
+*   **Configuration:** Use environment variables (`.env` file loaded via `python-dotenv`) for secrets and environment-specific settings. Avoid hardcoding API keys or sensitive paths.
+*   **Typing:** Use Python type hints extensively. Run `make type-check` (`mypy`) regularly.
+*   **Linting & Formatting:** Adhere to the styles enforced by `ruff`. Run `make format` and `make lint` frequently. Use pre-commit hooks (`make precommit`).
+*   **Testing:** Write unit tests (`pytest`) for individual functions/classes and integration tests for components working together. Aim for reasonable test coverage. Run tests via `make test`.
+*   **Documentation:** Write clear docstrings for public APIs (functions, classes, methods). Maintain project documentation in the `docs/` directory using MkDocs. Keep the README up-to-date.
+*   **Git:** Use feature branches for development. Write clear, concise commit messages. Ensure `make ci` passes before merging/pushing.
+*   **Project Planning:** Refer to `PROJECT_PLAN.md` for the development roadmap and task tracking.
 
 ## Contribution Guidelines
 
--   Fork the repo and create a feature branch.
--   Write tests for new features and bug fixes in the `tests/` directory.
--   Ensure all checks pass (`make ci` or `make format-check lint type-check test coverage`).
--   Document new modules/functions and update the main documentation (`docs/`) if necessary.
--   Update the project plan (`PROJECT_PLAN.md`) as needed.
--   See `CONTRIBUTING.md` (to be added) for more details.
+Please refer to `CONTRIBUTING.md` (to be added) for details on how to contribute to this project. General expectations include following the development best practices outlined above, ensuring tests pass, and documenting changes.
 
-## Documentation
+## Documentation Website
 
--   Main docs source: `docs/`
--   Build/serve docs using `make docs-build` / `make docs-serve`.
--   Online docs: (to be published)
--   Marimo: marimo docs
+The full project documentation, generated using MkDocs, is available at: [Placeholder - Link to be added once deployed]
+
+You can also build and serve the documentation locally using `make docs-serve`.
 
 ## GitHub Repository
 
--   https://github.com/gradient-divergence/agentic-retail-foundations
+*   Main repository: https://github.com/gradient-divergence/agentic-retail-foundations

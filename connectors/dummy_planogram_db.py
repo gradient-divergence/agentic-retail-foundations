@@ -50,9 +50,7 @@ class DummyPlanogramDB:
         },
     }
 
-    async def get_section_camera(
-        self, location_id: str, section_id: str
-    ) -> str | None:
+    async def get_section_camera(self, location_id: str, section_id: str) -> str | None:
         """Get the camera ID for a given location and section."""
         await asyncio.sleep(0.01)
         key = f"{location_id}-{section_id}"

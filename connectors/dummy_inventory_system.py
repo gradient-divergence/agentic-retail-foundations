@@ -4,7 +4,7 @@ Module: connectors.dummy_inventory_system
 Provides a dummy in-memory inventory system for testing shelf monitoring agents.
 """
 
-from typing import Any
+from typing import Any, Dict, List
 import asyncio
 
 
@@ -13,7 +13,7 @@ class DummyInventorySystem:
     Dummy in-memory inventory system for shelf monitoring.
     """
 
-    _audit_reports = []
+    _audit_reports: List[Dict[str, Any]] = []
 
     async def report_visual_audit(self, audit_report: dict[str, Any]) -> None:
         """Store or print the visual audit report for testing."""

@@ -4,7 +4,7 @@ Module: connectors.dummy_db
 Provides a dummy in-memory database for customers and products for testing agents.
 """
 
-from typing import Any
+from typing import Any, Dict, List
 import asyncio
 
 
@@ -57,19 +57,21 @@ class DummyDB:
             cid, {"name": f"Cust {cid}", "loyalty_tier": "Standard"}
         )
 
-    async def search_products(self, query: str) -> list[dict[str, Any]]:
+    async def search_products(self, query: str) -> List[Dict[str, Any]]:
         """Search for products by name or ID (simple substring match)."""
         await asyncio.sleep(0.01)
         results = []
+        query_lower = query.lower()
         for p in self._products.values():
-            if (
-                query.lower() in p["name"].lower()
-                or query.lower() in p["product_id"].lower()
-            ):
+            name = p.get("name")
+            product_id = p.get("product_id")
+            name_match = isinstance(name, str) and query_lower in name.lower()
+            id_match = isinstance(product_id, str) and query_lower in product_id.lower()
+            if name_match or id_match:
                 results.append(p)
         return results
 
-    async def get_product(self, pid: str) -> dict[str, Any] | None:
+    async def get_product(self, pid: str) -> Dict[str, Any] | None:
         """Get product details by ID."""
         await asyncio.sleep(0.01)
         return self._products.get(pid)
@@ -84,7 +86,9 @@ class DummyDB:
         await asyncio.sleep(0.01)
         if identifier in self._products:
             return identifier
+        identifier_lower = identifier.lower()
         for pid, data in self._products.items():
-            if identifier.lower() in data["name"].lower():
+            name = data.get("name")
+            if isinstance(name, str) and identifier_lower in name.lower():
                 return pid
         return None

@@ -4,9 +4,9 @@ Module: connectors.dummy_order_system
 Provides a dummy in-memory order management system for testing agents.
 """
 
-from typing import Any
+from typing import Any, Dict, List, Sequence, Collection
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class DummyOrderSystem:
     Dummy order management system connector for demonstration purposes.
     """
 
-    _orders = {
+    _orders: Dict[str, Dict[str, Any]] = {
         "ORD987": {
             "order_id": "ORD987",
             "customer_id": "C123",
@@ -60,7 +60,7 @@ class DummyOrderSystem:
         """Get recent orders for a customer."""
         await asyncio.sleep(0.02)
         cust_orders = [o for o in self._orders.values() if o.get("customer_id") == cid]
-        cust_orders.sort(key=lambda x: x.get("order_date", "0"), reverse=True)
+        cust_orders.sort(key=lambda x: date.fromisoformat(x.get("order_date", "1900-01-01")), reverse=True)
         return cust_orders[:limit]
 
     async def get_order_details(self, oid: str) -> dict[str, Any] | None:
@@ -74,9 +74,11 @@ class DummyOrderSystem:
         order = self._orders.get(oid)
         if not order:
             return {"eligible": False, "reason": "Order not found."}
-        if order["status"] == "Delivered" and "delivery_date" in order:
+        
+        delivery_date_str = order.get("delivery_date")
+        if order["status"] == "Delivered" and isinstance(delivery_date_str, str):
             try:
-                delivery_dt = datetime.fromisoformat(order["delivery_date"])
+                delivery_dt = datetime.fromisoformat(delivery_date_str)
                 if datetime.now() - delivery_dt <= timedelta(days=30):
                     return {"eligible": True}
                 else:

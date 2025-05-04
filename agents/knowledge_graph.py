@@ -13,15 +13,16 @@ Key Capabilities:
 Adapted from the in-notebook implementation in sensor-networks-and-cognitive-systems.py.
 """
 
-from typing import Any
+from typing import Any, List, Dict
 from datetime import datetime
 from rdflib import Graph, Literal, BNode, Namespace, RDF, URIRef
 from rdflib.namespace import RDFS, XSD
 
-try:
-    from SPARQLWrapper import SPARQLWrapper, JSON
-except ImportError:
-    SPARQLWrapper = None  # Optional dependency
+# Remove the try/except block here, we'll handle it in __init__
+# try:
+#     from SPARQLWrapper import SPARQLWrapper, JSON
+# except ImportError:
+#     SPARQLWrapper = None # This line caused the mypy error
 
 
 class RetailKnowledgeGraph:
@@ -59,13 +60,29 @@ class RetailKnowledgeGraph:
         self.graph.bind("store", self.STORE)
         self.graph.bind("customer", self.CUSTOMER)
         self._load_ontology()
-        self.sparql_endpoint = None
-        if graph_uri and SPARQLWrapper:
+        self.sparql_endpoint = None # Initialize as None
+        
+        # Only attempt SPARQL setup if graph_uri is provided
+        if graph_uri:
+            SPARQLWrapper = None # Local variable for check
+            JSON = None
             try:
-                self.sparql_endpoint = SPARQLWrapper(graph_uri)
-                self.sparql_endpoint.setReturnFormat(JSON)
-            except Exception:
-                pass
+                # Attempt import only if needed
+                from SPARQLWrapper import SPARQLWrapper as SPARQLWrapper_lib, JSON as JSON_lib
+                SPARQLWrapper = SPARQLWrapper_lib
+                JSON = JSON_lib
+            except ImportError:
+                print("SPARQLWrapper not installed, SPARQL endpoint disabled.")
+                # sparql_endpoint remains None
+            
+            # If import succeeded, try to create instance
+            if SPARQLWrapper and JSON:
+                try:
+                    self.sparql_endpoint = SPARQLWrapper(graph_uri)
+                    self.sparql_endpoint.setReturnFormat(JSON)
+                except Exception as e:
+                    print(f"Failed to initialize SPARQLWrapper for {graph_uri}: {e}")
+                    self.sparql_endpoint = None # Ensure it's None on failure
 
     def _load_ontology(self):
         """Load the retail domain ontology into the graph."""
@@ -364,19 +381,38 @@ class RetailKnowledgeGraph:
         if self.sparql_endpoint:
             try:
                 self.sparql_endpoint.setQuery(query_str)
-                results = self.sparql_endpoint.query().convert()
-                return results["results"]["bindings"]
-            except Exception:
+                sparql_results_raw = self.sparql_endpoint.query().convert()
+                if isinstance(sparql_results_raw, dict):
+                    bindings = sparql_results_raw.get("results", {}).get("bindings", []) # type: ignore[union-attr]
+                    return bindings if isinstance(bindings, list) else []
+                else:
+                    print(f"Unexpected SPARQL result type: {type(sparql_results_raw)}")
+                    return [] 
+            except Exception as e:
+                print(f"SPARQL query failed: {e}")
                 return []
         else:
-            results = []
-            qres = self.graph.query(query_str)
-            for row in qres:
-                result = {}
-                for var in row.labels:
-                    result[var] = row[var]
-                results.append(result)
-            return results
+            local_results: List[Dict[str, Any]] = [] # type: ignore[no-redef] # Ignore potential redef if mypy confused
+            try:
+                qres = self.graph.query(query_str)
+                binding_vars = [str(v) for v in getattr(qres, 'vars', [])]
+
+                for row in qres:
+                    result_dict: Dict[str, Any] = {}
+                    try:
+                        result_dict = row.asdict() # type: ignore[union-attr]
+                    except AttributeError:
+                        if isinstance(row, tuple) and len(row) == len(binding_vars):
+                            for i, var_name in enumerate(binding_vars):
+                                value: Any = row[i]
+                                result_dict[var_name] = value
+                        
+                    if result_dict: 
+                        local_results.append(result_dict) # type: ignore[union-attr]
+                
+            except Exception as e:
+                print(f"Local RDF query failed: {e}")
+            return local_results # type: ignore[return-value]
 
     def generate_recommendations(
         self,
@@ -448,7 +484,8 @@ class RetailKnowledgeGraph:
             ontology_triples = [
                 triple
                 for triple in self.graph
-                if triple[0].startswith(self.RETAIL)
+                # Convert subject to string before calling startswith
+                if str(triple[0]).startswith(str(self.RETAIL)) # Cast both to str 
                 and triple[1] in (RDF.type, RDFS.domain, RDFS.range)
             ]
             self.graph = Graph()

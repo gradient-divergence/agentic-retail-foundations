@@ -11,7 +11,7 @@ from typing import Any
 import json
 import logging
 
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 
 from agents.prompts import build_action_extraction_prompt
 from utils.openai_utils import safe_chat_completion
@@ -142,7 +142,7 @@ def build_response_prompt(
 
 
 async def extract_actions(
-    client: OpenAI,
+    client: AsyncOpenAI | OpenAI,
     *,
     intent: str,
     response_text: str,
@@ -180,23 +180,28 @@ async def extract_actions(
     # LLM-based action extraction
     prompt = build_action_extraction_prompt(response_text)
     try:
+        # Revert to using messages
+        messages = [
+            {
+                "role": "system",
+                "content": "You extract explicitly mentioned actions from agent text. Output ONLY a valid JSON array of strings.",
+            },
+            {"role": "user", "content": prompt},
+        ]
         completion = await safe_chat_completion(
             client,
             model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You extract explicitly mentioned actions from agent text. Output ONLY a valid JSON array of strings.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+            messages=messages, # Use messages
+            # input=prompt, # Removed input
+            # instructions=instructions, # Removed instructions
             logger=logger,
             retry_attempts=retry_attempts,
             retry_backoff=retry_backoff,
             max_tokens=100,
             temperature=0,
         )
-        extracted_text = completion.choices[0].message.content.strip()
+        # Use choices[0].message.content
+        extracted_text = completion.choices[0].message.content.strip() if completion.choices[0].message.content else "[]"
         try:
             parsed_data = json.loads(extracted_text)
             action_list: list[str] | None = None

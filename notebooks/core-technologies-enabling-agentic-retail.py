@@ -33,7 +33,6 @@ def _():
     import pandas as pd
     import marimo as mo
 
-
     # Setup basic logging
     import logging
 
@@ -76,9 +75,21 @@ def _():
 def _(mo):
     mo.md(
         r"""
-        ## LLM-Powered Customer Service Agent
+        ### Vision Language Models (VLMs)
 
-        The following example demonstrates how an LLM can be integrated into a retail customer service system, combining natural language understanding with structured business logic
+        VLMs bridge the gap between visual perception and language understanding.
+        These models, combining architectures like large language models and advanced
+        visual intelligence, redefine responsiveness and adaptability in retail
+        environments.
+
+        They can enable real-time shelf monitoring, improved customer interactions,
+        and intelligent product recognition. Additionally, the chapter dives into
+        Knowledge Graphs and Semantic Reasoning, illustrating how structured knowledge
+        and ontologies significantly enhance decision accuracy, personalization,
+        and overall retail intelligence.
+
+        These technologies combine to build sophisticated AI-driven retail
+        experiences that seamlessly blend perception, language, and reasoning.
         """
     )
     return
@@ -123,7 +134,8 @@ def _(customer_service_agent, mo):
             or customer_service_agent.client is None
         ):
             return mo.md(
-                "**Error:** OpenAI client not initialized. Cannot run LLM demo. Please set `OPENAI_API_KEY`."
+                "**Error:** OpenAI client not initialized. Cannot run LLM demo. "
+                "Please set `OPENAI_API_KEY`."
             )
 
         responses_md.append(mo.md("### Customer Service Agent Demo"))
@@ -133,7 +145,9 @@ def _(customer_service_agent, mo):
             )
             responses_md.append(
                 mo.md(
-                    f"**Customer:** {msg}\n\n**Agent:** {response.get('message', 'Error')}\n_(Actions: {response.get('actions', [])})_"
+                    f"**You:** {msg}\n\n" +
+                    f"**Agent:** {response.get('message', 'Error')}\n" +
+                    f"_(Actions: {response.get('actions', [])})_"
                 )
             )
             responses_md.append("---")
@@ -193,13 +207,15 @@ def _(asyncio, logger, mo, pd, shelf_agent):
             mo.stop(
                 True,
                 mo.md(
-                    "**Error:** Shelf Agent/Model not loaded. Check `model_path` & TF install."
+                    "**Error:** Shelf Agent/Model not loaded. "
+                    "Check `model_path` & TF install."
                 ),
             )
             # The return below is now technically unreachable due to mo.stop,
             # but kept for clarity if mo.stop is removed later.
             return mo.md(
-                "**Error:** Shelf Agent/Model not loaded. Check `model_path` & TF install."
+                "**Error:** Shelf Agent/Model not loaded. "
+                "Check `model_path` & TF install."
             )
 
         loc = "LOC1"
@@ -209,7 +225,8 @@ def _(asyncio, logger, mo, pd, shelf_agent):
             mo.md("## Shelf Monitoring Demo"),
             mo.md(f"Monitoring sections: {sections} at {loc}..."),
             mo.md(
-                f"_Ensure CAM01 (src: '{cam1_src}') active & sees target items (e.g., cans/bottles). Check console logs._"
+                f"_Ensure CAM01 (src: '{cam1_src}') active & sees target items "
+                f"(e.g., cans/bottles). Check console logs._"
             ),
         ]
 
@@ -259,7 +276,8 @@ async def _(logger, mo, run_shelf_monitoring_demo):
         # Marimo will automatically await this top-level async call
         monitoring_output = await run_shelf_monitoring_demo()
     except Exception as e:
-        # Catch errors from the function call itself (e.g., if the function wasn't returned properly)
+        # Catch errors from the function call itself
+        # (e.g., if the function wasn't returned properly)
         logger.error(f"Error calling run_shelf_monitoring_demo: {e}", exc_info=True)
         monitoring_output = mo.md(f"**Error setting up Shelf Demo:** {e}")
 
@@ -274,12 +292,21 @@ def _(mo):
         r"""
         ### Integration with Other Agent Systems
 
-        Computer vision systems are most valuable when integrated with other retail agent capabilities:
+        Computer vision systems are most valuable when integrated with other retail
+        agent capabilities:
 
-        1. **Computer Vision + LLMs**: Enable natural language queries about visual store conditions, such as "Show me all sections with more than 20% out-of-stocks" or "Which endcaps need to be reset for the new promotion?"
-        2. **Computer Vision + IoT**: Correlate visual data with shelf weight sensors to distinguish between similar-looking products or verify that observed changes match weight changes.
-        3. **Computer Vision + Knowledge Graphs**: Enrich product recognition with semantic relationships, allowing agents to understand not just what they see but what it means in the retail context.
-        4. **Computer Vision + Robotic Systems**: Direct autonomous robots to respond to detected issues, such as cleaning spills, retrieving products, or scanning barcodes to verify inventory.
+        1. **Computer Vision + LLMs**: Enable natural language queries about visual
+           store conditions, such as "Show me all sections with more than 20%
+           out-of-stocks" or "Which endcaps need to be reset for the new promotion?"
+        2. **Computer Vision + IoT**: Correlate visual data with shelf weight
+           sensors to distinguish between similar-looking products or verify that
+           observed changes match weight changes.
+        3. **Computer Vision + Knowledge Graphs**: Augment visual perception with
+           semantic relationships, allowing agents to understand not just what
+           they see but what it means in the retail context.
+        4. **Computer Vision + Robotics**: Guide robots to respond to detected
+           issues, such as cleaning spills, retrieving products, or scanning
+           barcodes to verify inventory.
         """
     )
     return

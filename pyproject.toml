@@ -83,6 +83,8 @@ dev = [
     "pandas-stubs",
     "types-tensorflow",
     "types-networkx",
+    "types-python-jose",
+    "types-passlib",
 ]
 
 docs = [
@@ -174,6 +176,7 @@ module = [
     "redis.*",
     "kafka.*",
     "graphviz.*",
+    "pyspark.*",
     # Add other problematic libraries here
 ]
 ignore_missing_imports = true

@@ -1,9 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from agents.llm import RetailCustomerServiceAgent
-from openai import OpenAI
-from utils.openai_utils import safe_chat_completion
-from agents.response_builder import extract_actions
+from tests.mocks import MockProductDB, MockOrderSystem, MockCustomerDB
 
 
 @pytest.fixture
@@ -18,28 +16,47 @@ def mock_connectors():
 
 
 @pytest.fixture
+def mock_nlp_module(monkeypatch):
+    mock_nlp = MagicMock()
+    # Configure return values for the nlp functions called by the agent
+    mock_nlp.classify_intent = AsyncMock(return_value="order_status")
+    mock_nlp.extract_order_id_llm = AsyncMock(return_value="ORD123")
+    mock_nlp.extract_product_id = AsyncMock(return_value="Product ABC")
+    mock_nlp.sentiment_analysis = AsyncMock(return_value="neutral")
+    monkeypatch.setattr("agents.llm.nlp", mock_nlp) # Patch where it's imported
+    return mock_nlp
+
+
+@pytest.fixture
 def agent(mock_connectors):
-    product_db, order_system, customer_db, policies = mock_connectors
-    with patch("agents.llm.OpenAI") as MockOpenAI:
-        mock_client = MagicMock()
-        MockOpenAI.return_value = mock_client
-        return RetailCustomerServiceAgent(
-            product_db, order_system, customer_db, policies, api_key="test-key"
-        )
+    # Use mocks for dependencies
+    _, _, _, policies = mock_connectors # Unpack to get the same policies dict
+    return RetailCustomerServiceAgent(
+        product_database=MockProductDB(),
+        order_management_system=MockOrderSystem(),
+        customer_database=MockCustomerDB(),
+        policy_guidelines=policies, # Use the consistent policy dict
+        api_key="dummy_key" # Provide a dummy key to attempt client init
+    )
 
 
 @pytest.mark.asyncio
-@patch('utils.nlp.safe_chat_completion', new_callable=AsyncMock)
-async def test_classify_intent(mock_safe_completion, agent):
-    """Test intent classification for various messages."""
-    # Mock the completion object structure expected by _classify_intent (via nlp_classify_intent)
-    mock_response = MagicMock()
-    mock_response.choices[0].message.content.strip.return_value = "order_status"
-    mock_safe_completion.return_value = mock_response
+async def test_classify_intent(agent, mock_nlp_module):
+    """Test intent classification delegation."""
+    message = "Where is my order?"
+    # We mock the nlp module itself, so we just need to ensure classify_intent is called
+    mock_nlp_module.classify_intent.return_value = "order_status" # Ensure mock returns expected
 
-    intent = await agent._classify_intent("Where is my order?")
+    # Call the agent's method which *uses* the nlp function
+    intent = await agent._classify_intent(message)
+
+    # Assert that the agent's method called the mocked nlp function correctly
+    mock_nlp_module.classify_intent.assert_awaited_once_with(
+        client=agent.client, # Check that the agent passes its client
+        message=message # Check that the agent passes the message
+        # No model or other args expected here anymore
+    )
     assert intent == "order_status"
-    mock_safe_completion.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -171,3 +188,59 @@ async def test_process_customer_inquiry_error(agent, mock_connectors):
     assert response.get("error") == "LLM client not available"
     assert response.get("actions") == []
     assert agent.policies == mock_connectors[3]
+
+
+@pytest.mark.asyncio
+async def test_extract_order_id_logic(agent, mock_nlp_module):
+    """Test order ID extraction logic combines regex and LLM call."""
+    message_with_id = "My order is #ORD123, what's the status?"
+    recent_orders = [{"order_id": "ORD123"}, {"order_id": "ORD456"}]
+    recent_order_ids_list = ["ORD123", "ORD456"]
+
+    # Setup mock return value for the LLM call
+    mock_nlp_module.extract_order_id_llm.return_value = "ORD123"
+
+    extracted_id = await agent._extract_order_id(message_with_id, recent_orders)
+
+    # Regex should find ORD123 and return it because it matches recent orders
+    assert extracted_id == "ORD123"
+    # Ensure the LLM function was NOT called because regex found a match in recent orders
+    mock_nlp_module.extract_order_id_llm.assert_not_awaited()
+
+    # --- Test case where regex finds ID but it's not recent ---
+    mock_nlp_module.extract_order_id_llm.reset_mock()
+    message_not_recent = "Check on order REGEX999?"
+    # LLM will be called, configure its return value
+    mock_nlp_module.extract_order_id_llm.return_value = "REGEX999" # Simulate LLM confirming
+
+    extracted_id = await agent._extract_order_id(message_not_recent, recent_orders)
+
+    # Assert LLM was called with correct arguments
+    mock_nlp_module.extract_order_id_llm.assert_awaited_once_with(
+        client=agent.client,
+        message=message_not_recent,
+        recent_order_ids=recent_order_ids_list,
+        model=agent.utility_model,
+        logger=agent.logger,
+        retry_attempts=agent.retry_attempts,
+        retry_backoff=agent.retry_backoff
+    )
+    # Assert the result from LLM is returned
+    assert extracted_id == "REGEX999"
+
+    # --- Test case where only LLM can find it ---
+    mock_nlp_module.extract_order_id_llm.reset_mock()
+    message_llm_only = "Where is my recent delivery?"
+    mock_nlp_module.extract_order_id_llm.return_value = "ORD456"
+
+    extracted_id = await agent._extract_order_id(message_llm_only, recent_orders)
+    mock_nlp_module.extract_order_id_llm.assert_awaited_once_with(
+        client=agent.client,
+        message=message_llm_only,
+        recent_order_ids=recent_order_ids_list,
+        model=agent.utility_model,
+        logger=agent.logger,
+        retry_attempts=agent.retry_attempts,
+        retry_backoff=agent.retry_backoff
+    )
+    assert extracted_id == "ORD456"

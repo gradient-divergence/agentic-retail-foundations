@@ -1,0 +1,77 @@
+name: Python CI
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [ main ] # Run on pushes to the main branch
+  pull_request:
+    branches: [ main ] # Run on pull requests targeting the main branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # Use the latest Ubuntu runner
+    strategy:
+      fail-fast: false # Don't cancel all jobs if one Python version fails
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"] # Test against multiple Python versions
+
+    steps:
+    #----------------------------------------------
+    #       check out repo & set up python
+    #----------------------------------------------
+    - name: Check out repository
+      uses: actions/checkout@v4 # Checks out your code
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    #----------------------------------------------
+    #           install uv & dependencies
+    #----------------------------------------------
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Add uv to PATH
+      run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    # Optional: Cache uv environment to speed up builds
+    # Cache depends on the pyproject.toml hash
+    - name: Get uv cache directory
+      id: uv-cache-dir
+      run: echo "dir=$(uv cache dir)" >> $GITHUB_OUTPUT
+
+    - name: Cache uv environment
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.uv-cache-dir.outputs.dir }}
+        key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-
+
+    - name: Install dependencies using make
+      run: make install # This should use uv to create .venv and install deps
+
+    #----------------------------------------------
+    #              run checks & tests
+    #----------------------------------------------
+    # Note: The make targets should use the tools installed in .venv
+    - name: Lint with Ruff
+      run: make lint
+
+    - name: Check formatting with Ruff
+      run: make format-check
+
+    - name: Type check with MyPy
+      run: make type-check
+
+    - name: Test with Pytest
+      run: make test
+
+    # Optional: Upload coverage report (if 'make coverage' generates one)
+    # - name: Upload coverage reports to Codecov
+    #   uses: codecov/codecov-action@v4
+    #   with:
+    #     token: ${{ secrets.CODECOV_TOKEN }} # Requires setting a secret in GitHub repo settings
+    #     fail_ci_if_error: true

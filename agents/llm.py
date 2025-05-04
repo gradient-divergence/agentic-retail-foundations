@@ -348,7 +348,7 @@ class RetailCustomerServiceAgent:
             return result # type: ignore[no-any-return]
         except Exception as e:
             self.logger.error(f"LLM product identifier extraction failed: {e}")
-            return None # type: ignore[no-any-return]
+            return None
 
     async def _generate_response(
         self,

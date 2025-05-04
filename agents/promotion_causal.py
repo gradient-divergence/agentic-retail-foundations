@@ -644,37 +644,30 @@ class PromotionCausalAnalyzer:
         import matplotlib.pyplot as plt
         import networkx as nx  # Ensure networkx is imported or available
 
-        if not hasattr(self, "causal_graph") or not isinstance(
-            self.causal_graph, nx.DiGraph
-        ):
-            print("Causal graph is not defined or not a NetworkX DiGraph.")
-            # Try generating from string if available
-            if hasattr(self, "causal_graph_str"):
-                try:
-                    # Requires pydot and graphviz
-                    from networkx.drawing.nx_pydot import read_dot
-
-                    # Create a temporary file-like object
-                    from io import StringIO
-
-                    dot_f = StringIO(self.causal_graph_str)
-                    self.causal_graph = read_dot(dot_f)
-                    print("Graph loaded from DOT string.")
-                except Exception as e:
-                    print(f"Could not load graph from DOT string: {e}")
-                    return
-            else:
-                print("No causal graph available to visualize.")
-                return
+        graph_obj = None
+        if hasattr(self, "causal_graph") and isinstance(self.causal_graph, nx.DiGraph):
+            graph_obj = self.causal_graph
+        elif hasattr(self, "causal_graph_str"):
+            try:
+                from networkx.drawing.nx_pydot import read_dot
+                from io import StringIO
+                dot_f = StringIO(self.causal_graph_str)
+                graph_obj = read_dot(dot_f)
+                print("Graph loaded from DOT string for visualization.")
+            except Exception as e:
+                print(f"Could not load graph from DOT string for visualization: {e}")
+                return None
+        
+        if graph_obj is None:
+             print("No valid graph object available for visualization.")
+             return None
 
         plt.figure(figsize=(12, 8))
-        # Define Node positions - Adjust as necessary based on actual graph nodes
-        # This position mapping might need update based on `_define_causal_graph` in .py
-        pos = nx.spring_layout(self.causal_graph, seed=42)  # Example layout
+        pos = nx.spring_layout(graph_obj, seed=42) # Use graph_obj
 
-        # Draw nodes - Adjust colors based on actual treatment/outcome names
+        # Draw nodes - Map nodes to colors
         node_colors = []
-        for node in self.causal_graph.nodes():
+        for node in graph_obj.nodes(): # Use graph_obj
             if node == self.treatment:
                 node_colors.append("lightblue")
             elif node == self.outcome:
@@ -683,12 +676,10 @@ class PromotionCausalAnalyzer:
                 node_colors.append("lightgrey")
 
         nx.draw_networkx_nodes(
-            self.causal_graph, pos, node_color=node_colors, node_size=3000, alpha=0.8
+            graph_obj, pos, node_color=node_colors, node_size=3000, alpha=0.8 # type: ignore[arg-type]
         )
-        # Draw edges
-        nx.draw_networkx_edges(self.causal_graph, pos, arrows=True, arrowsize=20)
-        # Draw labels
-        nx.draw_networkx_labels(self.causal_graph, pos, font_size=12)
+        nx.draw_networkx_edges(graph_obj, pos, arrows=True, arrowsize=20)
+        nx.draw_networkx_labels(graph_obj, pos, font_size=12) # Use graph_obj
         # Add title and remove axis
         plt.title("Causal Graph for Promotion Analysis", fontsize=15)
         plt.axis("off")
@@ -742,7 +733,7 @@ class PromotionCausalAnalyzer:
                 "percent_lift_naive": percent_lift,  # Key expected by notebook
             }
         except Exception as e:
-            return {"error": f"Error during naive calculation: {e}"}
+            return {"error": f"Error during naive calculation: {e}"} # type: ignore[dict-item]
 
     def regression_adjustment(self) -> Dict[str, Any]:
         """Estimate promotion impact using regression adjustment for confounders"""
@@ -884,9 +875,7 @@ class PromotionCausalAnalyzer:
         except Exception as e:
             import traceback
 
-            return {
-                "error": f"Error in regression adjustment: {e}\n{traceback.format_exc()}"
-            }
+            return {"error": f"Error in regression adjustment: {e}\n{traceback.format_exc()}"} # type: ignore[dict-item]
 
     def matching_analysis(
         self, caliper: float = 0.05, ratio: int = 1
@@ -1030,9 +1019,7 @@ class PromotionCausalAnalyzer:
         except Exception as e:
             import traceback
 
-            return {
-                "error": f"Error in matching analysis: {e}\n{traceback.format_exc()}"
-            }
+            return {"error": f"Error in matching analysis: {e}\n{traceback.format_exc()}"} # type: ignore[dict-item]
 
     def double_ml_forest(self, **kwargs) -> Dict[str, Any]:
         """Estimate heterogeneous treatment effects using double ML causal forest"""
@@ -1096,7 +1083,7 @@ class PromotionCausalAnalyzer:
                     col
                     for col in analysis_subset_model.columns
                     if col not in [self.outcome, self.treatment]
-                ] + [self.treatment]
+                ] + [self.treatment] # type: ignore[assignment]
 
             X_actual = analysis_subset_model[feature_cols_model]
             Y_actual = analysis_subset_model[self.outcome]
@@ -1112,7 +1099,7 @@ class PromotionCausalAnalyzer:
 
             model = sm.OLS(Y_actual, X_actual).fit()
             # Ensure model_cols is a list[str]
-            model_cols = model.params.index.tolist()
+            model_cols = model.params.index.tolist() # type: ignore[assignment]
 
             # --- Create Counterfactual Data ---
             cf_data = self.analysis_data.copy()

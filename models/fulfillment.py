@@ -3,64 +3,51 @@ Data models for store fulfillment optimization.
 Includes Item and Order classes.
 """
 
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple
 
-
+@dataclass
 class Item:
-    """Represents a product in the store inventory."""
+    """Represents an item to be picked in an order."""
+    item_id: str
+    name: str
+    section: str # e.g., 'grocery', 'produce', 'frozen'
+    location: Tuple[int, int] # (x, y) coordinates in the store layout
+    weight: float = 0.5 # Example weight in kg
+    volume: float = 0.001 # Example volume in cubic meters
+    temperature_zone: str = "ambient" # ambient, refrigerated, frozen
+    handling_time: float = 1.0 # Base time units to handle/pick this item
+    fragility: float = 0.0 # 0.0 (not fragile) to 1.0 (very fragile)
 
-    def __init__(
-        self,
-        item_id: str,
-        name: str,
-        category: str,
-        location: tuple[int, int],
-        temperature_zone: str = "ambient",
-        handling_time: float = 1.0,
-        fragility: float = 0.0,
-    ):
-        self.item_id = item_id
-        self.name = name
-        self.category = category
-        self.location = location  # (x, y) coordinates in store
-        self.temperature_zone = temperature_zone  # "ambient", "refrigerated", "frozen"
-        self.handling_time = handling_time  # base time to pick in minutes
-        self.fragility = fragility  # 0.0 to 1.0, affects stacking and handling
-
-    def __repr__(self):
-        return f"Item({self.item_id}: {self.name} at {self.location})"
-
-
+@dataclass
 class Order:
-    """Represents a customer order with multiple items."""
-
-    def __init__(
-        self,
-        order_id: str,
-        items: list[Item],
-        priority: int = 1,
-        due_time: float | None = None,
-    ):
-        self.order_id = order_id
-        self.items = items
-        self.priority = priority  # 1 (standard) to 5 (highest)
-        self.due_time = due_time  # minutes from now
-        self.assigned_to = None
-        self.status = "pending"  # pending, in_progress, completed
-
-    def get_temperature_zones(self) -> set[str]:
-        """Return the set of temperature zones required for this order."""
-        return {item.temperature_zone for item in self.items}
-
-    def get_item_locations(self) -> list[tuple[int, int]]:
-        """Return the locations of all items in the order."""
-        return [item.location for item in self.items]
+    """Represents a customer order to be fulfilled."""
+    order_id: str
+    items: List[Item]
+    priority: int = 1 # Lower number means higher priority
+    due_time: Optional[float] = None # Time limit for fulfillment in minutes from now
+    status: str = "pending" # e.g., pending, assigned, picking, completed
 
     def estimate_picking_time(self, associate_efficiency: float = 1.0) -> float:
         """Estimate the time to pick all items in the order."""
-        # Base handling time for all items
+        # Placeholder: more sophisticated estimation needed
+        # Consider handling_time per item, travel time (needs layout)
         base_time = sum(item.handling_time for item in self.items)
-        # Adjust for associate efficiency
         return base_time / associate_efficiency
+
+@dataclass
+class Associate:
+    """Represents a store associate who can fulfill orders."""
+    associate_id: str
+    name: str
+    efficiency: float = 1.0 # Multiplier for picking speed ( >1 faster, <1 slower)
+    authorized_zones: List[str] = field(default_factory=lambda: ["ambient", "refrigerated", "frozen"])
+    current_location: Tuple[int, int] = (0, 0) # Starting location (e.g., packing station)
+    max_capacity_weight: float = 15.0 # Max weight they can carry
+    max_capacity_volume: float = 0.1 # Max volume they can carry
+    shift_end_time: Optional[float] = None # Time remaining in shift (minutes)
+    current_task_completion_time: float = 0.0 # When current task is expected to end
+    current_order_ids: List[str] = field(default_factory=list)
 
     def __repr__(self):
         return (

@@ -1,5 +1,3 @@
-
-
 import marimo
 
 __generated_with = "0.13.2"
@@ -84,9 +82,11 @@ def _(demo_bayesian_recommendations):
                 mo_instance.md("---"),
                 *output_c2,
                 mo_instance.md("### Customer C1 Preference Distributions"),
-                fig_c1
-                if fig_c1
-                else mo_instance.md("_No interactions to visualize for C1._"),
+                (
+                    fig_c1
+                    if fig_c1
+                    else mo_instance.md("_No interactions to visualize for C1._")
+                ),
             ]
         )
 
@@ -118,11 +118,11 @@ def _(mo):
         r"""
         ### MDP/Q-Learning Dynamic Pricing Demo
 
-        Configure the environment and agent hyperparameters below, then click **Run Simulation** to train a Q-learning agent for dynamic pricing. 
-
+        Configure the environment and agent hyperparameters below, then click 
+        **Run Simulation** to train a Q-learning agent for dynamic pricing.
         Results will include a learning curve and a sample of the learned policy.
 
-        - For `DynamicPricingMDP`: 
+        - For `DynamicPricingMDP`:
             ```python
                 from environments.mdp import DynamicPricingMDP
             ```
@@ -229,16 +229,20 @@ def _(
     run_button,
     season_length_weeks,
 ):
-    mo.md(f"""
+    mo.md(
+        f"""
         ### Configure Environment
-        {initial_inventory} {season_length_weeks} {base_price} {base_demand} {price_elasticity} 
-        {holding_cost_per_unit}{end_season_salvage_value} {available_discounts}
+        {initial_inventory} {season_length_weeks} {base_price} {base_demand} 
+        {price_elasticity} {holding_cost_per_unit}{end_season_salvage_value} 
+        {available_discounts}
 
         ### Configure Agent
-        {learning_rate} {discount_factor} {exploration_rate} {exploration_decay} {min_exploration_rate} {num_training_episodes}
+        {learning_rate} {discount_factor} {exploration_rate} {exploration_decay} 
+        {min_exploration_rate} {num_training_episodes}
 
         {run_button}
-        """)
+        """
+    )
 
     return
 
@@ -348,15 +352,20 @@ def _(mo, results):
 
 @app.cell
 def _(mo, q_disc, q_inv, q_week, week_slider):
-    mo.md(f"""
+    mo.md(
+        f"""
         {week_slider} {q_week} {q_inv} {q_disc}
-        """)
+        """
+    )
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""### Check if UI elements were created (handles case where Cell 3 returned None)""")
+    mo.md(
+        r"""### Check if UI elements were created 
+        (handles case where Cell 3 returned None)"""
+    )
     return
 
 
@@ -559,14 +568,17 @@ def _(env, mo, np, pd, pricing_agent, q_disc, q_inv, q_week):
     )
     q_explorer_md_content = (
         f"""
-    **Q-Explorer State:** Week={q_week.value}, Inventory={q_inv.value}, Discount Index={q_disc.value}
+    **Q-Explorer State:** Week={q_week.value}, Inventory={q_inv.value}, 
+    Discount Index={q_disc.value}
     **Q-Values:**
     {mo.ui.table(q_df).to_html()}
-    **Best Action:** {q_best_action_idx} (Discount {env.available_discounts[q_best_action_idx] * 100:.0f}%)
+    **Best Action:** {q_best_action_idx} (Discount 
+    {env.available_discounts[q_best_action_idx] * 100:.0f}%)
     """
         if q_best_action_idx is not None
         else f"""
-    **Q-Explorer State:** Week={q_week.value}, Inventory={q_inv.value}, Discount Index={q_disc.value}
+    **Q-Explorer State:** Week={q_week.value}, Inventory={q_inv.value}, 
+    Discount Index={q_disc.value}
     *No Q-values learned for this specific state.*
     """
     )
@@ -603,7 +615,8 @@ def _(env, mo, policy, pricing_agent):
                 [f"{q:.2f}" for q in pricing_agent.q_table.get(valid_state, [])]
             )
             policy_rows.append(
-                f"| {valid_state} | {action_idx} ({action_discount:.0f}%) | [{q_values_str}] |"
+                f"| {valid_state} | {action_idx} ({action_discount:.0f}%) | "
+                f"[{q_values_str}] |"
             )
         else:
             policy_rows.append(f"| {valid_state} | *State not visited* | - |")
@@ -719,218 +732,37 @@ def _(mo):
 
         ### Store Fulfillment Optimization Demonstration
 
-        This demonstrates the planning algorithms for optimizing in-store order fulfillment, including order batching, associate assignment, and path optimization.
+        This demonstrates the planning algorithms for optimizing in-store order 
+        fulfillment, including order batching, associate assignment, and 
+        path optimization.
+        
+        - For Models (`Item`, `Order`, `Associate`):
+            ```python
+                from models.fulfillment import Item, Order, Associate
+            ```
+        - For Planning (`StoreLayout`, `FulfillmentPlanner`):
+            ```python
+                from utils.planning import StoreLayout, FulfillmentPlanner
+            ```
+        - For Demo (`demo_fulfillment_system`):
+             ```python
+                from demos.fulfillment_planning_demo import demo_fulfillment_system
+            ```
         """
     )
     return
 
 
 @app.cell
-def _():
-    from models.fulfillment import Item, Order
-    from agents.planning import Associate, StoreLayout, FulfillmentPlanner
-    import random
-    import time
-
-    return (
-        Associate,
-        FulfillmentPlanner,
-        Item,
-        Order,
-        StoreLayout,
-        random,
-        time,
-    )
-
-
-@app.cell
-def _(
-    Associate,
-    FulfillmentPlanner,
-    Item,
-    Order,
-    StoreLayout,
-    logger,
-    mo,
-    random,
-    time,
-):
-    def demo_fulfillment_system():
-        """Demonstrate the fulfillment optimization system with a sample scenario."""
-        logger.info("\n--- Starting Fulfillment Optimization Demo ---")
-        # Create store layout
-        store = StoreLayout(width=50, height=40)
-        logger.info("Store layout created.")
-        # Add sections
-        store.add_section((5, 15), (5, 15), "Grocery")
-        store.add_section((20, 30), (5, 15), "Produce")
-        store.add_section((35, 45), (5, 15), "Dairy")
-        store.add_section((5, 15), (20, 30), "Frozen")
-        store.add_section((20, 30), (20, 30), "Electronics")
-        store.add_section((35, 45), (20, 30), "Apparel")
-        logger.info("Store sections defined.")
-        # Add obstacles (walls, displays, etc.)
-        for x in range(0, 50, 10):
-            for y in range(0, 40):
-                if y % 5 != 0:  # Leave gaps for aisles
-                    store.add_obstacle(x, y)
-        logger.info("Obstacles added.")
-        # Create items
-        items = []
-        # Grocery items
-        for i in range(20):
-            x = random.randint(6, 14)
-            y = random.randint(6, 14)
-            items.append(Item(f"G{i}", f"Grocery Item {i}", "grocery", (x, y)))
-        # Produce items
-        for i in range(15):
-            x = random.randint(21, 29)
-            y = random.randint(6, 14)
-            items.append(
-                Item(
-                    f"P{i}",
-                    f"Produce Item {i}",
-                    "produce",
-                    (x, y),
-                    temperature_zone="refrigerated",
-                    handling_time=1.2,
-                )
-            )
-        # Dairy items
-        for i in range(10):
-            x = random.randint(36, 44)
-            y = random.randint(6, 14)
-            items.append(
-                Item(
-                    f"D{i}",
-                    f"Dairy Item {i}",
-                    "dairy",
-                    (x, y),
-                    temperature_zone="refrigerated",
-                    handling_time=1.1,
-                )
-            )
-        # Frozen items
-        for i in range(12):
-            x = random.randint(6, 14)
-            y = random.randint(21, 29)
-            items.append(
-                Item(
-                    f"F{i}",
-                    f"Frozen Item {i}",
-                    "frozen",
-                    (x, y),
-                    temperature_zone="frozen",
-                    handling_time=1.3,
-                )
-            )
-        # Electronics items
-        for i in range(8):
-            x = random.randint(21, 29)
-            y = random.randint(21, 29)
-            items.append(
-                Item(
-                    f"E{i}",
-                    f"Electronics Item {i}",
-                    "electronics",
-                    (x, y),
-                    handling_time=1.5,
-                    fragility=0.8,
-                )
-            )
-        # Apparel items
-        for i in range(15):
-            x = random.randint(36, 44)
-            y = random.randint(21, 29)
-            items.append(
-                Item(
-                    f"A{i}",
-                    f"Apparel Item {i}",
-                    "apparel",
-                    (x, y),
-                    handling_time=1.4,
-                    fragility=0.3,
-                )
-            )
-        logger.info(f"Created {len(items)} sample items.")
-        # Create orders
-        orders = []
-        for i in range(10):
-            num_items = random.randint(3, 8)
-            order_items = random.sample(items, num_items)
-            priority = random.randint(1, 3)
-            due_time = random.randint(30, 120)  # Due in 30-120 minutes
-            orders.append(Order(f"ORD{i}", order_items, priority, due_time))
-        logger.info(f"Created {len(orders)} sample orders.")
-        # Create associates
-        associates = [
-            Associate(
-                "A1",
-                "Alex",
-                efficiency=1.2,
-                authorized_zones=["ambient", "refrigerated", "frozen"],
-                current_location=(0, 0),
-                shift_end_time=240,
-            ),
-            Associate(
-                "A2",
-                "Bailey",
-                efficiency=1.0,
-                authorized_zones=["ambient", "refrigerated"],
-                current_location=(0, 20),
-                shift_end_time=180,
-            ),
-            Associate(
-                "A3",
-                "Casey",
-                efficiency=0.9,
-                authorized_zones=["ambient"],
-                current_location=(25, 0),
-                shift_end_time=120,
-            ),
-        ]
-        logger.info(f"Created {len(associates)} associates.")
-        # Create fulfillment planner
-        planner = FulfillmentPlanner(store)
-        # Add orders and associates
-        for order in orders:
-            planner.add_order(order)
-        for associate in associates:
-            planner.add_associate(associate)
-        logger.info("Added orders and associates to planner.")
-        # Generate plan
-        logger.info("Generating fulfillment plan...")
-        start_time = time.time()
-        plan = planner.plan()
-        end_time = time.time()
-        logger.info(f"Plan generated in {end_time - start_time:.3f} seconds")
-        # Explain plan
-        explanation_text = planner.explain_plan()
-        print(explanation_text)  # Print explanation to console
-        # Visualize plan
-        logger.info("Visualizing plan...")
-        plan_figure = planner.visualize_plan()
-        # Combine outputs for Marimo
-        return mo.vstack(
-            [
-                mo.md("### Fulfillment Plan Explanation"),
-                mo.md(
-                    f"```\n{explanation_text}\n```"
-                ),  # Display explanation as code block
-                mo.md("### Fulfillment Plan Visualization"),
-                plan_figure
-                if plan_figure
-                else mo.md("_Could not generate visualization._"),
-            ]
-        )
-
-    return (demo_fulfillment_system,)
-
-
-@app.cell
-def _(demo_fulfillment_system):
-    demo_fulfillment_system()
-    return
+def _(mo):
+    # Import the demo function from the new location
+    from demos.fulfillment_planning_demo import demo_fulfillment_system
+    
+    # Run the demo, passing the Marimo instance for output rendering
+    fulfillment_output = demo_fulfillment_system(mo)
+    
+    # Display the output returned by the demo function
+    return fulfillment_output
 
 
 if __name__ == "__main__":

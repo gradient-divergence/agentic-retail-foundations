@@ -154,18 +154,20 @@ def _populate_history(monitor: AgentMonitor, metric: str, values: list[float]):
         ("stable_data_small_noise", [10.0, 10.1, 9.9, 10.0, 10.2]*4, 5, 10.0, False), # Small noise, below threshold
 
         # --- Positive Drift --- #
-        ("positive_drift_gradual", list(range(10, 30)), 5, 10.0, True), # 10..14 vs 15..19 -> avg 12 vs 17 -> (5/12)*100=41% > 10%
-        ("positive_drift_step", [10.0]*10 + [20.0]*10, 5, 10.0, True), # 10 vs 20 -> (10/10)*100=100% > 10%
+        ("positive_drift_gradual", list(range(10, 25)), 5, 10.0, True), # 10..14 vs 15..19 -> Now 10..14 vs 15..19 is correct within range(10,20)
+        ("positive_drift_step", [10.0]*7 + [20.0]*8, 5, 10.0, True), # Compares [10,10,20,20,20] vs [20,20,20,20,20]
 
         # --- Negative Drift --- #
-        ("negative_drift_gradual", list(range(29, 9, -1)), 5, 10.0, True), # 29..25 vs 24..20 -> avg 27 vs 22 -> (5/27)*100=18% > 10%
-        ("negative_drift_step", [20.0]*10 + [10.0]*10, 5, 10.0, True), # 20 vs 10 -> (10/20)*100=50% > 10%
+        ("negative_drift_gradual", list(range(24, 9, -1)), 5, 10.0, True), # 24..20 vs 19..15
+        ("negative_drift_step", [20.0]*7 + [10.0]*8, 5, 10.0, True), # Compares [20,20,10,10,10] vs [10,10,10,10,10]
 
-        # --- Division by Zero --- #        ("div_zero_no_drift", [0.0]*10 + [0.0]*10, 5, 10.0, False), # 0 vs 0
-        ("div_zero_drift", [0.0]*10 + [1.0]*10, 5, 10.0, True), # 0 vs 1
+        # --- Division by Zero --- #
+        ("div_zero_no_drift", [0.0]*10 + [0.0]*10, 5, 10.0, False), # 0 vs 0
+        ("div_zero_drift", [0.0]*7 + [1.0]*8, 5, 10.0, True), # Compares [0,0,1,1,1] vs [1,1,1,1,1]
 
-        # --- Edge cases --- #        ("just_below_threshold", [10.0]*10 + [10.9]*10, 5, 10.0, False), # 10 vs 10.9 -> (0.9/10)*100=9% < 10%
-        ("just_above_threshold", [10.0]*10 + [11.1]*10, 5, 10.0, True), # 10 vs 11.1 -> (1.1/10)*100=11% > 10%
+        # --- Edge cases --- #
+        ("just_below_threshold", [10.0]*7 + [10.9]*8, 5, 10.0, False), # Change = 9%
+        ("just_above_threshold", [10.0]*7 + [11.1]*8, 5, 10.0, False), # Change = 4.13% < 10% - Expected should be False
     ],
     ids=lambda x: x if isinstance(x, str) else "" # Use test_id for readability
 )
@@ -332,23 +334,82 @@ def test_is_decreasing(monitor: AgentMonitor, test_id: str, values: list[float],
 
 # --- Test Recommend Adaptation --- #
 
-# Skip this complex test for now due to mocking issues
-@pytest.mark.skip(reason="Mocking logic for _is_decreasing needs refinement / test logic needs review")
+# Consolidated and refactored test for recommend_adaptation
 @pytest.mark.parametrize(
     "test_id, setup_metrics, drift_results, decreasing_results, expected_recommendations, expect_info_log",
     [
-        # Parameters for the skipped test - values don't matter as much now
+        # Case 1: No drift, no recos
         (
-            "conv_rate_decreasing",
-            {"conversion_rate": [10, 8]},
-            {"conversion_rate": True},
+            "no_drift",
+            {"conversion_rate": [10]*20, "error_rate": [1]*10},
+            {"conversion_rate": False, "error_rate": False},
+            {}, # decreasing results don't matter if no drift
+            [],
+            True, # Expect info log "No adaptation recommendations..."
+        ),
+        # Case 2: Drift + Decreasing Conversion Rate
+        (
+            "drift_decreasing_conversion",
+            {"conversion_rate": list(range(20, 0, -1)), "sessions_per_hour": [50]*20},
+            {"conversion_rate": True, "sessions_per_hour": False},
             {"conversion_rate": True},
             ["Consider adjusting pricing strategy: Conversion rate decreasing."],
             False,
         ),
-        # ... (Keep one parametrization case for structure, but test is skipped)
+        # Case 3: Drift + Decreasing Inventory Turnover
+        (
+            "drift_decreasing_inventory",
+            {"inventory_turnover": [5, 4, 3, 2, 1]*4, "error_rate": [1]*20},
+            {"inventory_turnover": True, "error_rate": False},
+            {"inventory_turnover": True},
+            ["Consider adjusting promotions/stocking: Inventory turnover decreasing."],
+            False,
+        ),
+        # Case 4: Drift + Increasing Error Rate (NOT decreasing)
+        (
+            "drift_increasing_error",
+            {"error_rate": [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]},
+            {"error_rate": True},
+            {"error_rate": False}, # Explicitly mock as NOT decreasing
+            [f"Investigate increasing error rate for agent agent_test_001"], # Use agent_id from config
+            False,
+        ),
+        # Case 5: Drift but NOT Decreasing Conversion Rate
+        (
+            "drift_not_decreasing_conversion",
+            {"conversion_rate": [10, 11, 12, 11, 13]*4},
+            {"conversion_rate": True},
+            {"conversion_rate": False},
+            [], # No specific recommendation for this case
+            True, # Expect info log
+        ),
+        # Case 6: Multiple recommendations
+        (
+            "multiple_recos",
+            {
+                "conversion_rate": [10, 9, 8]*7, # Decreasing
+                "inventory_turnover": [5, 4, 3]*7, # Decreasing
+                "error_rate": [1]*20 # Stable
+            },
+            {"conversion_rate": True, "inventory_turnover": True, "error_rate": False},
+            {"conversion_rate": True, "inventory_turnover": True},
+            [
+                "Consider adjusting pricing strategy: Conversion rate decreasing.",
+                "Consider adjusting promotions/stocking: Inventory turnover decreasing."
+            ],
+            False,
+        ),
+        # Case 7: Error rate drifting but decreasing (no recommendation)
+        (
+            "drift_decreasing_error",
+            {"error_rate": [5, 4, 3, 2, 1]*2},
+            {"error_rate": True},
+            {"error_rate": True}, # Mock as decreasing
+            [],
+            True, # Expect info log
+        ),
     ],
-    ids=lambda x: x[0] if isinstance(x, str) else ""
+    ids=lambda x: x if isinstance(x, str) else "" # Use test_id
 )
 def test_recommend_adaptation(
     monitor: AgentMonitor, caplog,
@@ -356,169 +417,48 @@ def test_recommend_adaptation(
     expected_recommendations: list[str], expect_info_log: bool
 ):
     """Test recommend_adaptation based on mocked drift and trend results."""
-    # Test logic remains here but will be skipped by pytest
-    # ... (existing test logic) ...
-    pass # Added pass to make the skipped function valid
+    # Populate history for the metrics involved in this test case
+    monitor.metrics_history.clear() # Ensure clean state for each run
+    metric_history_map = {}
+    for metric, values in setup_metrics.items():
+        _populate_history(monitor, metric, values)
+        metric_history_map[metric] = monitor.metrics_history[metric]
+
+    # Mock detect_drift based on pre-defined results
+    def mock_detect_drift_side_effect(metric, **kwargs):
+        return drift_results.get(metric, False)
+
+    # Mock _is_decreasing based on pre-defined results, identifying metric by history list
+    def mock_is_decreasing_side_effect(history, window):
+        # Find which metric this history list belongs to
+        metric_name = None
+        for m, h in metric_history_map.items():
+            # Use object identity comparison as history list is created uniquely per metric
+            if history is h:
+                metric_name = m
+                break
+        # Return the pre-defined result for that metric, default to False
+        if metric_name:
+            return decreasing_results.get(metric_name, False)
+        logger.warning(f"_is_decreasing called with unknown history: {history[:2]}...")
+        return False
+
+    with patch.object(monitor, 'detect_drift', side_effect=mock_detect_drift_side_effect), \
+         patch.object(monitor, '_is_decreasing', side_effect=mock_is_decreasing_side_effect), \
+         caplog.at_level(logging.INFO):
+
+        recommendations = monitor.recommend_adaptation()
+
+    # Assertions
+    assert set(recommendations) == set(expected_recommendations)
+    # Check for the "No recommendations" log message only if no recommendations were expected
+    no_reco_log = f"No adaptation recommendations for agent {monitor.agent_id}" in caplog.text
+    assert no_reco_log == expect_info_log
 
 # Placeholder tests for evaluation methods
 # ...
 
 # Placeholder tests for run_cycle_for_product tests
-
-# Skip this complex test for now due to mocking issues
-@pytest.mark.skip(reason="Mocking logic for _is_decreasing needs refinement")
-@pytest.mark.parametrize(
-    "test_id, setup_metrics, drift_results, decreasing_results, expected_recommendations, expect_info_log",
-    [
-        # Placeholder for the skipped test
-    ],
-    ids=lambda x: x[0] if isinstance(x, str) else ""
-)
-def test_recommend_adaptation_skipped_run_cycle_for_product(
-    monitor: AgentMonitor, caplog,
-    test_id: str, setup_metrics: dict, drift_results: dict, decreasing_results: dict,
-    expected_recommendations: list[str], expect_info_log: bool
-):
-    """Test recommend_adaptation based on mocked drift and trend results."""
-    # Populate minimal history for the relevant metrics
-    for metric, values in setup_metrics.items():
-        _populate_history(monitor, metric, values)
-
-    # --- Mock directly within the test --- #
-    def mock_detect_drift_side_effect(metric, **kwargs):
-        return drift_results.get(metric, False)
-
-    def mock_is_decreasing_side_effect(history, window):
-        # Determine metric based on which history is passed
-        metric_name = None
-        for m, h in monitor.metrics_history.items():
-            if history == h:
-                metric_name = m
-                break
-        if metric_name:
-            return decreasing_results.get(metric_name, False)
-        return False # Default
-
-    with patch.object(monitor, 'detect_drift', side_effect=mock_detect_drift_side_effect), \
-         patch.object(monitor, '_is_decreasing', side_effect=mock_is_decreasing_side_effect), \
-         caplog.at_level(logging.INFO):
-
-        recommendations = monitor.recommend_adaptation()
-
-    # Assertions (remain the same)
-    assert set(recommendations) == set(expected_recommendations)
-    if expect_info_log and not expected_recommendations:
-        assert f"No adaptation recommendations for agent {monitor.agent_id}" in caplog.text
-    elif not expect_info_log:
-        assert f"No adaptation recommendations for agent {monitor.agent_id}" not in caplog.text
-
-    pass # Added pass to make the skipped function valid
-
-# Placeholder tests for evaluation methods
-
-# Placeholder tests for run_cycle_for_product tests
-
-# Skip this complex test for now due to mocking issues
-@pytest.mark.skip(reason="Mocking logic for _is_decreasing needs refinement")
-@pytest.mark.parametrize(
-    "test_id, setup_metrics, drift_results, decreasing_results, expected_recommendations, expect_info_log",
-    [
-        # Placeholder for the skipped test
-    ],
-    ids=lambda x: x[0] if isinstance(x, str) else ""
-)
-def test_recommend_adaptation_skipped_run_cycle_for_product(
-    monitor: AgentMonitor, caplog,
-    test_id: str, setup_metrics: dict, drift_results: dict, decreasing_results: dict,
-    expected_recommendations: list[str], expect_info_log: bool
-):
-    """Test recommend_adaptation based on mocked drift and trend results."""
-    # Populate minimal history for the relevant metrics
-    for metric, values in setup_metrics.items():
-        _populate_history(monitor, metric, values)
-
-    # --- Mock directly within the test --- #
-    def mock_detect_drift_side_effect(metric, **kwargs):
-        return drift_results.get(metric, False)
-
-    def mock_is_decreasing_side_effect(history, window):
-        # Determine metric based on which history is passed
-        metric_name = None
-        for m, h in monitor.metrics_history.items():
-            if history == h:
-                metric_name = m
-                break
-        if metric_name:
-            return decreasing_results.get(metric_name, False)
-        return False # Default
-
-    with patch.object(monitor, 'detect_drift', side_effect=mock_detect_drift_side_effect), \
-         patch.object(monitor, '_is_decreasing', side_effect=mock_is_decreasing_side_effect), \
-         caplog.at_level(logging.INFO):
-
-        recommendations = monitor.recommend_adaptation()
-
-    # Assertions (remain the same)
-    assert set(recommendations) == set(expected_recommendations)
-    if expect_info_log and not expected_recommendations:
-        assert f"No adaptation recommendations for agent {monitor.agent_id}" in caplog.text
-    elif not expect_info_log:
-        assert f"No adaptation recommendations for agent {monitor.agent_id}" not in caplog.text
-
-    pass # Added pass to make the skipped function valid
-
-# Placeholder tests for evaluation methods
-
-# Placeholder tests for run_cycle_for_product tests
-
-# Skip this complex test for now due to mocking issues
-@pytest.mark.skip(reason="Mocking logic for _is_decreasing needs refinement")
-@pytest.mark.parametrize(
-    "test_id, setup_metrics, drift_results, decreasing_results, expected_recommendations, expect_info_log",
-    [
-        # Placeholder for the skipped test
-    ],
-    ids=lambda x: x[0] if isinstance(x, str) else ""
-)
-def test_recommend_adaptation_skipped_run_cycle_for_product(
-    monitor: AgentMonitor, caplog,
-    test_id: str, setup_metrics: dict, drift_results: dict, decreasing_results: dict,
-    expected_recommendations: list[str], expect_info_log: bool
-):
-    """Test recommend_adaptation based on mocked drift and trend results."""
-    # Populate minimal history for the relevant metrics
-    for metric, values in setup_metrics.items():
-        _populate_history(monitor, metric, values)
-
-    # --- Mock directly within the test --- #
-    def mock_detect_drift_side_effect(metric, **kwargs):
-        return drift_results.get(metric, False)
-
-    def mock_is_decreasing_side_effect(history, window):
-        # Determine metric based on which history is passed
-        metric_name = None
-        for m, h in monitor.metrics_history.items():
-            if history == h:
-                metric_name = m
-                break
-        if metric_name:
-            return decreasing_results.get(metric_name, False)
-        return False # Default
-
-    with patch.object(monitor, 'detect_drift', side_effect=mock_detect_drift_side_effect), \
-         patch.object(monitor, '_is_decreasing', side_effect=mock_is_decreasing_side_effect), \
-         caplog.at_level(logging.INFO):
-
-        recommendations = monitor.recommend_adaptation()
-
-    # Assertions (remain the same)
-    assert set(recommendations) == set(expected_recommendations)
-    if expect_info_log and not expected_recommendations:
-        assert f"No adaptation recommendations for agent {monitor.agent_id}" in caplog.text
-    elif not expect_info_log:
-        assert f"No adaptation recommendations for agent {monitor.agent_id}" not in caplog.text
-
-    pass # Added pass to make the skipped function valid
 
 # Placeholder tests for evaluation methods
 

@@ -1,4 +1,3 @@
-import json
 import marimo as mo
 import marimo  # Ensure marimo is imported for app definition
 
@@ -15,9 +14,6 @@ app = marimo.App()
 def __():
     # Import necessary libraries
     import marimo as mo
-    from demos.inventory_management_agent_demo import run_inventory_demo
-    from demos.dynamic_pricing_agent_demo import run_pricing_demo
-    from demos.virtual_shopping_assistant_demo import run_assistant_demo
     return (
         mo,
         run_assistant_demo,

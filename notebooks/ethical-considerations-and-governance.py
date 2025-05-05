@@ -5,13 +5,14 @@ app = marimo.App()
 
 
 @app.cell
-def __(): # type: ignore[no-redef]
+def __():  # type: ignore[no-redef]
     import marimo as mo
+
     return (mo,)
 
 
 @app.cell
-def __(mo): # type: ignore[no-redef]
+def __(mo):  # type: ignore[no-redef]
     mo.md(
         r"""
         # Ethical Considerations and Governance
@@ -27,7 +28,7 @@ def __(mo): # type: ignore[no-redef]
 
 
 @app.cell
-def __(mo): # type: ignore[no-redef]
+def __(mo):  # type: ignore[no-redef]
     mo.md(
         r"""
         **Backend (Python/FastAPI)** – managing suggestions and approvals:
@@ -38,12 +39,11 @@ def __(mo): # type: ignore[no-redef]
 
 
 @app.cell
-def __(FastAPI, Dict, mo): # type: ignore[no-redef]
+def __(FastAPI, Dict, mo):  # type: ignore[no-redef]
     from fastapi import FastAPI
-    from typing import Dict
 
     app = FastAPI()
-    pending_reviews: Dict[
+    pending_reviews: dict[
         int, dict
     ] = {}  # In-memory store for pending decisions (for demo)
 
@@ -120,7 +120,7 @@ def __(FastAPI, Dict, mo): # type: ignore[no-redef]
 
 
 @app.cell
-def __(mo): # type: ignore[no-redef]
+def __(mo):  # type: ignore[no-redef]
     mo.md(
         r"""
         In this backend code, the AI system would call `/ai/propose_price` whenever it has a price recommendation. The logic checks the size of the discount; if it's above 20%, instead of approving automatically, it stores the suggestion in a `pending_reviews` dictionary and returns a status that it's pending. A real system might push a notification to a review dashboard at this point. There are also endpoints for an admin (human) to list all pending reviews, approve them, or reject/modify them. This way, a human can fetch the list (perhaps via the frontend) and take actions.
@@ -132,7 +132,7 @@ def __(mo): # type: ignore[no-redef]
 
 
 @app.cell
-def __(mo): # type: ignore[no-redef]
+def __(mo):  # type: ignore[no-redef]
     mo.md(
         r"""
         ```svelte
@@ -189,7 +189,7 @@ def __(mo): # type: ignore[no-redef]
 
 
 @app.cell
-def __(mo): # type: ignore[no-redef]
+def __(mo):  # type: ignore[no-redef]
     mo.md(
         r"""
         In this Svelte component, when the page loads (`onMount`), it fetches the pending reviews from our backend and stores them in a `pending` array. It then displays them in a table with product ID, current price, and suggested price. The manager can click **Approve** to call the approve API, or **Reject** to call the reject API (we also allow an optional flow to provide an alternative price – for brevity, we show a reject with or without suggesting an alternative; in a real UI, we'd provide an input to capture the new price). Once an action is taken, we update the `pending` list in the UI by removing that review.
@@ -215,7 +215,7 @@ def __(mo): # type: ignore[no-redef]
 
 
 @app.cell
-def __(mo): # type: ignore[no-redef]
+def __(mo):  # type: ignore[no-redef]
     import pandas as pd
     import numpy as np
     import shap
@@ -263,8 +263,7 @@ def __(mo): # type: ignore[no-redef]
     # The explanation dict now holds feature contributions to the price prediction.
     # Define returned variables if needed, e.g.:
     # return var1, var2
-    return explanation # Return the explanation dict for potential use
-
+    return explanation  # Return the explanation dict for potential use
 
 
 if __name__ == "__main__":

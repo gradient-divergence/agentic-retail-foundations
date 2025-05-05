@@ -1,7 +1,10 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from agents.llm import RetailCustomerServiceAgent
-from tests.mocks import MockProductDB, MockOrderSystem, MockCustomerDB
+from openai import OpenAI
+from utils.openai_utils import safe_chat_completion
+from agents.response_builder import extract_actions
+from tests.mocks import MockAsyncOpenAI, MockProductDB, MockOrderSystem, MockCustomerDB
 
 
 @pytest.fixture
@@ -244,3 +247,93 @@ async def test_extract_order_id_logic(agent, mock_nlp_module):
         retry_backoff=agent.retry_backoff
     )
     assert extracted_id == "ORD456"
+
+# --- Test process_customer_inquiry End-to-End --- #
+
+@pytest.mark.asyncio
+@patch('agents.llm.nlp.classify_intent', new_callable=AsyncMock)
+@patch('agents.llm.nlp.extract_order_id_llm', new_callable=AsyncMock)
+@patch('agents.llm.nlp.sentiment_analysis', new_callable=AsyncMock)
+@patch('agents.llm.safe_chat_completion', new_callable=AsyncMock)
+@patch('agents.llm.extract_actions', new_callable=AsyncMock)
+async def test_process_customer_inquiry_order_status(
+    mock_extract_actions: AsyncMock,
+    mock_safe_completion: AsyncMock,
+    mock_sentiment: AsyncMock,
+    mock_extract_oid: AsyncMock,
+    mock_classify_intent: AsyncMock,
+    agent: RetailCustomerServiceAgent, # Uses mocks from MockProductDB etc.
+    mock_connectors: tuple # Provides access to mock instances if needed
+):
+    """Test the full flow for an order_status inquiry."""
+    customer_id = "C123"
+    message = "Where is ORD123?"
+    test_order_id = "ORD123"
+
+    # --- Mock Setup --- #
+    # 1. Mock NLP functions
+    mock_classify_intent.return_value = "order_status"
+    # Assume regex fails, LLM extracts the ID
+    mock_extract_oid.return_value = test_order_id
+    mock_sentiment.return_value = "neutral"
+
+    # 2. Mock Connectors (using the Mock* classes passed to agent fixture)
+    # Ensure methods are async if they need to be awaited by the agent
+    agent.customer_db.get_customer = AsyncMock(return_value={"name": "Alice", "loyalty_tier": "Gold"})
+    agent.order_system.get_recent_orders = AsyncMock(return_value=[
+        {"order_id": test_order_id, "order_date": "2024-07-01", "status": "Shipped"}
+    ])
+    mock_order_details = {
+        "order_id": test_order_id,
+        "status": "Shipped",
+        "items": [{"name": "Test Item"}],
+        "est_delivery": "2024-07-10",
+        "tracking": "TRACK123"
+    }
+    agent.order_system.get_order_details = AsyncMock(return_value=mock_order_details)
+
+    # 3. Mock LLM calls within _generate_response
+    #   - Mock the response generation call
+    mock_message_response = MagicMock()
+    mock_message_response.choices[0].message.content.strip.return_value = f"Your order {test_order_id} shipped and is due 2024-07-10."
+    mock_safe_completion.return_value = mock_message_response
+    #   - Mock the action extraction call
+    mock_extract_actions.return_value = [{"type": "provide_tracking", "tracking_number": "TRACK123"}]
+
+    # 4. Mock log_interaction
+    agent._log_interaction = AsyncMock()
+
+    # --- Execute --- #
+    response = await agent.process_customer_inquiry(customer_id, message)
+
+    # --- Assertions --- #
+    # Check dependencies were called
+    agent.customer_db.get_customer.assert_awaited_once_with(customer_id)
+    agent.order_system.get_recent_orders.assert_awaited_once_with(customer_id, limit=3)
+    mock_classify_intent.assert_awaited_once_with(client=agent.client, message=message)
+    # _extract_order_id calls the nlp helper
+    mock_extract_oid.assert_awaited_once()
+    agent.order_system.get_order_details.assert_awaited_once_with(test_order_id)
+
+    # Check _generate_response dependencies
+    mock_safe_completion.assert_awaited_once() # For message generation
+    mock_extract_actions.assert_awaited_once() # For action extraction
+    mock_sentiment.assert_awaited_once_with(client=agent.client, message=message, model=agent.utility_model, logger=agent.logger, retry_attempts=agent.retry_attempts, retry_backoff=agent.retry_backoff)
+
+    # Check logging
+    agent._log_interaction.assert_awaited_once()
+
+    # Check final response structure
+    assert response["intent"] == "order_status"
+    assert response["message"] == f"Your order {test_order_id} shipped and is due 2024-07-10."
+    assert response["actions"] == [{"type": "provide_tracking", "tracking_number": "TRACK123"}]
+    assert response["customer_sentiment"] == "neutral"
+    assert "error" not in response
+
+    # Check conversation history updated
+    history = agent.conversation_history[customer_id]
+    assert len(history) == 2 # Customer message + Agent response
+    assert history[0]["role"] == "customer"
+    assert history[0]["content"] == message
+    assert history[1]["role"] == "agent"
+    assert history[1]["content"] == response["message"]

@@ -3,7 +3,7 @@ Data models for agent communication messages.
 """
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from datetime import datetime
 import uuid
 
@@ -36,11 +36,11 @@ class AgentMessage:
         receiver: str,
         content: Any,
         ontology: str = "retail-general",
-        conversation_id: Optional[str] = None,
-        message_id: Optional[str] = None,  # Added explicit message ID
-        reply_with: Optional[str] = None,
-        in_reply_to: Optional[str] = None,
-        timestamp: Optional[datetime] = None,  # Allow passing timestamp
+        conversation_id: str | None = None,
+        message_id: str | None = None,  # Added explicit message ID
+        reply_with: str | None = None,
+        in_reply_to: str | None = None,
+        timestamp: datetime | None = None,  # Allow passing timestamp
     ):
         if not isinstance(performative, Performative):
             raise TypeError(
@@ -126,7 +126,7 @@ class AgentMessage:
         self,
         performative: Performative,
         content: Any,
-        sender: Optional[str] = None,  # Allow overriding sender if needed
+        sender: str | None = None,  # Allow overriding sender if needed
     ) -> "AgentMessage":
         """
         Create a reply message directed back to the original sender.

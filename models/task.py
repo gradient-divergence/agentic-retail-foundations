@@ -5,7 +5,7 @@ Data models related to tasks and bidding in coordination protocols like Contract
 from enum import Enum
 from dataclasses import dataclass, field
 import uuid
-from typing import Optional, Any
+from typing import Any
 import time
 
 
@@ -34,6 +34,7 @@ class TaskType(Enum):
     INVENTORY_CHECK = "INVENTORY_CHECK"
     CUSTOMER_ASSISTANCE = "CUSTOMER_ASSISTANCE"
     DATA_ANALYSIS = "DATA_ANALYSIS"
+    PICKUP = "PICKUP"
     # Add more specific retail task types as needed
 
 
@@ -47,14 +48,14 @@ class Task:
     description: str
     urgency: int  # Example: 1-10 scale, higher is more urgent
     required_capacity: int  # Abstract measure of effort/resources needed
-    location: Optional[str] = None  # Optional: relevant for physical tasks
-    deadline: Optional[float] = None  # Optional: e.g., timestamp or duration
+    location: str | None = None  # Optional: relevant for physical tasks
+    deadline: float | None = None  # Optional: e.g., timestamp or duration
     status: TaskStatus = TaskStatus.PENDING
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    assigned_agent_id: Optional[str] = None
-    winning_bid: Optional[float] = None  # Store the value of the winning bid
+    assigned_agent_id: str | None = None
+    winning_bid: float | None = None  # Store the value of the winning bid
     creation_time: float = field(default_factory=time.time)
-    data: Optional[dict[str, Any]] = None  # For additional task-specific data
+    data: dict[str, Any] | None = None  # For additional task-specific data
 
     def __post_init__(self):
         # Basic validation
@@ -81,9 +82,9 @@ class Bid:
     task_id: str
     bid_value: float  # The calculated bid score/cost (lower is often better)
     # Optional fields providing more context for bid evaluation:
-    estimated_completion_time: Optional[float] = None
-    agent_capacity_available: Optional[int] = None
-    confidence_score: Optional[float] = (
+    estimated_completion_time: float | None = None
+    agent_capacity_available: int | None = None
+    confidence_score: float | None = (
         None  # Agent's confidence in completing the task
     )
 

@@ -4,7 +4,6 @@ Data models for suppliers.
 
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
 
 
 class SupplierRating(Enum):
@@ -43,15 +42,15 @@ class Supplier:
     supplier_id: str
     name: str
     rating: SupplierRating
-    product_capabilities: List[str] = field(default_factory=list)
+    product_capabilities: list[str] = field(default_factory=list)
     # Performance factors (example: lower value is better/faster/cheaper)
     cost_factor: float = 1.0
     speed_factor: float = 1.0
     quality_factor: float = 1.0  # Could represent defect rate, lower is better
     status: SupplierStatus = SupplierStatus.ACTIVE
     # current_bids: Dict[str, 'SupplierBid'] = field(default_factory=dict) # Might belong elsewhere
-    contact_email: Optional[str] = None
-    address: Optional[str] = None
+    contact_email: str | None = None
+    address: str | None = None
 
     def __post_init__(self):
         if not isinstance(self.rating, SupplierRating):

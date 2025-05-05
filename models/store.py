@@ -3,7 +3,7 @@ Data model for retail store entities.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Any
 from datetime import datetime
 from enum import Enum
 
@@ -15,13 +15,13 @@ class StoreLocation:
     """Geographic and address information for a store."""
 
     city: str
-    state: Optional[str] = None
-    postal_code: Optional[str] = None
-    address_line1: Optional[str] = None
-    address_line2: Optional[str] = None
+    state: str | None = None
+    postal_code: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
     country: str = "USA"
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    latitude: float | None = None
+    longitude: float | None = None
 
     def get_formatted_address(self) -> str:
         """Return a formatted address string."""
@@ -71,12 +71,12 @@ class Store:
     name: str
     location: str  # Simple location string for now, could use StoreLocation
     initial_cooperation_score: float = 1.0
-    store_type: Optional[StoreType] = None
+    store_type: StoreType | None = None
     transfer_cost_factor: float = 1.0
-    capacity: Optional[int] = None
-    opening_date: Optional[datetime] = None
-    inventory: Dict[str, InventoryPosition] = field(default_factory=dict)
-    transfer_history: List[Dict[str, Any]] = field(default_factory=list)
+    capacity: int | None = None
+    opening_date: datetime | None = None
+    inventory: dict[str, InventoryPosition] = field(default_factory=dict)
+    transfer_history: list[dict[str, Any]] = field(default_factory=list)
     cooperation_score: float = 1.0
 
     def __post_init__(self):
@@ -118,13 +118,13 @@ class Store:
             self.inventory[product_id].daily_sales_rate = new_rate
             self.inventory[product_id].last_updated = datetime.now()
 
-    def get_inventory_status(self, product_id: str) -> Optional[InventoryStatus]:
+    def get_inventory_status(self, product_id: str) -> InventoryStatus | None:
         """Get the inventory status enum for a product."""
         if product_id not in self.inventory:
             return None
         return self.inventory[product_id].get_status()
 
-    def get_sharable_inventory(self) -> Dict[str, int]:
+    def get_sharable_inventory(self) -> dict[str, int]:
         """Return a dict of product_id to excess units for products with excess inventory."""
         sharable = {}
         for pid, pos in self.inventory.items():
@@ -133,7 +133,7 @@ class Store:
                 sharable[pid] = excess
         return sharable
 
-    def get_needed_inventory(self) -> Dict[str, int]:
+    def get_needed_inventory(self) -> dict[str, int]:
         """Return a dict of product_id to needed units for products with low or critical inventory."""
         needed = {}
         for pid, pos in self.inventory.items():

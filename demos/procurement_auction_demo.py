@@ -6,49 +6,67 @@ import asyncio
 import random
 import logging
 import pandas as pd
-from datetime import datetime # Needed for bid simulation
-from typing import Optional # Added Optional
+from datetime import datetime  # Needed for bid simulation
 
 # Import necessary components from the project structure
 from models.supplier import Supplier, SupplierRating
-from models.procurement import PurchaseOrder, PurchaseOrderStatus, SupplierBid # Added SupplierBid
+from models.procurement import (
+    PurchaseOrder,
+    SupplierBid,
+)  # Added SupplierBid
 from agents.protocols.auction import ProcurementAuction, AuctionType
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
+
 # --- Helper Function to Simulate Bid Calculation ---
-def simulate_bid(supplier: Supplier, purchase_order: PurchaseOrder) -> Optional[SupplierBid]:
+def simulate_bid(
+    supplier: Supplier, purchase_order: PurchaseOrder
+) -> SupplierBid | None:
     """Simulates a supplier calculating a bid, returning None if constraints not met."""
     # Basic check if supplier is capable (more checks could be added)
     if purchase_order.product_id not in supplier.product_capabilities:
         return None
 
     # Simulate price based on cost factor and random variation
-    base_price_per_unit = 15.0 # Example base cost
-    simulated_cost = base_price_per_unit * supplier.cost_factor * random.uniform(0.95, 1.05)
+    base_price_per_unit = 15.0  # Example base cost
+    simulated_cost = (
+        base_price_per_unit * supplier.cost_factor * random.uniform(0.95, 1.05)
+    )
     total_price = simulated_cost * purchase_order.quantity
 
     # Simulate delivery days based on speed factor and quantity
     base_days = 5
-    simulated_days = int(base_days + (purchase_order.quantity / 200.0) * supplier.speed_factor * random.uniform(0.8, 1.2))
+    simulated_days = int(
+        base_days
+        + (purchase_order.quantity / 200.0)
+        * supplier.speed_factor
+        * random.uniform(0.8, 1.2)
+    )
 
     # Simulate quality guarantee based on quality factor (lower factor = better quality)
     base_quality = 0.85
-    simulated_quality = min(0.99, base_quality + (1.0 / (supplier.quality_factor + 0.1)) * 0.15 * random.uniform(0.9, 1.1))
+    simulated_quality = min(
+        0.99,
+        base_quality
+        + (1.0 / (supplier.quality_factor + 0.1)) * 0.15 * random.uniform(0.9, 1.1),
+    )
 
     # --- Check Constraints (Must meet PO requirements) ---
     days_until_required = (purchase_order.required_delivery_date - datetime.now()).days
     if simulated_days > days_until_required:
         # print(f"DEBUG: {supplier.name} cannot meet deadline ({simulated_days} > {days_until_required})")
-        return None # Cannot meet deadline
+        return None  # Cannot meet deadline
     if simulated_quality < purchase_order.quality_threshold:
         # print(f"DEBUG: {supplier.name} cannot meet quality ({simulated_quality:.2f} < {purchase_order.quality_threshold})")
-        return None # Cannot meet quality
+        return None  # Cannot meet quality
     if total_price > purchase_order.maximum_acceptable_price:
         # print(f"DEBUG: {supplier.name} price too high (${total_price:.2f} > ${purchase_order.maximum_acceptable_price})")
-        return None # Exceeds budget
+        return None  # Exceeds budget
 
     # If constraints met, create and return the bid
     return SupplierBid(
@@ -58,7 +76,10 @@ def simulate_bid(supplier: Supplier, purchase_order: PurchaseOrder) -> Optional[
         delivery_days=simulated_days,
         quality_guarantee=round(simulated_quality, 3),
     )
+
+
 # --------------------------------------------------
+
 
 async def demo_procurement_auction():
     """Runs the procurement auction demonstration."""
@@ -73,7 +94,7 @@ async def demo_procurement_auction():
             product_capabilities=["PROD-XYZ", "PROD-ABC"],
             cost_factor=1.1,
             speed_factor=1.0,
-            quality_factor=0.9, # Lower is better?
+            quality_factor=0.9,  # Lower is better?
         ),
         "sup2": Supplier(
             supplier_id="sup2",
@@ -109,8 +130,8 @@ async def demo_procurement_auction():
     purchase_order = PurchaseOrder(
         product_id="PROD-XYZ",
         quantity=1000,
-        deadline_days=30, # Example: delivery needed within 30 days
-        maximum_acceptable_price=20000.0, # Example budget
+        deadline_days=30,  # Example: delivery needed within 30 days
+        maximum_acceptable_price=20000.0,  # Example budget
         quality_threshold=0.90,
     )
     # Access the generated ID
@@ -134,21 +155,27 @@ async def demo_procurement_auction():
     logger.info("Starting auction...")
     if not await auction.start_auction():
         logger.error("Auction failed to start (e.g., not enough participants).")
-        return # Exit if auction couldn't start
+        return  # Exit if auction couldn't start
     logger.info("Auction active. Simulating bids...")
 
     # Simulate bid submission
     submitted_bids = 0
     for supplier_id, supplier in suppliers_data.items():
-        bid = simulate_bid(supplier, purchase_order) # Use helper to simulate
+        bid = simulate_bid(supplier, purchase_order)  # Use helper to simulate
         if bid:
             if auction.submit_bid(bid):
-                 logger.info(f"  Supplier {supplier.name} submitted bid: ${bid.price:.2f}, {bid.delivery_days} days, {bid.quality_guarantee:.2%} qual.")
-                 submitted_bids += 1
+                logger.info(
+                    f"  Supplier {supplier.name} submitted bid: ${bid.price:.2f}, {bid.delivery_days} days, {bid.quality_guarantee:.2%} qual."
+                )
+                submitted_bids += 1
             else:
-                 logger.warning(f"  Supplier {supplier.name}'s generated bid was rejected by auction protocol (e.g., too late, invalid round). Bid: ${bid.price:.2f}")
+                logger.warning(
+                    f"  Supplier {supplier.name}'s generated bid was rejected by auction protocol (e.g., too late, invalid round). Bid: ${bid.price:.2f}"
+                )
         else:
-            logger.info(f"  Supplier {supplier.name} did not submit a valid bid (constraints not met)." )
+            logger.info(
+                f"  Supplier {supplier.name} did not submit a valid bid (constraints not met)."
+            )
 
     logger.info(f"{submitted_bids} bids were successfully submitted.")
 
@@ -160,7 +187,7 @@ async def demo_procurement_auction():
 
     # Finalize the auction
     logger.info("Finalizing auction...")
-    winning_bid = await auction.finalize_auction() # finalize determines winner
+    winning_bid = await auction.finalize_auction()  # finalize determines winner
     logger.info("Auction finished.")
 
     # Print results

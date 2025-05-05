@@ -5,17 +5,19 @@ Demonstration of the fulfillment planning system.
 import random
 import time
 import logging
-import marimo as mo # Keep for now, might remove if only running script
 
 # Import the refactored components
 from models.fulfillment import Item, Order, Associate
 from utils.planning import StoreLayout, FulfillmentPlanner
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
-def demo_fulfillment_system(mo_instance=None): # Allow passing mo for notebook context
+
+def demo_fulfillment_system(mo_instance=None):  # Allow passing mo for notebook context
     """Demonstrate the fulfillment optimization system with a sample scenario."""
     logger.info("\n--- Starting Fulfillment Optimization Demo ---")
     # Create store layout
@@ -161,7 +163,7 @@ def demo_fulfillment_system(mo_instance=None): # Allow passing mo for notebook c
     # Generate plan
     logger.info("Generating fulfillment plan...")
     start_time = time.time()
-    planner.plan() # Call plan
+    planner.plan()  # Call plan
     end_time = time.time()
     logger.info(f"Plan generated in {end_time - start_time:.3f} seconds")
     # Explain plan
@@ -193,7 +195,8 @@ def demo_fulfillment_system(mo_instance=None): # Allow passing mo for notebook c
         # (Visualization requires further handling like saving to file)
         if plan_figure:
             print("(Visualization generated, not shown in script output)")
-        return explanation_text # Return text explanation
+        return explanation_text  # Return text explanation
+
 
 if __name__ == "__main__":
-    demo_fulfillment_system() 
+    demo_fulfillment_system()

@@ -7,7 +7,6 @@ from environments.mdp import DynamicPricingMDP
 from agents.qlearning import QLearningAgent
 from config.config import DynamicPricingMDPConfig, QLearningAgentConfig
 from utils.logger import get_logger
-from typing import List, Dict, Tuple, Optional
 
 logger = get_logger("demos.dynamic_pricing")
 
@@ -17,7 +16,7 @@ def train_agent(
     agent: QLearningAgent,
     num_episodes: int = 5000,
     verbose: bool = False,
-) -> tuple[List[float], Dict[Tuple[int, int, int], int]]:
+) -> tuple[list[float], dict[tuple[int, int, int], int]]:
     """
     Train a Q-learning agent on the Dynamic Pricing MDP.
     Returns:
@@ -25,7 +24,7 @@ def train_agent(
         - List of total returns for each episode.
         - The learned policy (dictionary mapping state to best action index).
     """
-    episode_returns: List[float] = []
+    episode_returns: list[float] = []
     print_every = max(1, num_episodes // 20)
     logger.info(f"Starting training for {num_episodes} episodes...")
     for episode in range(num_episodes):
@@ -59,14 +58,14 @@ def train_agent(
                 f"Exploration Rate: {agent.exploration_rate:.4f}"
             )
     logger.info("Training complete.")
-    policy: Dict[Tuple[int, int, int], int] = agent.get_policy()
+    policy: dict[tuple[int, int, int], int] = agent.get_policy()
     logger.info(f"Learned policy has {len(policy)} state entries.")
     return episode_returns, policy
 
 
 def demonstrate_mdp_dynamic_pricing(
     env_config: DynamicPricingMDPConfig = DynamicPricingMDPConfig(),
-    agent_config: Optional[QLearningAgentConfig] = None,
+    agent_config: QLearningAgentConfig | None = None,
     num_training_episodes: int = 10000,
     verbose: bool = True,
 ) -> dict:

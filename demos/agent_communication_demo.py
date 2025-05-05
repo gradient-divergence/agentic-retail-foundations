@@ -10,7 +10,9 @@ from models.messaging import AgentMessage, Performative
 from agents.messaging import MessageBroker
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -23,13 +25,15 @@ async def demo_retail_agent_communication():
     broker = MessageBroker()
 
     async def inventory_agent_handler(msg: AgentMessage):
-        log_msg = f"Inventory agent received: {msg.performative.value} from {msg.sender}"
+        log_msg = (
+            f"Inventory agent received: {msg.performative.value} from {msg.sender}"
+        )
         log_messages.append(log_msg)
         logger.info(log_msg)
 
         if msg.performative == Performative.QUERY:
             product_id = msg.content.get("product_id")
-            stock_level = 15 if product_id == "P1001" else 5 # Simulate stock
+            stock_level = 15 if product_id == "P1001" else 5  # Simulate stock
             response = msg.create_reply(
                 Performative.INFORM,
                 {"product_id": product_id, "stock_level": stock_level},
@@ -40,14 +44,16 @@ async def demo_retail_agent_communication():
             logger.info(log_msg)
 
         elif msg.performative == Performative.SUBSCRIBE:
-            topic = msg.content.get("topic", "default_topic") # Use topic from content
+            topic = msg.content.get("topic", "default_topic")  # Use topic from content
             broker.subscribe(msg.sender, topic)
             log_msg = f"Registered {msg.sender} for topic '{topic}'"
             log_messages.append(log_msg)
             logger.info(log_msg)
 
     async def replenishment_agent_handler(msg: AgentMessage):
-        log_msg = f"Replenishment agent received: {msg.performative.value} from {msg.sender}"
+        log_msg = (
+            f"Replenishment agent received: {msg.performative.value} from {msg.sender}"
+        )
         log_messages.append(log_msg)
         logger.info(log_msg)
 
@@ -79,7 +85,7 @@ async def demo_retail_agent_communication():
         performative=Performative.SUBSCRIBE,
         sender="replenishment",
         receiver="inventory",
-        content={"topic": "inventory_alerts"}, # Specify topic
+        content={"topic": "inventory_alerts"},  # Specify topic
     )
     await broker.deliver_message(subscribe_msg)
     await asyncio.sleep(0.1)
@@ -87,8 +93,8 @@ async def demo_retail_agent_communication():
     logger.info("Step 3: Inventory system sends an alert about low stock of P1002")
     alert_msg = AgentMessage(
         performative=Performative.INFORM,
-        sender="inventory_system", # Simulate system message
-        receiver="topic:inventory_alerts", # Publish to topic
+        sender="inventory_system",  # Simulate system message
+        receiver="topic:inventory_alerts",  # Publish to topic
         content={
             "product_id": "P1002",
             "stock_level": 3,
@@ -96,7 +102,7 @@ async def demo_retail_agent_communication():
         },
     )
     await broker.deliver_message(alert_msg)
-    await asyncio.sleep(0.1) # Ensure alert is processed
+    await asyncio.sleep(0.1)  # Ensure alert is processed
 
     logger.info("Agent Communication Demo completed.")
     print("\n--- Communication Log ---")

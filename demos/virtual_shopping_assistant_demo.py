@@ -5,7 +5,6 @@ This script demonstrates how an AI assistant can recommend outfits by calling
 a predefined function when prompted by the user.
 """
 
-import os
 import json
 import logging
 from openai import OpenAI, OpenAIError
@@ -169,4 +168,4 @@ if __name__ == "__main__":
     # Example of running the demo directly
     run_assistant_demo()
     # Example with a different query
-    # run_assistant_demo("What should I wear for a formal event?") 
+    # run_assistant_demo("What should I wear for a formal event?")

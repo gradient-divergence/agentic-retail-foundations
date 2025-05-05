@@ -13,26 +13,20 @@ logger = logging.getLogger(__name__)
 
 # --- Placeholder Agent Framework ---
 
-
 class Tool:
     """Placeholder for an agent tool."""
-
     def __init__(self, name: str, func, description: str):
         self.name = name
         self.func = func
         self.description = description
 
-
 class Agent:
     """Placeholder for an agent."""
-
     def __init__(self, name: str, instructions: str, tools: list[Tool]):
         self.name = name
         self.instructions = instructions
         self.tools = {tool.name: tool for tool in tools}
-        logger.info(
-            f"Agent '{self.name}' initialized with tools: {list(self.tools.keys())}"
-        )
+        logger.info(f"Agent '{self.name}' initialized with tools: {list(self.tools.keys())}")
 
     def run(self, task: str):
         """Simulates the agent running a task (highly simplified)."""
@@ -44,52 +38,34 @@ class Agent:
             order_tool = self.tools.get("order_product")
 
             if not stock_tool or not order_tool:
-                return type(
-                    "Result", (), {"final_output": "Error: Missing required tools."}
-                )()
+                return type("Result", (), {"final_output": "Error: Missing required tools."})()
 
             current_stock = stock_tool.func(product_id="product_123")
             logger.info(f"Checked inventory for product_123: {current_stock}")
 
             if current_stock < 50:
                 amount_to_order = 50 - current_stock
-                logger.info(
-                    f"Stock below threshold ({current_stock} < 50). Ordering {amount_to_order} units."
-                )
+                logger.info(f"Stock below threshold ({current_stock} < 50). Ordering {amount_to_order} units.")
                 # Simulate ordering
-                order_result = order_tool.func(
-                    product_id="product_123", amount=amount_to_order
-                )
+                order_result = order_tool.func(product_id="product_123", amount=amount_to_order)
                 return type("Result", (), {"final_output": order_result})()
             else:
                 logger.info("Stock is sufficient.")
-                return type(
-                    "Result",
-                    (),
-                    {"final_output": "Stock level is sufficient. No action needed."},
-                )()
+                return type("Result", (), {"final_output": "Stock level is sufficient. No action needed."})()
         else:
             logger.warning("Simplified agent logic cannot handle this task.")
-            return type(
-                "Result",
-                (),
-                {"final_output": "Task not understood by simplified agent."},
-            )()
-
+            return type("Result", (), {"final_output": "Task not understood by simplified agent."})()
 
 class Runner:
     """Placeholder for an agent runner."""
-
     @staticmethod
     def run_sync(agent: Agent, task: str):
         return agent.run(task)
-
 
 # --- Inventory Demo Specific Logic ---
 
 # Simulated inventory database
 inventory_db = {"product_123": 20}
-
 
 # Tool Functions
 def check_inventory(product_id: str) -> int:
@@ -97,7 +73,6 @@ def check_inventory(product_id: str) -> int:
     stock = inventory_db.get(product_id, 0)
     logger.debug(f"Tool 'check_inventory' called for {product_id}. Returning {stock}")
     return stock
-
 
 def order_product(product_id: str, amount: int) -> str:
     """Order more of the given product and update inventory."""
@@ -108,9 +83,7 @@ def order_product(product_id: str, amount: int) -> str:
     logger.info(result_msg)
     return result_msg
 
-
 # --- Demo Execution ---
-
 
 def run_inventory_demo():
     """Sets up and runs the inventory agent demo."""
@@ -143,21 +116,16 @@ def run_inventory_demo():
     logger.info(f"Task: {task}")
 
     # Print initial stock
-    logger.info(
-        f"Initial stock level (product_123): {inventory_db.get('product_123', 0)}"
-    )
+    logger.info(f"Initial stock level (product_123): {inventory_db.get('product_123', 0)}")
 
     # Run the agent
     result = Runner.run_sync(inventory_agent, task)
 
     # Print the final result and updated stock
     logger.info(f"Agent Result: {result.final_output}")
-    logger.info(
-        f"Final stock level (product_123): {inventory_db.get('product_123', 0)}"
-    )
+    logger.info(f"Final stock level (product_123): {inventory_db.get('product_123', 0)}")
     logger.info("--- Inventory Management Agent Demo Finished ---")
-    return result.final_output  # Return result for potential display in Marimo
-
+    return result.final_output # Return result for potential display in Marimo
 
 if __name__ == "__main__":
-    run_inventory_demo()
+    run_inventory_demo() 

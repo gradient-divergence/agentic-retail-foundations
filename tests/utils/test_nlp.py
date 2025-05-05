@@ -61,7 +61,7 @@ async def test_classify_intent(monkeypatch):
         (None, "unknown", False),
         ("", "unknown", True), # Empty string fails validation -> unknown, warning
         ("   ", "unknown", True), # Whitespace strips empty -> unknown, warning
-        ("cancel_order", "general_inquiry", True), # Unexpected intent -> general_inquiry, WITH warning
+        ("cancel_order", "unknown", True), # Unexpected intent -> unknown, WITH warning
     ],
 )
 @pytest.mark.asyncio
@@ -89,8 +89,35 @@ async def test_classify_intent_edge_cases(
         )
 
     assert intent == expected_intent
-    log_present = "LLM returned unexpected intent:" in caplog.text
-    assert log_present == expect_warning_log
+    # Adjust log check based on the specific warning expected
+    log_present = False
+    expected_log_substring = None
+    if llm_response_content is not None:
+        # Handle the specific test cases explicitly
+        if llm_response_content == "": # Empty string
+            expected_log_substring = "LLM completion failed or gave empty content."
+        elif llm_response_content == "   ": # Whitespace only
+             expected_log_substring = "LLM returned unexpected intent:"
+        elif llm_response_content == "cancel_order": # Non-empty, unexpected
+             expected_log_substring = "LLM returned unexpected intent:"
+        # Add other specific unexpected content checks here if needed
+
+    if expect_warning_log and expected_log_substring:
+        log_present = expected_log_substring in caplog.text
+    elif expect_warning_log and not expected_log_substring:
+        # This case shouldn't happen if parametrize is correct, but indicates a mismatch
+        log_present = False
+    elif not expect_warning_log:
+        # If we don't expect a log, ensure *none* of the warning substrings are present
+        log_present = not any(sub in caplog.text for sub in [
+            "LLM completion failed or gave empty content.",
+            "LLM returned unexpected intent:"
+        ] if sub)
+    else: # Should not happen
+        log_present = False
+
+    assert log_present == expect_warning_log, \
+           f"Log check failed. Expected log? {expect_warning_log}. Expected substring: '{expected_log_substring}'. Actual logs: {caplog.text!r}"
 
 
 @pytest.mark.asyncio

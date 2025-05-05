@@ -66,20 +66,22 @@ async def test_handle_order_event_tracking_and_status(
     mock_dt.now.return_value = fixed_now # Used for logging potentially
 
     order_id = "ORD_TRACK_1"
-    event1_ts = (fixed_now - timedelta(minutes=5)).isoformat()
-    event2_ts = fixed_now.isoformat()
+    event1_dt = fixed_now - timedelta(minutes=5)
+    event2_dt = fixed_now
+    event1_ts_str = event1_dt.isoformat() # Store the string version
+    event2_ts_str = event2_dt.isoformat()
 
     event1 = RetailEvent(
         event_type="order.created",
         payload={"order_id": order_id, "customer_id": "C1"},
         source=AgentType.ORDER_INGESTION,
-        timestamp=event1_ts
+        timestamp=event1_dt # Use datetime object here
     )
     event2 = RetailEvent(
         event_type="order.allocated",
         payload={"order_id": order_id, "items": []},
         source=AgentType.INVENTORY,
-        timestamp=event2_ts
+        timestamp=event2_dt # Use datetime object here
     )
 
     with caplog.at_level(logging.INFO):
@@ -91,10 +93,20 @@ async def test_handle_order_event_tracking_and_status(
     order_state = orchestrator.orders[order_id]
     assert len(order_state["events"]) == 2
     assert order_state["events"][0]["event_type"] == "order.created"
-    assert order_state["events"][0]["timestamp"] == event1_ts
+    # Compare ISO format strings
+    stored_ts_1 = order_state["events"][0]["timestamp"]
+    assert isinstance(stored_ts_1, datetime)
+    assert stored_ts_1.isoformat() == event1_ts_str
+
     assert order_state["events"][1]["event_type"] == "order.allocated"
-    assert order_state["events"][1]["timestamp"] == event2_ts
-    assert order_state["last_update"] == event2_ts
+    stored_ts_2 = order_state["events"][1]["timestamp"]
+    assert isinstance(stored_ts_2, datetime)
+    assert stored_ts_2.isoformat() == event2_ts_str
+
+    stored_last_update = order_state["last_update"]
+    assert isinstance(stored_last_update, datetime)
+    assert stored_last_update.isoformat() == event2_ts_str
+
     assert order_state["current_status"] == OrderStatus.ALLOCATED.value # Mapped from event type
 
     # Verify logging
@@ -214,43 +226,58 @@ async def test_apply_recovery_strategy(
     order_id = "ORD_RECOV_1"
 
     # Case 1: Inventory allocation failure
+    payload_inv = {"order_id": order_id, "error_details": {"context": {"stage": "allocation"}}}
     event_inv = RetailEvent(
-        "order.exception", {"order_id": order_id, "error_details": {"context": {"stage": "allocation"}}},
+        event_type="order.exception",
+        payload=payload_inv,
         source=AgentType.INVENTORY
     )
-    await orchestrator._apply_recovery_strategy(order_id, event_inv)
-    mock_handle_inventory.assert_awaited_once_with(order_id)
+    await orchestrator._apply_recovery_strategy(order_id, event_inv) # Pass order_id and event
+    mock_handle_inventory.assert_awaited_once_with(order_id) # Expect order_id based on helper signature
     mock_handle_payment.assert_not_awaited()
     mock_escalate.assert_not_awaited()
     mock_handle_inventory.reset_mock()
 
     # Case 2: Payment failure
+    payload_pay = {"order_id": order_id, "error_details": {"context": {"stage": "payment"}, "error_type": "CardInvalid"}}
     event_pay = RetailEvent(
-        "order.exception", {"order_id": order_id, "error_details": {"error_type": "CardExpired"}},
+        event_type="order.exception",
+        payload=payload_pay,
         source=AgentType.PAYMENT
     )
-    await orchestrator._apply_recovery_strategy(order_id, event_pay)
+    await orchestrator._apply_recovery_strategy(order_id, event_pay) # Pass order_id and event
+    # Expect order_id and error_type based on helper signature
+    mock_handle_payment.assert_awaited_once_with(order_id, payload_pay["error_details"]["error_type"])
     mock_handle_inventory.assert_not_awaited()
-    mock_handle_payment.assert_awaited_once_with(order_id, "CardExpired")
     mock_escalate.assert_not_awaited()
     mock_handle_payment.reset_mock()
 
-    # Case 3: Unknown source/context -> Escalate
-    event_unknown = RetailEvent(
-        "order.exception", {"order_id": order_id, "error_details": {}},
-        source=AgentType.FULFILLMENT # Example other source
+    # Case 3: Other/Unknown failure -> Escalate
+    payload_other = {"order_id": order_id, "error_details": {"context": {"stage": "unknown"}}}
+    event_other = RetailEvent(
+        event_type="order.exception",
+        payload=payload_other,
+        source=AgentType.FULFILLMENT
     )
-    await orchestrator._apply_recovery_strategy(order_id, event_unknown)
+    await orchestrator._apply_recovery_strategy(order_id, event_other) # Pass order_id and event
+    # Expect order_id and error_details based on helper signature
+    mock_escalate.assert_awaited_once_with(order_id, payload_other["error_details"])
     mock_handle_inventory.assert_not_awaited()
     mock_handle_payment.assert_not_awaited()
-    mock_escalate.assert_awaited_once_with(order_id, {})
     mock_escalate.reset_mock()
 
-    # Case 4: No event provided (e.g., internal trigger) -> Escalate
-    await orchestrator._apply_recovery_strategy(order_id, None)
+    # Case 4: Missing error details -> Escalate
+    payload_no_details = {"order_id": order_id} # No error_details
+    event_no_details = RetailEvent(
+        event_type="order.exception",
+        payload=payload_no_details,
+        source=AgentType.INVENTORY
+    )
+    await orchestrator._apply_recovery_strategy(order_id, event_no_details) # Pass order_id and event
+    # Expect order_id and empty dict for error_details based on helper signature
+    mock_escalate.assert_awaited_once_with(order_id, {})
     mock_handle_inventory.assert_not_awaited()
     mock_handle_payment.assert_not_awaited()
-    mock_escalate.assert_awaited_once_with(order_id, {})
 
 @pytest.mark.asyncio
 @patch.object(MasterOrchestrator, 'publish_event', new_callable=AsyncMock)

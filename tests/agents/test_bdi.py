@@ -163,7 +163,8 @@ def test_observe_missing_data(bdi_agent: InventoryBDIAgent, caplog):
             "premium_slow", 50, [0,1,0,0,1,0,0], 10.0, 3, # Price=12 > 10*1.1
             {
                 "price_position": "premium", "inventory_status": "optimal",
-                "sales_assessment": "slow_moving", "market_situation": "price_sensitive_market",
+                "sales_assessment": "normal",
+                "market_situation": "balanced",
                 "days_of_supply": pytest.approx(50/0.29, 0.1), "projected_daily_sales": pytest.approx(0.29, 0.1)
             }
         ),

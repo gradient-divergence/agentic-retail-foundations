@@ -267,7 +267,8 @@ async def test_process_customer_inquiry_order_status(
 ):
     """Test the full flow for an order_status inquiry."""
     customer_id = "C123"
-    message = "Where is ORD123?"
+    # FIX: Use a message where regex won't find the ID, forcing LLM fallback
+    message = "Where is my recent package?"
     test_order_id = "ORD123"
 
     # --- Mock Setup --- #

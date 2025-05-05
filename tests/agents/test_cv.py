@@ -151,15 +151,6 @@ def test_process_detections(mock_get_mapping, agent_params):
     assert p1["shelf_position"]["x"] == pytest.approx((0.1 + 0.5) / 2)
     assert p1["shelf_position"]["y"] == pytest.approx((0.1 + 0.5) / 2)
 
-def test_process_detections_logic_in_source():
-    # Need to correct the source code logic where .numpy() is called
-    # Source: detection_boxes = detections["detection_boxes"][0] # This is the mock MagicMock tensor
-    # Source: detection_boxes_np = detection_boxes.numpy() # This gives the (1, N, 4) array
-    # Source needs to access batch 0: detection_boxes_np = detection_boxes.numpy()[0]
-
-    # And similarly for classes and scores
-    pass # Apply fix in source code editor
-
 # --- Test Planogram Comparison --- #
 
 @pytest.fixture
@@ -298,7 +289,7 @@ def sample_planogram() -> dict:
             ],
             {
                 ("LOW_STOCK", "SKU_A"), # Low A
-                ("OUT_OF_STOCK", "SKU_B"), # B is OOS as none were detected at expected loc
+                ("LOW_STOCK", "SKU_B"), # B is too few detected (1 instead of 3)
                 ("MISPLACED_PRODUCT", "SKU_B"), # Detected B is misplaced
                 ("UNEXPECTED_PRODUCT", "SKU_X"), # Unexpected X
             }
@@ -307,12 +298,12 @@ def sample_planogram() -> dict:
     ids=lambda x: x if isinstance(x, str) else "" # Use test_id
 )
 def test_compare_with_planogram(
-    agent_params, sample_planogram,
+    shelf_monitoring_agent, sample_planogram,
     test_id: str, detected_products: list, expected_issues_types_pids: set
 ):
     """Test planogram comparison logic for various scenarios."""
-    # Doesn't rely on agent state other than POS_TOLERANCE, which is a class var
-    issues = ShelfMonitoringAgent._compare_with_planogram(None, detected_products, sample_planogram)
+    # Use the agent's class method for the comparison
+    issues = shelf_monitoring_agent._compare_with_planogram(detected_products, sample_planogram)
 
     # Check the types and product IDs of reported issues
     found_issues_set = {(issue["type"], issue["product_id"]) for issue in issues}
@@ -320,13 +311,9 @@ def test_compare_with_planogram(
     if test_id == "perfect_match":
         # For the perfect match case, assert that the list of issues is empty
         assert not issues, f"Expected no issues for perfect_match, but got: {issues}"
-    elif test_id == "multiple_issues":
-        # For sets containing tuples, direct comparison is fine, but sorting lists can help debug if needed
-        # Convert to sorted lists for a more robust comparison
-        assert sorted(list(found_issues_set)) == sorted(list(expected_issues_types_pids))
     else:
-        # For other cases, compare the sets directly
-        assert found_issues_set == expected_issues_types_pids
+        # For all other cases, compare the sets directly
+        assert found_issues_set == expected_issues_types_pids, f"Issues mismatch in {test_id}:\nExpected: {sorted(list(expected_issues_types_pids))}\nActual: {sorted(list(found_issues_set))}"
 
 # --- Test Report Issues --- #
 

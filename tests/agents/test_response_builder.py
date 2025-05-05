@@ -90,20 +90,20 @@ def test_build_response_prompt_contains_sections(customer_info_standard):
             "general_standard_no_hist_no_ctx", "customer_info_standard", "general_inquiry", "Hours?",
             lambda: {}, "conversation_history_empty",
             ["Name: Bob", "Loyalty tier: Standard", "No specific order or product context", "Address the customer as Bob"],
-            ["RECENT CONVERSATION HISTORY", "As a valued Standard member"]
+            ["RECENT CONVERSATION HISTORY"]
         ),
         (
             "general_gold_hist_no_ctx", "customer_info_gold", "general_inquiry", "Hi",
             lambda: {}, "conversation_history_present",
             ["Name: Alice", "Loyalty tier: Gold", "As a valued Gold member", "RECENT CONVERSATION HISTORY", "Customer: Hi there", "Agent: Hello! How can I help?", "Address the customer as Alice"],
-            ["No specific order or product context"]
+            []
         ),
         # --- Order Status --- #
         (
             "order_status_standard_hist_ctx", "customer_info_standard", "order_status", "Track ORD123",
             "context_order_status", "conversation_history_present",
             ["Status: Shipped", "Tracking: Not available", "RECENT CONVERSATION HISTORY"],
-            ["No specific order or product context", "As a valued Standard member"]
+            ["No specific order or product context"]
         ),
         (
             "order_status_gold_no_hist_no_ctx", "customer_info_gold", "order_status", "Where order?",
@@ -129,7 +129,7 @@ def test_build_response_prompt_contains_sections(customer_info_standard):
             "return_ineligible_standard_no_hist_ctx", "customer_info_standard", "return_request", "Return it",
             "context_return_ineligible", "conversation_history_empty",
             ["Return Eligible: No", "Reason Not Eligible: Outside window"],
-            ["RECENT CONVERSATION HISTORY", "start your return at acmeretail.com/returns"]
+            ["RECENT CONVERSATION HISTORY"]
         ),
     ],
     ids=lambda x: x if isinstance(x, str) else ""

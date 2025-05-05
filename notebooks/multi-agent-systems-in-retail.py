@@ -8,10 +8,9 @@ app = marimo.App(width="full")
 def _():
     # Imports for types and standard libraries
     from collections import defaultdict
-    from dataclasses import dataclass
     from datetime import datetime, timedelta
     from enum import Enum
-    from typing import Any, Optional, List, Dict, Set
+    from typing import Any, Optional
     from collections.abc import Callable, Awaitable
     import asyncio
     import json
@@ -43,25 +42,59 @@ def _():
     from agents.coordinators.product_launch import ProductLaunchCoordinator
     from utils.planning import calculate_remediation_timeline
 
-    # Configure logging 
+    # Configure logging
     import logging
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    logger = logging.getLogger(__name__)
 
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    logger = logging.getLogger(__name__)
 
     # Return all imported names needed by subsequent cells
     return (
-        AgentMessage, Performative, MessageBroker,
-        Task, TaskStatus, TaskType, Bid,
-        StoreAgent, RetailCoordinator,
-        Supplier, SupplierRating, ProcurementAuction,
-        Store, InventoryCollaborationNetwork,
-        CustomerServiceAgent, MarketingAgent, PricingAgent, StoreOpsAgent,
-        SupplyChainAgent, ProductLaunchCoordinator,
+        AgentMessage,
+        Performative,
+        MessageBroker,
+        Task,
+        TaskStatus,
+        TaskType,
+        Bid,
+        StoreAgent,
+        RetailCoordinator,
+        Supplier,
+        SupplierRating,
+        ProcurementAuction,
+        Store,
+        InventoryCollaborationNetwork,
+        CustomerServiceAgent,
+        MarketingAgent,
+        PricingAgent,
+        StoreOpsAgent,
+        SupplyChainAgent,
+        ProductLaunchCoordinator,
         calculate_remediation_timeline,
-        asyncio, datetime, timedelta, Enum, Any, Optional, List, Dict, Set,
-        Callable, Awaitable, defaultdict, json, random, uuid,
-        mo, pathlib, pd, np, time, logging, logger,
+        asyncio,
+        datetime,
+        timedelta,
+        Enum,
+        Any,
+        Optional,
+        list,
+        dict,
+        set,
+        Callable,
+        Awaitable,
+        defaultdict,
+        json,
+        random,
+        uuid,
+        mo,
+        pathlib,
+        pd,
+        np,
+        time,
+        logging,
+        logger,
         # Add any other necessary models if used below, e.g. from procurement
     )
 
@@ -121,9 +154,13 @@ def _(asyncio, communication_logs, mo, run_comm_button):
         # For now, we just run it.
         await demo_retail_agent_communication()
         # Update state after completion (maybe with a success message)
-        communication_logs.set_value(["Communication Demo Completed (check console for logs)."])
+        communication_logs.set_value(
+            ["Communication Demo Completed (check console for logs)."]
+        )
 
-    _ = run_comm_button.on_click(lambda: asyncio.create_task(run_and_log_communication()))
+    _ = run_comm_button.on_click(
+        lambda: asyncio.create_task(run_and_log_communication())
+    )
 
     mo.md(
         f"""
@@ -265,7 +302,9 @@ def _(asyncio, mo, run_sharing_button, sharing_logs):
     async def run_and_log_sharing():
         """Runs the Inventory Sharing demo."""
         await demo_collaborative_inventory_sharing()
-        sharing_logs.set_value(["Inventory Sharing Demo Completed (check console for logs)."])
+        sharing_logs.set_value(
+            ["Inventory Sharing Demo Completed (check console for logs)."]
+        )
 
     _ = run_sharing_button.on_click(lambda: asyncio.create_task(run_and_log_sharing()))
 
@@ -313,7 +352,9 @@ def _(asyncio, launch_logs, mo, run_launch_button):
     async def run_and_log_launch():
         """Runs the Product Launch demo."""
         await demo_product_launch()
-        launch_logs.set_value(["Product Launch Demo Completed (check console for logs)."])
+        launch_logs.set_value(
+            ["Product Launch Demo Completed (check console for logs)."]
+        )
 
     _ = run_launch_button.on_click(lambda: asyncio.create_task(run_and_log_launch()))
 

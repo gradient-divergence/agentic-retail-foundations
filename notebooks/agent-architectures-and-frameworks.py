@@ -12,14 +12,10 @@ def _():
     - Logging setup
     - Return frequently used objects so other cells can receive them
     """
-    from dataclasses import dataclass, field
     from datetime import datetime, timedelta
-    from typing import Optional
 
     import marimo as mo
     import logging
-    import numpy as np
-    import requests
     import random
 
     from agents.bdi import InventoryBDIAgent

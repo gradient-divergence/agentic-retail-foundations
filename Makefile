@@ -9,7 +9,7 @@ PROJECT_NAME := $(shell basename $(CURDIR))
 
 # Directories containing project source code and tests
 # Adjust SRC_DIRS if your structure differs (e.g., src/agents instead of agents/)
-SRC_DIRS    := agents models utils connectors config environments demos notebooks
+# SRC_DIRS    := agents models utils connectors config environments demos notebooks # Removed as coverage source is read from pyproject.toml
 TEST_DIRS   := tests # Assuming tests are in a 'tests' directory
 
 
@@ -31,7 +31,7 @@ MKDOCS      ?= $(VENV_BIN)/mkdocs
 PRECOMMIT   ?= $(VENV_BIN)/pre-commit
 
 # Phony targets prevent conflicts with files of the same name
-.PHONY: venv install clean help lint format format-check type-check test coverage docs-build docs-serve precommit ci check clean-venv default shell
+.PHONY: venv install clean help lint format format-check type-check test coverage docs-build docs-serve precommit precommit-run ci check clean-venv default shell
 
 # Default target
 default: help
@@ -87,6 +87,10 @@ precommit: venv ## Install Git pre-commit hooks (ensures venv exists first)
 	@echo "--> Installing pre-commit hooks..."
 	$(PRECOMMIT) install
 
+precommit-run: venv ## Run pre-commit checks on all files
+	@echo "--> Running pre-commit checks on all files..."
+	$(PRECOMMIT) run --all-files
+
 ###############################################################################
 # Code Quality (Targets assume venv is active or run via make)
 ###############################################################################
@@ -117,10 +121,9 @@ test: venv ## Run unit & integration tests with Pytest
 	@echo "--> Running tests ($(PYTEST))..."
 	$(PYTEST) $(TEST_DIRS)
 
-coverage: venv ## Generate test coverage report
+coverage: test ## Generate test coverage report (assumes tests were run via make test)
 	@echo "--> Generating test coverage report ($(COVERAGE))..."
-	$(COVERAGE) run --source=$(subst $(eval) ,$(eval) ,,$(SRC_DIRS)) -m pytest $(TEST_DIRS)
-	$(COVERAGE) report -m --fail-under=80 # Example: fail if coverage < 80%
+	$(COVERAGE) report -m --fail-under=80 # Ensure fail-under matches pyproject.toml
 	@echo "--> HTML report generated: htmlcov/index.html"
 	$(COVERAGE) html
 

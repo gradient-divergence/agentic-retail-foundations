@@ -57,17 +57,8 @@ jobs:
     #              run checks & tests
     #----------------------------------------------
     # Note: The make targets should use the tools installed in .venv
-    - name: Lint with Ruff
-      run: make lint
-
-    - name: Check formatting with Ruff
-      run: make format-check
-
-    - name: Type check with MyPy
-      run: make type-check
-
-    - name: Test with Pytest
-      run: make test
+    - name: Run CI Checks (Format, Lint, Type Check, Test, Coverage, Docs Build)
+      run: make ci
 
     # Optional: Upload coverage report (if 'make coverage' generates one)
     # - name: Upload coverage reports to Codecov

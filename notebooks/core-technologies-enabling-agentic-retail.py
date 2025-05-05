@@ -145,9 +145,9 @@ def _(customer_service_agent, mo):
             )
             responses_md.append(
                 mo.md(
-                    f"**You:** {msg}\n\n" +
-                    f"**Agent:** {response.get('message', 'Error')}\n" +
-                    f"_(Actions: {response.get('actions', [])})_"
+                    f"**You:** {msg}\n\n"
+                    + f"**Agent:** {response.get('message', 'Error')}\n"
+                    + f"_(Actions: {response.get('actions', [])})_"
                 )
             )
             responses_md.append("---")

@@ -757,10 +757,10 @@ def _(mo):
 def _(mo):
     # Import the demo function from the new location
     from demos.fulfillment_planning_demo import demo_fulfillment_system
-    
+
     # Run the demo, passing the Marimo instance for output rendering
     fulfillment_output = demo_fulfillment_system(mo)
-    
+
     # Display the output returned by the demo function
     return fulfillment_output
 

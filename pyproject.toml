@@ -60,13 +60,15 @@ dependencies = [
     "tensorflow~=2.16.0",
     "opencv-python-headless>=4.9.0",
     "rdflib>=7.1.4",
-    "dowhy",
-    "econml",
+    "SPARQLWrapper>=2.0",
+    "dowhy>=0.11",
+    "econml>=0.14",
     "doubleml>=0.9.3",
     "networkx>=3.4.2",
     "python-dotenv>=1.0.0",
     "psycopg2-binary>=2.9.9",
     "supabase>=2.0.0",
+    "redis>=5.0",
 ]
 
 [project.optional-dependencies]
@@ -80,7 +82,9 @@ dev = [
     "coverage[toml]>=7.0",
     "pre-commit>=4.2.0",
     "uv>=0.1.20",
-    "types-redis",
+    # Dependencies needed for mocking in tests
+    "kafka-python>=2.0", # For mocking kafka clients
+    # Type stubs
     "types-requests",
     "pandas-stubs",
     "types-tensorflow",
@@ -117,11 +121,14 @@ target-version = "py310" # Minimum Python version to target for compatibility
 line-length = 88
 # Select rule codes to enable. Add more as needed (e.g., "I" for isort)
 # Start with defaults and gradually add more. `ruff check --select ALL .` shows available.
-select = ["E", "F", "W", "C90", "UP"] # Common subset: pyflakes, pycodestyle, mccabe, flake8-bugbear, pyupgrade
+select = ["E", "F", "W", "C90", "UP", "I", "B", "T20"] # Added I (isort), B (bugbear), T20 (print)
 ignore = [] # Rule codes to ignore (e.g., "E501" if you don't enforce line length strictly)
 
 [tool.ruff.lint.per-file-ignores]
 "notebooks/ethical-considerations-and-governance.py" = ["E501"]
+"notebooks/multi-agent-systems-in-retail.py" = ["E501"]
+"notebooks/sensor-networks-and-cognitive-systems.py" = ["E501"]
+"notebooks/real-world-case-studies.py" = ["E501"]
 
 [tool.ruff.lint]
 # Exclude common directories
@@ -159,6 +166,7 @@ line-ending = "auto"
 python_version = "3.10" # Match your project's minimum Python version
 warn_return_any = true
 warn_unused_configs = true
+disallow_untyped_defs = true # Ensure all functions are annotated
 # Removed global ignore_missing_imports (false is default)
 
 # Global excludes
@@ -205,7 +213,7 @@ pythonpath = "." # Add project root to PYTHONPATH for imports
 [tool.coverage.run]
 # See https://coverage.readthedocs.io/en/latest/config.html
 branch = true # Measure branch coverage
-source = ["agents", "connectors", "models", "utils", "demos", "config", "environments"]
+source = ["agents", "connectors", "utils", "demos", "config", "environments"]
 # omit = ["*/tests/*", "*/__main__.py"] # Files/patterns to exclude from coverage
 
 [tool.coverage.report]

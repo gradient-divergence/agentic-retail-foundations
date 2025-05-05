@@ -7,7 +7,6 @@ import numpy as np
 from config.config import DynamicPricingMDPConfig
 from utils.logger import get_logger
 import pickle
-from typing import Tuple, List
 
 
 class DynamicPricingMDP:
@@ -34,9 +33,9 @@ class DynamicPricingMDP:
         self.current_week = 0
         self.current_inventory = self.initial_inventory
         self.current_discount_index = 0
-        self._episode_rewards: List[float] = []
-        self._episode_states: List[Tuple[int, int, int]] = []
-        self._episode_actions: List[int] = []
+        self._episode_rewards: list[float] = []
+        self._episode_states: list[tuple[int, int, int]] = []
+        self._episode_actions: list[int] = []
         self.logger.info(
             f"DynamicPricingMDP initialized: {self.season_length_weeks} weeks, {self.initial_inventory} units, discounts: {self.available_discounts}"
         )

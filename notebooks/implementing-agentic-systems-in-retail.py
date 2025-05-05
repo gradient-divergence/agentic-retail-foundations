@@ -13,7 +13,6 @@ def __():
     from supabase import create_client
     import os
     import psycopg2
-    import marimo as mo
 
     # Return all modules needed by other cells
     return mo, FastAPI, HTTPException, RealDictCursor, create_client, os, psycopg2
@@ -308,7 +307,6 @@ def __(mo):
         """
     )
     return
-
 
 
 if __name__ == "__main__":

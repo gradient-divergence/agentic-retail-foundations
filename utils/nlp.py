@@ -1,17 +1,12 @@
-from __future__ import annotations
+"""Natural Language Processing Utilities for Agentic Systems.
 
-"""NLP-related helpers that rely on LLM calls but **do not** have any business logic.
-
-The goal is to keep the `RetailCustomerServiceAgent` lean by extracting reusable
-functionality here.  The helpers expect an initialised `openai.OpenAI` client and
-are pure in the sense that they do not mutate external state.
+This module provides functions for common NLP tasks needed by retail agents,
+such as intent classification, entity extraction (order IDs, product IDs),
+and sentiment analysis, leveraging OpenAI's models.
 """
 
 import logging
-from typing import Union, List, Dict, Any, Optional
-
 from openai import OpenAI, AsyncOpenAI
-
 from utils.openai_utils import safe_chat_completion
 from agents.prompts import (
     build_intent_classification_prompt,
@@ -22,22 +17,21 @@ from agents.prompts import (
 
 __all__ = [
     "classify_intent",
-    "extract_order_id_via_llm",
-    "extract_product_identifier",
-    "analyze_sentiment",
+    "extract_order_id_llm",
+    "extract_product_id",
+    "sentiment_analysis",
 ]
 
+logger_nlp = logging.getLogger(__name__)
 
-async def classify_intent(
-    client: AsyncOpenAI | OpenAI,
-    *,
-    message: str,
-    model: str,
-    logger: logging.Logger,
-    retry_attempts: int = 3,
-    retry_backoff: float = 1.0,
-) -> str:
+
+async def classify_intent(client: AsyncOpenAI, *, message: str) -> str:
     """Return one of the allowed intents inferred by the LLM."""
+    # Ensure client is AsyncOpenAI
+    if not isinstance(client, AsyncOpenAI):
+        logger_nlp.error("Expected AsyncOpenAI client for classify_intent")
+        return "unknown" # Or raise TypeError
+
     prompt = build_intent_classification_prompt(message)
     messages = [
         {
@@ -51,29 +45,28 @@ async def classify_intent(
     ]
     completion = await safe_chat_completion(
         client,
-        model=model,
+        model="gpt-3.5-turbo",
         messages=messages,
-        logger=logger,
-        retry_attempts=retry_attempts,
-        retry_backoff=retry_backoff,
+        logger=logger_nlp,
         max_tokens=15,
         temperature=0,
-        stop=["\n"],
     )
-    content = completion.choices[0].message.content
-    intent_result = content.strip().lower() if content else "general_inquiry"
-    valid_intents = [
-        "order_status",
-        "product_question",
-        "return_request",
-        "complaint",
-        "general_inquiry",
-    ]
-    return intent_result if intent_result in valid_intents else "general_inquiry"
+    # Handle potential None completion
+    if completion and completion.choices and completion.choices[0].message.content:
+        intent = completion.choices[0].message.content.strip().lower()
+        # Validate against allowed intents
+        allowed_intents = {"order_status", "product_question", "return_request", "complaint", "general_inquiry"}
+        if intent in allowed_intents:
+            return intent
+        else:
+            logger_nlp.warning(f"LLM returned unexpected intent: {intent}")
+            return "unknown" # Fallback should be unknown, not general_inquiry
+    logger_nlp.warning(f"LLM completion failed or gave empty content.")
+    return "unknown" # Default if something went wrong
 
 
-async def extract_order_id_via_llm(
-    client: AsyncOpenAI | OpenAI,
+async def extract_order_id_llm(
+    client: AsyncOpenAI,
     *,
     message: str,
     recent_order_ids: list[str],
@@ -81,13 +74,17 @@ async def extract_order_id_via_llm(
     logger: logging.Logger,
     retry_attempts: int = 3,
     retry_backoff: float = 1.0,
-) -> str:
-    """Return best-guess order ID or helper keywords from the LLM."""
+) -> str | None:
+    """Extract an order ID using LLM, returning None if unable."""
+    # Ensure client is AsyncOpenAI
+    if not isinstance(client, AsyncOpenAI):
+        pass # Or raise TypeError("Expected AsyncOpenAI client for async function")
+
     prompt = build_order_id_inference_prompt(message, recent_order_ids)
     messages = [
         {
             "role": "system",
-            "content": "You extract specific order references based on recent orders.",
+            "content": "You extract order IDs. Respond ONLY with the ID or 'None'. If multiple recent IDs are mentioned and it's ambiguous which one the user means, respond 'ambiguous'. If the message mentions an ID but it's not in the recent list, respond 'not_recent'.",
         },
         {"role": "user", "content": prompt},
     ]
@@ -98,15 +95,24 @@ async def extract_order_id_via_llm(
         logger=logger,
         retry_attempts=retry_attempts,
         retry_backoff=retry_backoff,
-        max_tokens=25,
+        max_tokens=20, # Allow reasonable length for IDs
         temperature=0,
     )
-    content = completion.choices[0].message.content
-    return content.strip() if content else ""
+    if completion and completion.choices and completion.choices[0].message.content:
+        result = completion.choices[0].message.content.strip()
+        # Handle empty string after strip
+        if not result:
+            return None
+        # Handle explicit non-extraction cases
+        if result.lower() in ["none", "ambiguous", "not_recent", "not_found"]:
+            return None
+        # Basic validation (e.g., alphanumeric, length) could be added here
+        return result
+    return None
 
 
-async def extract_product_identifier(
-    client: AsyncOpenAI | OpenAI,
+async def extract_product_id(
+    client: AsyncOpenAI,
     *,
     message: str,
     model: str,
@@ -114,12 +120,16 @@ async def extract_product_identifier(
     retry_attempts: int = 3,
     retry_backoff: float = 1.0,
 ) -> str | None:
-    """Return a product identifier (name or ID) or ``None`` if not found."""
+    """Extract a product identifier (SKU, name fragment) using LLM."""
+    # Ensure client is AsyncOpenAI
+    if not isinstance(client, AsyncOpenAI):
+        pass # Or raise TypeError("Expected AsyncOpenAI client for async function")
+
     prompt = build_product_identifier_prompt(message)
     messages = [
         {
             "role": "system",
-            "content": "You extract specific product identifiers from text.",
+            "content": "You extract product names or SKUs. Respond ONLY with the identifier or 'None'.",
         },
         {"role": "user", "content": prompt},
     ]
@@ -130,20 +140,22 @@ async def extract_product_identifier(
         logger=logger,
         retry_attempts=retry_attempts,
         retry_backoff=retry_backoff,
-        max_tokens=40,
+        max_tokens=50, # Allow for longer product names
         temperature=0,
     )
-    content = completion.choices[0].message.content
-    result = content.strip() if content else None
-    if not result or result.lower() == "not_found" or len(result) < 2:
-        return None
-    if result.startswith('"') and result.endswith('"'):
-        result = result[1:-1]
-    return result
+    if completion and completion.choices and completion.choices[0].message.content:
+        result = completion.choices[0].message.content.strip()
+        # Handle empty string after strip
+        if not result:
+            return None
+        # Basic check to filter out conversational fillers if the model fails strict instruction
+        if result.lower() != "none" and len(result.split()) < 10: # Avoid long sentences
+             return result
+    return None
 
 
-async def analyze_sentiment(
-    client: AsyncOpenAI | OpenAI,
+async def sentiment_analysis(
+    client: AsyncOpenAI,
     *,
     message: str,
     model: str,
@@ -151,7 +163,11 @@ async def analyze_sentiment(
     retry_attempts: int = 3,
     retry_backoff: float = 1.0,
 ) -> str:
-    """Classify sentiment as *positive*, *neutral*, or *negative*."""
+    """Classify sentiment as positive, neutral, or negative."""
+    # Ensure client is AsyncOpenAI
+    if not isinstance(client, AsyncOpenAI):
+        pass # Or raise TypeError("Expected AsyncOpenAI client for async function")
+
     prompt = build_sentiment_prompt(message)
     messages = [
         {
@@ -170,10 +186,10 @@ async def analyze_sentiment(
         max_tokens=10,
         temperature=0,
     )
-    content = completion.choices[0].message.content
-    sentiment = (
-        content.strip().lower().replace(".", "").replace(",", "")
-        if content
-        else "neutral"
-    )
-    return sentiment if sentiment in {"positive", "neutral", "negative"} else "neutral"
+    if completion and completion.choices and completion.choices[0].message.content:
+        sentiment = completion.choices[0].message.content.strip().lower()
+        if sentiment in ["positive", "neutral", "negative"]:
+            return sentiment
+        else:
+            logger.warning(f"LLM returned unexpected sentiment: {sentiment}")
+    return "neutral" # Default to neutral if classification fails

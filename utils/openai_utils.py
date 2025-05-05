@@ -1,13 +1,15 @@
 import asyncio
 import logging
-from typing import Any, Iterable, Union, List, Dict, Optional
+from typing import Any
+from collections.abc import Iterable
 
 # Use AsyncOpenAI for async operations
 from openai import AsyncOpenAI, OpenAI
+
 # Import specific message param types
 from openai.types.chat import (
     ChatCompletion,
-    ChatCompletionMessageParam, # Use the base MessageParam type hint
+    ChatCompletionMessageParam,  # Use the base MessageParam type hint
     # ChatCompletionSystemMessageParam,
     # ChatCompletionUserMessageParam,
 )
@@ -21,7 +23,7 @@ async def safe_chat_completion(
     client: AsyncOpenAI | OpenAI,
     *,
     model: str,
-    messages: Iterable[Dict[str, Any]],
+    messages: Iterable[dict[str, Any]],
     logger: logging.Logger | None = None,
     retry_attempts: int = 3,
     retry_backoff: float = 1.0,
@@ -69,7 +71,7 @@ async def safe_chat_completion(
     start_ts: float
     last_exc: Exception | None = None
     # Cast messages just before use
-    typed_messages: Iterable[ChatCompletionMessageParam] = messages # type: ignore[assignment]
+    typed_messages: Iterable[ChatCompletionMessageParam] = messages  # type: ignore[assignment]
 
     for attempt in range(1, retry_attempts + 1):
         try:
@@ -77,7 +79,7 @@ async def safe_chat_completion(
             # Now we know client is AsyncOpenAI
             completion = await client.chat.completions.create(
                 model=model,
-                messages=typed_messages, # Use casted messages
+                messages=typed_messages,  # Use casted messages
                 **kwargs,
             )
             latency = asyncio.get_event_loop().time() - start_ts
@@ -93,7 +95,9 @@ async def safe_chat_completion(
             logger.warning(
                 "OpenAI call failed (attempt %s/%s): %s", attempt, retry_attempts, exc
             )
-            await asyncio.sleep(retry_backoff * (2 ** (attempt - 1)))
+            # Only sleep if there are more retries left
+            if attempt < retry_attempts:
+                await asyncio.sleep(retry_backoff * (2 ** (attempt - 1)))
 
     # All retries exhausted
     assert last_exc is not None  # for type checkers

@@ -10,15 +10,15 @@ def _():
     import marimo as mo
     import logging
     import asyncio
-    import pandas as pd # Keep if used in any display logic
-    from datetime import datetime, timedelta # Keep if used
+    import pandas as pd  # Keep if used in any display logic
+    from datetime import datetime, timedelta  # Keep if used
 
     # Configure logging once
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    logger = logging.getLogger("EndToEndIntegrationNotebook") 
+    logger = logging.getLogger("EndToEndIntegrationNotebook")
 
     # Return only commonly needed modules for UI/basic ops
     return asyncio, datetime, logger, logging, mo, pd, timedelta
@@ -40,7 +40,7 @@ def _(mo):
 def _(mo):
     mo.md("### Order Orchestration Simulation")
     run_ord_orch_button = mo.ui.button(label="Run Order Orchestration Demo")
-    ord_orch_logs = mo.state([]) # To display completion message
+    ord_orch_logs = mo.state([])  # To display completion message
     return ord_orch_logs, run_ord_orch_button
 
 

@@ -4,7 +4,7 @@ Module: agents.cv
 Contains the ShelfMonitoringAgent class for computer vision-based shelf monitoring in retail.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 import asyncio
 import time
 from datetime import datetime
@@ -63,11 +63,11 @@ class ShelfMonitoringAgent:
         self.planogram_db = planogram_database
         self.inventory_system = inventory_system
         self.camera_streams = camera_stream_urls
-        self.active_streams: Dict[str, cv2.VideoCapture] = {}
+        self.active_streams: dict[str, cv2.VideoCapture] = {}
         self.confidence_threshold = confidence_threshold
         self.check_frequency = check_frequency_seconds
-        self.last_check_times: Dict[str, float] = {}
-        self.detected_issues: Dict[str, List[Dict[str, Any]]] = {}
+        self.last_check_times: dict[str, float] = {}
+        self.detected_issues: dict[str, list[dict[str, Any]]] = {}
 
     async def start_monitoring_section(self, location_id: str, section_id: str):
         """Begin monitoring a specific shelf section at a location."""
@@ -151,14 +151,24 @@ class ShelfMonitoringAgent:
         self, detections: dict, img_w: int, img_h: int
     ) -> list[dict[str, Any]]:
         """Process raw detections into structured product data."""
-        detection_boxes = detections["detection_boxes"][0].numpy()
-        detection_classes = detections["detection_classes"][0].numpy().astype(np.int32)
-        detection_scores = detections["detection_scores"][0].numpy()
+        # Assuming model output dictionary values are lists of tensors/objects
+        # Access the first element (index 0) which is the tensor for the first (only) batch image
+        detection_boxes_tensor = detections["detection_boxes"][0]
+        detection_classes_tensor = detections["detection_classes"][0]
+        detection_scores_tensor = detections["detection_scores"][0]
+
+        # Convert tensors to numpy arrays
+        detection_boxes_np = detection_boxes_tensor.numpy()
+        detection_classes_np = detection_classes_tensor.numpy().astype(np.int32)
+        detection_scores_np = detection_scores_tensor.numpy()
+
         class_mapping = self._get_class_mapping()
         products = []
-        for i in range(len(detection_scores)):
-            if detection_scores[i] >= self.confidence_threshold:
-                box = detection_boxes[i]
+        # Loop through detections FOR THE FIRST IMAGE in the batch (index 0)
+        num_detections = detection_scores_np.shape[0] # Number of detections for this image
+        for i in range(num_detections):
+            if detection_scores_np[i] >= self.confidence_threshold:
+                box = detection_boxes_np[i]
                 ymin, xmin, ymax, xmax = box
                 box_pixel = [
                     int(ymin * img_h),
@@ -166,13 +176,13 @@ class ShelfMonitoringAgent:
                     int(ymax * img_h),
                     int(xmax * img_w),
                 ]
-                class_id = detection_classes[i]
+                class_id = detection_classes_np[i]
                 if class_id in class_mapping:
                     product_id = class_mapping[class_id]
                     products.append(
                         {
                             "product_id": product_id,
-                            "confidence": float(detection_scores[i]),
+                            "confidence": float(detection_scores_np[i]),
                             "bounding_box": box_pixel,
                             "shelf_position": {
                                 "x": (xmin + xmax) / 2,
@@ -197,8 +207,8 @@ class ShelfMonitoringAgent:
     ) -> list[dict[str, Any]]:
         """Compare detected products with expected planogram."""
         issues = []
-        product_counts: Dict[str, int] = {}
-        product_positions: Dict[str, List[Dict[str, float]]] = {}
+        product_counts: dict[str, int] = {}
+        product_positions: dict[str, list[dict[str, float]]] = {}
         for product in detected_products:
             product_id = product["product_id"]
             if product_id in product_counts:

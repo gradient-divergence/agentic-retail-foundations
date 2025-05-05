@@ -5,7 +5,7 @@ Coordinates inventory transfers between stores.
 
 from datetime import datetime
 import random
-from typing import TypedDict, List, Dict, Any
+from typing import TypedDict
 
 from models.store import Store
 
@@ -49,8 +49,8 @@ class InventoryCollaborationNetwork:
             List of proposed transfer operations (dicts).
         """
         opportunities = []
-        store_needs: Dict[str, Dict[str, int]] = {}
-        store_excess: Dict[str, Dict[str, int]] = {}
+        store_needs: dict[str, dict[str, int]] = {}
+        store_excess: dict[str, dict[str, int]] = {}
 
         # Define structure for clarity and type checking
         class PotentialSenderInfo(TypedDict):
@@ -67,7 +67,7 @@ class InventoryCollaborationNetwork:
         for needing_id, needs in store_needs.items():
             needing_store = self.stores[needing_id]
             for product_id, qty_needed in needs.items():
-                potential_senders: List[PotentialSenderInfo] = []
+                potential_senders: list[PotentialSenderInfo] = []
                 for sending_id, excess in store_excess.items():
                     if sending_id == needing_id:
                         continue
@@ -142,4 +142,4 @@ class InventoryCollaborationNetwork:
             op_res["status"] = "completed" if success else "failed"
             op_res["timestamp"] = datetime.now()
             results.append(op_res)
-        return results 
+        return results

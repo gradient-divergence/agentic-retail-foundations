@@ -191,7 +191,7 @@ async def extract_actions(
         completion = await safe_chat_completion(
             client,
             model=model,
-            messages=messages, # Use messages
+            messages=messages,  # Use messages
             # input=prompt, # Removed input
             # instructions=instructions, # Removed instructions
             logger=logger,
@@ -201,7 +201,11 @@ async def extract_actions(
             temperature=0,
         )
         # Use choices[0].message.content
-        extracted_text = completion.choices[0].message.content.strip() if completion.choices[0].message.content else "[]"
+        extracted_text = (
+            completion.choices[0].message.content.strip()
+            if completion.choices[0].message.content
+            else "[]"
+        )
         try:
             parsed_data = json.loads(extracted_text)
             action_list: list[str] | None = None

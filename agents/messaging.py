@@ -2,16 +2,14 @@
 Agent communication protocol classes for FIPA-inspired messaging in retail multi-agent systems.
 """
 
-from enum import Enum
-from typing import Any, Dict, Optional, Set, Coroutine
-from collections.abc import Callable, Awaitable
-from datetime import datetime
-import uuid
+from typing import Any
+from collections.abc import Coroutine
+from collections.abc import Callable
 from collections import defaultdict
 import asyncio
 
 # Import the data models from the models directory
-from models.messaging import AgentMessage, Performative
+from models.messaging import AgentMessage
 
 
 class MessageBroker:
@@ -22,14 +20,20 @@ class MessageBroker:
 
     def __init__(self):
         # Stores agent_id -> persistent handler mapping
-        self._primary_handlers: Dict[str, Callable[[AgentMessage], Coroutine[Any, Any, None]]] = {}
+        self._primary_handlers: dict[
+            str, Callable[[AgentMessage], Coroutine[Any, Any, None]]
+        ] = {}
         # Stores agent_id -> the next one-time handler (if any)
-        self._one_time_handlers: Dict[str, Callable[[AgentMessage], Coroutine[Any, Any, None]]] = {}
+        self._one_time_handlers: dict[
+            str, Callable[[AgentMessage], Coroutine[Any, Any, None]]
+        ] = {}
         # Stores topic -> set of subscriber agent_ids
-        self._subscriptions: Dict[str, Set[str]] = defaultdict(set)
+        self._subscriptions: dict[str, set[str]] = defaultdict(set)
 
     def register_agent(
-        self, agent_id: str, handler_func: Callable[[AgentMessage], Coroutine[Any, Any, None]]
+        self,
+        agent_id: str,
+        handler_func: Callable[[AgentMessage], Coroutine[Any, Any, None]],
     ):
         """
         Register an agent with its primary message handler.
@@ -39,7 +43,7 @@ class MessageBroker:
             raise ValueError("agent_id cannot be empty")
         if not callable(handler_func):
             raise TypeError("handler must be a callable async function")
-        
+
         self._primary_handlers[agent_id] = handler_func
         print(f"Agent {agent_id} registered with primary handler.")
 
@@ -53,7 +57,7 @@ class MessageBroker:
         if agent_id in self._one_time_handlers:
             del self._one_time_handlers[agent_id]
             print(f"Removed one-time handler for {agent_id}.")
-            
+
         # Also remove from any subscriptions
         for topic in list(self._subscriptions.keys()):
             if agent_id in self._subscriptions[topic]:
@@ -65,7 +69,7 @@ class MessageBroker:
     def register_one_time_handler(
         self,
         agent_id: str,
-        handler: Callable[[AgentMessage], Coroutine[Any, Any, None]]
+        handler: Callable[[AgentMessage], Coroutine[Any, Any, None]],
     ):
         """
         Register a handler that will be called only once for the next message
@@ -77,7 +81,7 @@ class MessageBroker:
             raise ValueError("agent_id cannot be empty")
         if not callable(handler):
             raise TypeError("handler must be a callable async function")
-            
+
         self._one_time_handlers[agent_id] = handler
         print(f"Registered one-time handler for agent {agent_id}.")
 
@@ -89,9 +93,11 @@ class MessageBroker:
             raise ValueError("agent_id and topic cannot be empty")
         # Agent must be registered to subscribe (have a primary handler)
         if agent_id not in self._primary_handlers:
-            print(f"Warning: Agent {agent_id} must be registered before subscribing to topics.")
+            print(
+                f"Warning: Agent {agent_id} must be registered before subscribing to topics."
+            )
             return
-            
+
         self._subscriptions[topic].add(agent_id)
         print(f"Agent {agent_id} subscribed to topic {topic}.")
 
@@ -100,8 +106,10 @@ class MessageBroker:
         Unsubscribe an agent from a topic.
         """
         if topic in self._subscriptions:
-            self._subscriptions[topic].discard(agent_id) # Use discard to avoid KeyError
-            if not self._subscriptions[topic]: # Clean up empty topic lists
+            self._subscriptions[topic].discard(
+                agent_id
+            )  # Use discard to avoid KeyError
+            if not self._subscriptions[topic]:  # Clean up empty topic lists
                 del self._subscriptions[topic]
             print(f"Agent {agent_id} unsubscribed from topic {topic}.")
 
@@ -115,20 +123,25 @@ class MessageBroker:
             return
 
         receiver_id = msg.receiver
-        print(f"Broker attempting delivery: {msg.sender} -> {msg.receiver} ({msg.performative.name if msg.performative else 'N/A'})", flush=True)
+        print(
+            f"Broker attempting delivery: {msg.sender} -> {msg.receiver} ({msg.performative.name if msg.performative else 'N/A'})",
+            flush=True,
+        )
 
         # Helper function to execute handler for a specific agent_id
         async def _execute_handler(agent_id: str, message: AgentMessage):
             executed = False
             # Prioritize one-time handler
             if agent_id in self._one_time_handlers:
-                handler_to_run = self._one_time_handlers.pop(agent_id) # Get and remove
+                handler_to_run = self._one_time_handlers.pop(agent_id)  # Get and remove
                 try:
                     print(f"  Executing one-time handler for {agent_id}...", flush=True)
                     await handler_to_run(message)
                     executed = True
                 except Exception as e:
-                    print(f"  Error in one-time handler for {agent_id}: {e}", flush=True)
+                    print(
+                        f"  Error in one-time handler for {agent_id}: {e}", flush=True
+                    )
             # If no one-time handler was executed, try the primary handler
             elif agent_id in self._primary_handlers:
                 handler_to_run = self._primary_handlers[agent_id]
@@ -138,17 +151,23 @@ class MessageBroker:
                     executed = True
                 except Exception as e:
                     print(f"  Error in primary handler for {agent_id}: {e}", flush=True)
-            
-            if not executed:
-                print(f"  Warning: No handler found or executed for agent {agent_id}", flush=True)
 
-        # --- Delivery Logic --- 
+            if not executed:
+                print(
+                    f"  Warning: No handler found or executed for agent {agent_id}",
+                    flush=True,
+                )
+
+        # --- Delivery Logic ---
         if receiver_id.startswith("topic:"):
             topic = receiver_id.split(":", 1)[1]
             if topic in self._subscriptions:
                 # Create copy in case subscriptions change during iteration
-                subscribers = list(self._subscriptions[topic]) 
-                print(f"  Delivering to topic '{topic}' subscribers: {subscribers}", flush=True)
+                subscribers = list(self._subscriptions[topic])
+                print(
+                    f"  Delivering to topic '{topic}' subscribers: {subscribers}",
+                    flush=True,
+                )
                 tasks = [_execute_handler(sub_id, msg) for sub_id in subscribers]
                 if tasks:
                     await asyncio.gather(*tasks)

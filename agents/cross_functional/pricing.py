@@ -3,7 +3,7 @@ PricingAgent for developing launch pricing and pricing remediation in retail MAS
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any
 import asyncio
 import random
 
@@ -16,26 +16,37 @@ class PricingAgent:
     def __init__(self):
         print("PricingAgent initialized")
 
-    async def set_initial_price(self, product_data: Dict[str, Any]):
+    async def set_initial_price(self, product_data: dict[str, Any]):
         """Placeholder: Determine and set the initial launch price."""
         cost = product_data.get("unit_cost", 0)
         target_margin = product_data.get("margin_targets", {}).get("target_margin", 0.4)
-        competitor_prices = [p.get("price", 0) for p in product_data.get("competitor_products", {}).values()]
-        avg_comp_price = sum(competitor_prices) / len(competitor_prices) if competitor_prices else cost / (1-target_margin) * 1.1
-        
+        competitor_prices = [
+            p.get("price", 0)
+            for p in product_data.get("competitor_products", {}).values()
+        ]
+        avg_comp_price = (
+            sum(competitor_prices) / len(competitor_prices)
+            if competitor_prices
+            else cost / (1 - target_margin) * 1.1
+        )
+
         # Simple pricing logic: aim for target margin but consider competitors
         calculated_price = cost / (1 - target_margin)
-        initial_price = round(min(calculated_price, avg_comp_price * 0.95), 2) # Undercut slightly
+        initial_price = round(
+            min(calculated_price, avg_comp_price * 0.95), 2
+        )  # Undercut slightly
 
-        print(f"Pricing: Setting initial price based on cost {cost}, target margin {target_margin}, and competitor avg {avg_comp_price:.2f}...")
-        await asyncio.sleep(0.15) # Simulate calculation time
+        print(
+            f"Pricing: Setting initial price based on cost {cost}, target margin {target_margin}, and competitor avg {avg_comp_price:.2f}..."
+        )
+        await asyncio.sleep(0.15)  # Simulate calculation time
         print(f"Pricing: Initial price set to ${initial_price:.2f}")
         return {"status": "price_set", "initial_price": initial_price}
 
-    async def check_readiness(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def check_readiness(self, product_data: dict[str, Any]) -> dict[str, Any]:
         """Simulate checking if pricing strategy is finalized based on available data."""
         agent_name = self.__class__.__name__
-        product_id = product_data.get('id', "Unknown Product")
+        product_id = product_data.get("id", "Unknown Product")
         print(f"Pricing: Checking readiness for {product_id}")
         await asyncio.sleep(random.uniform(0.05, 0.1))
 
@@ -51,18 +62,27 @@ class PricingAgent:
             details = "Margin target data missing."
         else:
             # Simulate occasional requirement for final review
-            needs_review = random.choice([True, False, False, False]) # 25% chance needs review
+            needs_review = random.choice(
+                [True, False, False, False]
+            )  # 25% chance needs review
             if needs_review:
-                 details = "Pricing model complete, awaiting final review/approval."
-                 status = "blocked"
-                 readiness_date = None # Blocked until reviewed
+                details = "Pricing model complete, awaiting final review/approval."
+                status = "blocked"
+                readiness_date = None  # Blocked until reviewed
             else:
                 status = "ready"
                 details = "Initial pricing strategy calculated and confirmed."
-                readiness_date = datetime.now() # Ready now
+                readiness_date = datetime.now()  # Ready now
 
-        print(f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}")
-        return {"agent": agent_name, "status": status, "details": details, "readiness_date": readiness_date}
+        print(
+            f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}"
+        )
+        return {
+            "agent": agent_name,
+            "status": status,
+            "details": details,
+            "readiness_date": readiness_date,
+        }
 
     async def develop_launch_pricing(
         self,

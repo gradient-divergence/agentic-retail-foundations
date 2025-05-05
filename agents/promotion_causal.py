@@ -19,7 +19,7 @@ import statsmodels.api as sm
 from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
 import networkx as nx
-from typing import Optional, Dict, List, Tuple, Union, Any, Set
+from typing import Any
 
 # Optional dependencies
 try:
@@ -206,7 +206,7 @@ class PromotionCausalAnalyzer:
             print(f"Inferred common causes: {common_causes}")
 
         # Basic graph: Common causes affect both treatment and outcome
-        graph = f"digraph {{\n"
+        graph = "digraph {\n"
         graph += f'  "{treatment}" [label="Promotion Applied"];\n'
         graph += f'  "{outcome}" [label="Sales"];\n'
 
@@ -361,7 +361,7 @@ class PromotionCausalAnalyzer:
             est.fit(Y, T, X=X)  # W=W if used
 
             ate = est.ate(X=X)  # Average treatment effect over the provided samples
-            print(f"\nCausalForestDML Estimation:")
+            print("\nCausalForestDML Estimation:")
             print(f"Estimated ATE: {ate:.4f}")
 
             # Optional: Get confidence intervals
@@ -639,10 +639,8 @@ class PromotionCausalAnalyzer:
 
     # Method extracted from .qmd (Previously called in notebook)
     # Requires matplotlib and networkx
-    def visualize_causal_graph(self, save_path: Optional[str] = None):
+    def visualize_causal_graph(self, save_path: str | None = None):
         """Visualize the causal graph"""
-        import matplotlib.pyplot as plt
-        import networkx as nx  # Ensure networkx is imported or available
 
         graph_obj = None
         if hasattr(self, "causal_graph") and isinstance(self.causal_graph, nx.DiGraph):
@@ -651,23 +649,24 @@ class PromotionCausalAnalyzer:
             try:
                 from networkx.drawing.nx_pydot import read_dot
                 from io import StringIO
+
                 dot_f = StringIO(self.causal_graph_str)
                 graph_obj = read_dot(dot_f)
                 print("Graph loaded from DOT string for visualization.")
             except Exception as e:
                 print(f"Could not load graph from DOT string for visualization: {e}")
                 return None
-        
+
         if graph_obj is None:
-             print("No valid graph object available for visualization.")
-             return None
+            print("No valid graph object available for visualization.")
+            return None
 
         plt.figure(figsize=(12, 8))
-        pos = nx.spring_layout(graph_obj, seed=42) # Use graph_obj
+        pos = nx.spring_layout(graph_obj, seed=42)  # Use graph_obj
 
         # Draw nodes - Map nodes to colors
         node_colors = []
-        for node in graph_obj.nodes(): # Use graph_obj
+        for node in graph_obj.nodes():  # Use graph_obj
             if node == self.treatment:
                 node_colors.append("lightblue")
             elif node == self.outcome:
@@ -676,10 +675,14 @@ class PromotionCausalAnalyzer:
                 node_colors.append("lightgrey")
 
         nx.draw_networkx_nodes(
-            graph_obj, pos, node_color=node_colors, node_size=3000, alpha=0.8 # type: ignore[arg-type]
+            graph_obj,
+            pos,
+            node_color=node_colors,
+            node_size=3000,
+            alpha=0.8,  # type: ignore[arg-type]
         )
         nx.draw_networkx_edges(graph_obj, pos, arrows=True, arrowsize=20)
-        nx.draw_networkx_labels(graph_obj, pos, font_size=12) # Use graph_obj
+        nx.draw_networkx_labels(graph_obj, pos, font_size=12)  # Use graph_obj
         # Add title and remove axis
         plt.title("Causal Graph for Promotion Analysis", fontsize=15)
         plt.axis("off")
@@ -693,7 +696,7 @@ class PromotionCausalAnalyzer:
         # Return figure for potential display in Marimo
         return plt.gcf()
 
-    def naive_promotion_impact(self) -> Dict[str, float]:
+    def naive_promotion_impact(self) -> dict[str, float]:
         """Calculate naive promotion impact (ignoring confounders)"""
         if (
             "promotion_applied" not in self.analysis_data.columns
@@ -733,12 +736,10 @@ class PromotionCausalAnalyzer:
                 "percent_lift_naive": percent_lift,  # Key expected by notebook
             }
         except Exception as e:
-            return {"error": f"Error during naive calculation: {e}"} # type: ignore[dict-item]
+            return {"error": f"Error during naive calculation: {e}"}  # type: ignore[dict-item]
 
-    def regression_adjustment(self) -> Dict[str, Any]:
+    def regression_adjustment(self) -> dict[str, Any]:
         """Estimate promotion impact using regression adjustment for confounders"""
-        import statsmodels.api as sm # type: ignore[import-untyped] # statsmodels lacks stubs
-        import numpy as np  # Ensure numpy is imported or available
 
         try:
             # Use inferred common causes + treatment
@@ -782,7 +783,7 @@ class PromotionCausalAnalyzer:
                     if col not in [self.outcome, self.treatment]
                 ]
 
-            if not feature_cols: # Check if list is empty
+            if not feature_cols:  # Check if list is empty
                 return {
                     "error": "No suitable features found for regression adjustment."
                 }
@@ -797,7 +798,7 @@ class PromotionCausalAnalyzer:
             # Clean column names if necessary after get_dummies
             X.columns = [
                 (
-                    "_".join(map(str, x)) # Join tuple elements as strings
+                    "_".join(map(str, x))  # Join tuple elements as strings
                     if isinstance(x, tuple)
                     else "".join(c if c.isalnum() else "_" for c in str(x))
                 )
@@ -875,13 +876,14 @@ class PromotionCausalAnalyzer:
         except Exception as e:
             import traceback
 
-            return {"error": f"Error in regression adjustment: {e}\n{traceback.format_exc()}"} # type: ignore[dict-item]
+            return {
+                "error": f"Error in regression adjustment: {e}\n{traceback.format_exc()}"
+            }  # type: ignore[dict-item]
 
     def matching_analysis(
         self, caliper: float = 0.05, ratio: int = 1
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Estimate promotion impact using propensity score matching"""
-        from sklearn.linear_model import LogisticRegression # type: ignore[import-untyped]
         import numpy as np  # Ensure numpy is imported or available
 
         try:
@@ -952,7 +954,7 @@ class PromotionCausalAnalyzer:
 
             # Matching (Nearest Neighbor within Caliper)
             matched_pairs = []
-            used_control_indices: Set[int] = set()
+            used_control_indices: set[int] = set()
 
             for treat_idx, treat_row in treatment_group.iterrows():
                 # Calculate distances to control units not yet used
@@ -985,11 +987,15 @@ class PromotionCausalAnalyzer:
                         # Cast index to int before adding to Set[int], handle non-int/non-float
                         if isinstance(control_idx, (int, float, np.number)):
                             try:
-                                used_control_indices.add(int(control_idx)) 
+                                used_control_indices.add(int(control_idx))
                             except (ValueError, TypeError):
-                                print(f"Warning: Could not convert control index '{control_idx}' to int. Skipping.")
+                                print(
+                                    f"Warning: Could not convert control index '{control_idx}' to int. Skipping."
+                                )
                         else:
-                             print(f"Warning: Control index '{control_idx}' is not numeric. Skipping.")
+                            print(
+                                f"Warning: Control index '{control_idx}' is not numeric. Skipping."
+                            )
 
             # Calculate treatment effect from matched pairs
             if matched_pairs:
@@ -1019,9 +1025,11 @@ class PromotionCausalAnalyzer:
         except Exception as e:
             import traceback
 
-            return {"error": f"Error in matching analysis: {e}\n{traceback.format_exc()}"} # type: ignore[dict-item]
+            return {
+                "error": f"Error in matching analysis: {e}\n{traceback.format_exc()}"
+            }  # type: ignore[dict-item]
 
-    def double_ml_forest(self, **kwargs) -> Dict[str, Any]:
+    def double_ml_forest(self, **kwargs) -> dict[str, Any]:
         """Estimate heterogeneous treatment effects using double ML causal forest"""
         if CausalForestDML is None:
             return {
@@ -1034,7 +1042,7 @@ class PromotionCausalAnalyzer:
             "reason": "DoubleML Forest implementation requires specific feature/modifier setup",
         }
 
-    def dowhy_analysis(self, **kwargs) -> Dict[str, Any]:
+    def dowhy_analysis(self, **kwargs) -> dict[str, Any]:
         """Estimate causal effect using the DoWhy causal inference framework"""
         if CausalModel is None:
             return {"error": "DoWhy library not found. Skipping DoWhy analysis."}
@@ -1045,11 +1053,9 @@ class PromotionCausalAnalyzer:
         }
 
     def perform_counterfactual_analysis(
-        self, scenario: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, scenario: dict[str, Any]
+    ) -> dict[str, Any]:
         """Predict outcomes under counterfactual scenarios using a regression model."""
-        import statsmodels.api as sm  # Ensure statsmodels is imported or available
-        import numpy as np  # Ensure numpy is imported or available
 
         try:
             # Fit a regression model on the original data
@@ -1083,14 +1089,14 @@ class PromotionCausalAnalyzer:
                     col
                     for col in analysis_subset_model.columns
                     if col not in [self.outcome, self.treatment]
-                ] + [self.treatment] # type: ignore[assignment]
+                ] + [self.treatment]  # type: ignore[assignment]
 
             X_actual = analysis_subset_model[feature_cols_model]
             Y_actual = analysis_subset_model[self.outcome]
             X_actual = sm.add_constant(X_actual, has_constant="add")
             X_actual.columns = [
                 (
-                    "_".join(map(str, x)) # Join tuple elements as strings
+                    "_".join(map(str, x))  # Join tuple elements as strings
                     if isinstance(x, tuple)
                     else "".join(c if c.isalnum() else "_" for c in str(x))
                 )
@@ -1099,7 +1105,7 @@ class PromotionCausalAnalyzer:
 
             model = sm.OLS(Y_actual, X_actual).fit()
             # Ensure model_cols is a list[str]
-            model_cols = model.params.index.tolist() # type: ignore[assignment]
+            model_cols = model.params.index.tolist()  # type: ignore[assignment]
 
             # --- Create Counterfactual Data ---
             cf_data = self.analysis_data.copy()
@@ -1130,7 +1136,7 @@ class PromotionCausalAnalyzer:
             # Clean column names similarly to X_actual
             X_cf.columns = [
                 (
-                    "_".join(map(str, x)) # Join tuple elements as strings
+                    "_".join(map(str, x))  # Join tuple elements as strings
                     if isinstance(x, tuple)
                     else "".join(c if c.isalnum() else "_" for c in str(x))
                 )
@@ -1172,7 +1178,7 @@ class PromotionCausalAnalyzer:
 
     def calculate_promotion_roi(
         self, promotion_cost_per_instance: float, margin_percent: float
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Calculate ROI of promotions considering causal effects"""
         try:
             regression_results = self.regression_adjustment()
@@ -1271,21 +1277,28 @@ class PromotionCausalAnalyzer:
             print(traceback.format_exc())
             return {"error": f"Error calculating ROI: {e}"}
 
-    def interpret_causal_impact(self, roi_results: Dict[str, Any]) -> Union[str, Dict[str, str]]:
+    def interpret_causal_impact(
+        self, roi_results: dict[str, Any]
+    ) -> str | dict[str, str]:
         """Interpret the causal impact of promotions based on ROI results."""
         try:
             # Check if all required keys are present and not NaN
             required_keys = [
-                "estimated_ATE", "avg_price_promoted", "incremental_margin_per_instance", 
-                "roi_per_instance_percent", "num_promotion_instances", 
-                "total_incremental_margin_est", "total_promotion_cost_est", 
-                "estimated_ROI_percent", "profitable_estimate"
+                "estimated_ATE",
+                "avg_price_promoted",
+                "incremental_margin_per_instance",
+                "roi_per_instance_percent",
+                "num_promotion_instances",
+                "total_incremental_margin_est",
+                "total_promotion_cost_est",
+                "estimated_ROI_percent",
+                "profitable_estimate",
             ]
             for key in required_keys:
                 if key not in roi_results:
                     return {"error": f"Missing key '{key}' in ROI results dict."}
                 # Use pandas isna for robust NaN checking
-                if pd.isna(roi_results[key]): 
+                if pd.isna(roi_results[key]):
                     return {"error": f"NaN value found for '{key}' in ROI results."}
 
             # Generate interpretation string
@@ -1293,8 +1306,12 @@ class PromotionCausalAnalyzer:
             interpretation += f"- Estimated Average Treatment Effect (ATE): {roi_results['estimated_ATE']:.4f}\n"
             interpretation += f"- Average Price of Promoted Items: ${roi_results['avg_price_promoted']:.2f}\n"
             interpretation += f"- Incremental Margin per Instance: ${roi_results['incremental_margin_per_instance']:.2f}\n"
-            interpretation += f"- ROI per Instance: {roi_results['roi_per_instance_percent']:.2f}%\n"
-            interpretation += f"- Total Instances: {int(roi_results['num_promotion_instances'])}\n"
+            interpretation += (
+                f"- ROI per Instance: {roi_results['roi_per_instance_percent']:.2f}%\n"
+            )
+            interpretation += (
+                f"- Total Instances: {int(roi_results['num_promotion_instances'])}\n"
+            )
             interpretation += f"- Total Estimated Incremental Margin: ${roi_results['total_incremental_margin_est']:.2f}\n"
             interpretation += f"- Total Estimated Promotion Cost: ${roi_results['total_promotion_cost_est']:.2f}\n"
             interpretation += f"- Estimated Overall ROI: {roi_results['estimated_ROI_percent']:.2f}%\n"
@@ -1304,6 +1321,7 @@ class PromotionCausalAnalyzer:
 
         except Exception as e:
             import traceback
+
             print(f"--- ERROR interpreting causal impact: Exception caught: {e}")
             print(traceback.format_exc())
             return {"error": f"Error interpreting causal impact: {e}"}

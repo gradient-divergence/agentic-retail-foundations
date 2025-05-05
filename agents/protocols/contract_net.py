@@ -5,11 +5,9 @@ This module implements the Contract Net Protocol for task allocation in retail s
 The CNP is a negotiation protocol used to solve distributed problem solving tasks.
 """
 
-from typing import Dict, List, Optional, Callable, Any
+from typing import Any
+from collections.abc import Callable
 from datetime import datetime
-import random
-import asyncio
-from dataclasses import asdict
 
 from models.task import Task, TaskStatus, Bid
 from models.messaging import AgentMessage, Performative
@@ -31,11 +29,11 @@ class RetailCoordinator:
         """
         self.coordinator_id = coordinator_id
         self.name = name
-        self.tasks: Dict[str, Task] = {}
-        self.bids: Dict[str, List[Bid]] = {}  # task_id -> list of bids
-        self.message_handlers: Dict[Performative, Callable] = {}
-        self.participant_ids: List[str] = []
-        self.task_history: List[Dict[str, Any]] = []
+        self.tasks: dict[str, Task] = {}
+        self.bids: dict[str, list[Bid]] = {}  # task_id -> list of bids
+        self.message_handlers: dict[Performative, Callable] = {}
+        self.participant_ids: list[str] = []
+        self.task_history: list[dict[str, Any]] = []
 
     def register_participant(self, participant_id: str) -> None:
         """
@@ -59,7 +57,7 @@ class RetailCoordinator:
         """
         self.message_handlers[performative] = handler
 
-    def process_message(self, message: AgentMessage) -> Optional[AgentMessage]:
+    def process_message(self, message: AgentMessage) -> AgentMessage | None:
         """
         Process an incoming message based on its performative.
 
@@ -75,10 +73,10 @@ class RetailCoordinator:
             result = self.message_handlers[message.performative](message)
             # If unsure about handler return types, could assert here:
             # assert isinstance(result, (AgentMessage, type(None))), f"Handler for {message.performative} returned wrong type"
-            return result # type: ignore[no-any-return]
+            return result  # type: ignore[no-any-return]
         return None
 
-    async def announce_task(self, task: Task) -> List[str]:
+    async def announce_task(self, task: Task) -> list[str]:
         """
         Announce a task to all participants and collect their bids.
 
@@ -132,7 +130,7 @@ class RetailCoordinator:
         }
         self.task_history.append(task_record)
 
-    async def award_task(self, task_id: str) -> Optional[Bid]:
+    async def award_task(self, task_id: str) -> Bid | None:
         """
         Evaluate bids and award the task to the best bidder.
 
@@ -169,7 +167,7 @@ class RetailCoordinator:
 
         return best_bid
 
-    def get_task_status(self, task_id: str) -> Optional[TaskStatus]:
+    def get_task_status(self, task_id: str) -> TaskStatus | None:
         """
         Get the current status of a task.
 

@@ -16,12 +16,7 @@ from openai import AsyncOpenAI, OpenAI
 from utils.openai_utils import safe_chat_completion
 
 # NLP helpers
-from utils.nlp import (
-    classify_intent as nlp_classify_intent,
-    extract_product_identifier as nlp_extract_product_identifier,
-    analyze_sentiment as nlp_analyze_sentiment,
-    extract_order_id_via_llm as nlp_extract_order_id_llm,
-)
+from utils import nlp
 
 # Utils
 from agents.response_builder import build_response_prompt, extract_actions
@@ -266,13 +261,9 @@ class RetailCustomerServiceAgent:
         if not self.client:
             return "general_inquiry"
         try:
-            return await nlp_classify_intent(
-                self.client,
+            return await nlp.classify_intent(
+                client=self.client,
                 message=message,
-                model=self.utility_model,
-                logger=self.logger,
-                retry_attempts=self.retry_attempts,
-                retry_backoff=self.retry_backoff,
             )
         except Exception as e:
             self.logger.error(f"LLM intent classification failed: {e}")
@@ -297,36 +288,49 @@ class RetailCustomerServiceAgent:
                 self.logger.debug(
                     f"Extracted potential order ID via regex: {plausible_id}"
                 )
-                for order in recent_orders:
-                    order_id_val = order.get("order_id")
-                    if order_id_val and order_id_val.upper() == plausible_id:
-                        self.logger.debug(
-                            f"Regex extracted ID {plausible_id} matches recent order."
-                        )
-                        return order_id_val
-        if not self.client:
+                # Validate against recent orders only if regex found something
+                if plausible_id:
+                    is_recent = False
+                    for order in recent_orders:
+                        order_id_val = order.get("order_id")
+                        if order_id_val and order_id_val.upper() == plausible_id:
+                            self.logger.debug(
+                                f"Regex extracted ID {plausible_id} matches recent order."
+                            )
+                            is_recent = True
+                            # Return the correctly cased ID from the order system
+                            return order_id_val
+                    if not is_recent:
+                         self.logger.debug(f"Regex ID {plausible_id} not in recent orders.")
+                         # Keep plausible_id, LLM might confirm/deny
+
+        if not self.client: # Should be AsyncOpenAI if initialized
+            self.logger.warning("LLM client not available for order ID extraction.")
             return plausible_id
-        if not recent_orders:
+
+        # Ensure recent_order_ids is explicitly list[str]
+        recent_order_ids: list[str] = [
+            o_id for o in recent_orders if (o_id := o.get("order_id")) is not None
+        ]
+        if not recent_order_ids:
             self.logger.debug("No recent orders available for LLM inference.")
             return plausible_id
-        recent_order_ids = [order.get("order_id", "N/A") for order in recent_orders]
+
         try:
-            result = await nlp_extract_order_id_llm(
-                self.client,
+            # Updated call
+            result = await nlp.extract_order_id_llm(
+                client=self.client,
                 message=message,
-                recent_order_ids=recent_order_ids,
+                recent_order_ids=recent_order_ids, # Pass the extracted list
                 model=self.utility_model,
                 logger=self.logger,
                 retry_attempts=self.retry_attempts,
                 retry_backoff=self.retry_backoff,
             )
             self.logger.debug(f"LLM order ID extraction result: '{result}'")
-            # If the LLM cannot uniquely determine an order (or returns a helper keyword),
-            # do **not** propagate that string as a real order ID.  Fallback to the regex
-            # extracted `plausible_id` which may be ``None``.
-            if result.lower() in {"ambiguous", "not_found", "not_recent"}:
-                return plausible_id
-            return result
+            # If LLM returns an ID, use it. If it returns None (due to ambiguity, etc.),
+            # rely on the plausible_id from regex (which might also be None).
+            return result if result else plausible_id
         except Exception as e:
             self.logger.error(f"LLM order ID extraction failed via helper: {e}")
             return plausible_id
@@ -336,8 +340,9 @@ class RetailCustomerServiceAgent:
         if not self.client:
             return None
         try:
-            result = await nlp_extract_product_identifier(
-                self.client,
+            # Updated call
+            result = await nlp.extract_product_id(
+                client=self.client,
                 message=message,
                 model=self.utility_model,
                 logger=self.logger,
@@ -345,7 +350,7 @@ class RetailCustomerServiceAgent:
                 retry_backoff=self.retry_backoff,
             )
             self.logger.debug(f"LLM product identifier extraction result: '{result}'")
-            return result # type: ignore[no-any-return]
+            return result
         except Exception as e:
             self.logger.error(f"LLM product identifier extraction failed: {e}")
             return None
@@ -423,8 +428,9 @@ class RetailCustomerServiceAgent:
         if not self.client:
             return "neutral"
         try:
-            sentiment = await nlp_analyze_sentiment(
-                self.client,
+            # Updated call
+            sentiment = await nlp.sentiment_analysis(
+                client=self.client,
                 message=message,
                 model=self.utility_model,
                 logger=self.logger,

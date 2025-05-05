@@ -3,12 +3,12 @@ Defines the Store Agent class representing a store participating in protocols li
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Any
 import asyncio
 import random
 
 # Import the data models from the models directory
-from models.task import TaskStatus, TaskType, Task, Bid
+from models.task import TaskStatus, Task, Bid
+
 
 @dataclass
 class StoreAgent:
@@ -16,18 +16,19 @@ class StoreAgent:
     Agent representing a store, capable of bidding for and executing tasks.
     Assumes Task and Bid models are imported from models.task
     """
+
     agent_id: str
     name: str
     capacity: int
     efficiency: float
-    location: str = field(init=False) # Set in post_init
-    assigned_tasks: List[Task] = field(default_factory=list)
+    location: str = field(init=False)  # Set in post_init
+    assigned_tasks: list[Task] = field(default_factory=list)
 
     def __post_init__(self):
         # Use name as location if not specified otherwise
         self.location = self.name
 
-    def calculate_bid(self, task: Task) -> Optional[Bid]:
+    def calculate_bid(self, task: Task) -> Bid | None:
         """
         Calculate a bid for a given task, considering capacity and efficiency.
         Returns None if the agent cannot perform the task.
@@ -93,4 +94,4 @@ class StoreAgent:
 
         # Remove task from assigned list upon completion/failure
         self.assigned_tasks = [t for t in self.assigned_tasks if t.id != task.id]
-        return success 
+        return success

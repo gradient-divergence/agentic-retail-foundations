@@ -9,7 +9,6 @@ import pickle
 import pandas as pd
 from config.config import QLearningAgentConfig
 from utils.logger import get_logger
-from typing import Dict, Tuple
 
 
 class QLearningAgent:
@@ -24,7 +23,9 @@ class QLearningAgent:
     def __init__(self, config: QLearningAgentConfig):
         self.config = config
         self.logger = get_logger(self.__class__.__name__)
-        self.q_table: Dict[Tuple[int, int, int], np.ndarray] = defaultdict(lambda: np.zeros(self.config.action_space_size))
+        self.q_table: dict[tuple[int, int, int], np.ndarray] = defaultdict(
+            lambda: np.zeros(self.config.action_space_size)
+        )
         self.learning_rate = config.learning_rate
         self.discount_factor = config.discount_factor
         self.exploration_rate = config.exploration_rate
@@ -66,7 +67,7 @@ class QLearningAgent:
         self.logger.debug(
             f"Action chosen (Exploit): {action} (Q={max_q:.3f}) from state {state}"
         )
-        return action # type: ignore[no-any-return]
+        return action  # type: ignore[no-any-return]
 
     def update(
         self, state: tuple, action: int, reward: float, next_state: tuple, done: bool
@@ -91,7 +92,7 @@ class QLearningAgent:
         policy = {}
         for state, q_values in self.q_table.items():
             best_action_idx: int = int(np.argmax(q_values))
-            policy[state] = best_action_idx # type: ignore[assignment]
+            policy[state] = best_action_idx  # type: ignore[assignment]
         return policy
 
     def get_q_table_df(self, discount_map: list[float]) -> pd.DataFrame | None:

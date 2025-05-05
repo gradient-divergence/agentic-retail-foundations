@@ -3,7 +3,7 @@ StoreOpsAgent for preparing stores for launch and store ops remediation in retai
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any
 import asyncio
 import random
 
@@ -56,53 +56,70 @@ class StoreOpsAgent:
             ],
         }
 
-    async def prepare_store_layout(self, product_data: Dict[str, Any]):
+    async def prepare_store_layout(self, product_data: dict[str, Any]):
         """Placeholder: Plan store layout changes based on planogram."""
         planogram = product_data.get("planogram", {})
         print(f"StoreOps: Preparing layout for {planogram.get('location')}...")
-        await asyncio.sleep(0.25) # Simulate layout planning
+        await asyncio.sleep(0.25)  # Simulate layout planning
         print("StoreOps: Store layout adjustments planned.")
         return {"status": "layout_planned"}
 
-    async def check_readiness(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def check_readiness(self, product_data: dict[str, Any]) -> dict[str, Any]:
         """Simulate checking if stores are ready (layout, staff trained)."""
         agent_name = self.__class__.__name__
-        product_id = product_data.get('id', "Unknown Product")
-        planned_launch_date = product_data.get("planned_launch_date", datetime.now() + timedelta(days=30))
+        product_id = product_data.get("id", "Unknown Product")
+        planned_launch_date = product_data.get(
+            "planned_launch_date", datetime.now() + timedelta(days=30)
+        )
         print(f"StoreOps: Checking readiness for {product_id}")
         await asyncio.sleep(random.uniform(0.15, 0.35))
 
         # Check for required data
         missing_data = []
-        if not product_data.get("planogram"): 
+        if not product_data.get("planogram"):
             missing_data.append("Planogram")
         if not product_data.get("training_materials"):
             missing_data.append("Training Materials")
         if not product_data.get("display_guidelines"):
             missing_data.append("Display Guidelines")
-        
+
         status = "blocked"
         details = ""
         readiness_date = None
 
         if missing_data:
-            details = f"Blocked: Missing required launch data - {', '.join(missing_data)}."
-            readiness_date = None # Cannot proceed
+            details = (
+                f"Blocked: Missing required launch data - {', '.join(missing_data)}."
+            )
+            readiness_date = None  # Cannot proceed
         else:
             # Simulate potential delays in training rollout or display setup
             delay_chance = random.random()
-            if delay_chance < 0.7: # 70% chance ready
+            if delay_chance < 0.7:  # 70% chance ready
                 status = "ready"
                 details = "Stores ready: Layout updated, staff training scheduled, displays prepared."
-                readiness_date = planned_launch_date - timedelta(days=random.randint(2, 5)) # Ready a few days before
-            elif delay_chance < 0.9: # 20% minor delay
+                readiness_date = planned_launch_date - timedelta(
+                    days=random.randint(2, 5)
+                )  # Ready a few days before
+            elif delay_chance < 0.9:  # 20% minor delay
                 status = "blocked"
                 details = "Minor delay: Staff training sessions behind schedule in some regions."
-                readiness_date = planned_launch_date + timedelta(days=random.randint(1, 3))
-            else: # 10% major delay
+                readiness_date = planned_launch_date + timedelta(
+                    days=random.randint(1, 3)
+                )
+            else:  # 10% major delay
                 status = "blocked"
                 details = "Major delay: Delivery of new display units postponed."
-                readiness_date = planned_launch_date + timedelta(days=random.randint(5, 10))
-        
-        print(f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}")
-        return {"agent": agent_name, "status": status, "details": details, "readiness_date": readiness_date}
+                readiness_date = planned_launch_date + timedelta(
+                    days=random.randint(5, 10)
+                )
+
+        print(
+            f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}"
+        )
+        return {
+            "agent": agent_name,
+            "status": status,
+            "details": details,
+            "readiness_date": readiness_date,
+        }

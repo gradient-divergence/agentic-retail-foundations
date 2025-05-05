@@ -3,7 +3,7 @@ CustomerServiceAgent for preparing customer support and support remediation in r
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any
 import asyncio
 import random
 
@@ -52,28 +52,35 @@ class CustomerServiceAgent:
             "resource_needs": ["technical_writers", "product_specialists"],
         }
 
-    async def prepare_support_team(self, product_data: Dict[str, Any]):
+    async def prepare_support_team(self, product_data: dict[str, Any]):
         """Placeholder: Prepare support team with training materials and FAQs."""
         support_materials = product_data.get("support_materials", [])
         faqs = product_data.get("anticipated_questions", [])
-        print(f"CustomerService: Preparing support team with {len(support_materials)} materials and {len(faqs)} FAQs...")
-        await asyncio.sleep(0.1) # Simulate prep time
+        print(
+            f"CustomerService: Preparing support team with {len(support_materials)} materials and {len(faqs)} FAQs..."
+        )
+        await asyncio.sleep(0.1)  # Simulate prep time
         print("CustomerService: Support team briefing scheduled.")
         return {"status": "support_prepared"}
 
-    async def check_readiness(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def check_readiness(self, product_data: dict[str, Any]) -> dict[str, Any]:
         """Simulate checking if customer service is ready (FAQs, training, docs)."""
         agent_name = self.__class__.__name__
-        product_id = product_data.get('id', "Unknown Product")
-        planned_launch_date = product_data.get("planned_launch_date", datetime.now() + timedelta(days=30))
+        product_id = product_data.get("id", "Unknown Product")
+        planned_launch_date = product_data.get(
+            "planned_launch_date", datetime.now() + timedelta(days=30)
+        )
         print(f"CustomerService: Checking readiness for {product_id}")
         await asyncio.sleep(random.uniform(0.05, 0.1))
 
         # Check for required data/content
         support_materials = product_data.get("support_materials", [])
         faqs = product_data.get("anticipated_questions", [])
-        has_manual = "user_manual" in support_materials or "quick_start_guide" in support_materials
-        has_faqs = len(faqs) >= 3 # Need at least a few FAQs
+        has_manual = (
+            "user_manual" in support_materials
+            or "quick_start_guide" in support_materials
+        )
+        has_faqs = len(faqs) >= 3  # Need at least a few FAQs
 
         status = "blocked"
         details = ""
@@ -90,7 +97,14 @@ class CustomerServiceAgent:
             status = "ready"
             details = "Support team briefed, KB updated with FAQs and docs."
             # Ready once materials are confirmed
-            readiness_date = datetime.now() 
+            readiness_date = datetime.now()
 
-        print(f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}")
-        return {"agent": agent_name, "status": status, "details": details, "readiness_date": readiness_date}
+        print(
+            f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}"
+        )
+        return {
+            "agent": agent_name,
+            "status": status,
+            "details": details,
+            "readiness_date": readiness_date,
+        }

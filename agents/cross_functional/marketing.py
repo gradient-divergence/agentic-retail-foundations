@@ -3,7 +3,7 @@ MarketingAgent for creating launch campaigns and marketing remediation in retail
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any
 import asyncio
 import random
 
@@ -62,20 +62,27 @@ class MarketingAgent:
             ],
         }
 
-    async def plan_launch_campaign(self, product_data: Dict[str, Any]):
+    async def plan_launch_campaign(self, product_data: dict[str, Any]):
         """Placeholder: Plan the marketing campaign based on product data."""
         target_segments = product_data.get("target_segments", ["general"])
         messaging = product_data.get("messaging_guidelines", {})
-        print(f"Marketing: Planning campaign for segments: {target_segments} with message '{messaging.get('primary_message')}'...")
-        await asyncio.sleep(0.2) # Simulate planning time
+        print(
+            f"Marketing: Planning campaign for segments: {target_segments} with message '{messaging.get('primary_message')}'..."
+        )
+        await asyncio.sleep(0.2)  # Simulate planning time
         print("Marketing: Launch campaign plan drafted.")
-        return {"status": "campaign_planned", "channels": ["social", "email", "in_store"]}
+        return {
+            "status": "campaign_planned",
+            "channels": ["social", "email", "in_store"],
+        }
 
-    async def check_readiness(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def check_readiness(self, product_data: dict[str, Any]) -> dict[str, Any]:
         """Simulate checking if marketing materials and plans are ready."""
         agent_name = self.__class__.__name__
-        product_id = product_data.get('id', "Unknown Product")
-        planned_launch_date = product_data.get("planned_launch_date", datetime.now() + timedelta(days=30))
+        product_id = product_data.get("id", "Unknown Product")
+        planned_launch_date = product_data.get(
+            "planned_launch_date", datetime.now() + timedelta(days=30)
+        )
         print(f"Marketing: Checking readiness for {product_id}")
         await asyncio.sleep(random.uniform(0.1, 0.25))
 
@@ -83,9 +90,9 @@ class MarketingAgent:
         missing_data = []
         if not product_data.get("target_segments"):
             missing_data.append("Target Segments")
-        if not product_data.get("messaging_guidelines"): 
+        if not product_data.get("messaging_guidelines"):
             missing_data.append("Messaging Guidelines")
-        if not product_data.get("key_features"): 
+        if not product_data.get("key_features"):
             missing_data.append("Key Features")
 
         status = "blocked"
@@ -93,23 +100,38 @@ class MarketingAgent:
         readiness_date = None
 
         if missing_data:
-            details = f"Blocked: Missing required product data - {', '.join(missing_data)}."
-            readiness_date = None # Cannot proceed without data
+            details = (
+                f"Blocked: Missing required product data - {', '.join(missing_data)}."
+            )
+            readiness_date = None  # Cannot proceed without data
         else:
             # Simulate creative/approval delays
-            delay_chance = random.random() # 0.0 to 1.0
-            if delay_chance < 0.6: # 60% chance ready on time
+            delay_chance = random.random()  # 0.0 to 1.0
+            if delay_chance < 0.6:  # 60% chance ready on time
                 status = "ready"
                 details = "Campaign assets finalized, approved, and scheduled."
-                readiness_date = planned_launch_date - timedelta(days=random.randint(5, 10)) # Ready 5-10 days before
-            elif delay_chance < 0.85: # 25% chance of minor delay
+                readiness_date = planned_launch_date - timedelta(
+                    days=random.randint(5, 10)
+                )  # Ready 5-10 days before
+            elif delay_chance < 0.85:  # 25% chance of minor delay
                 status = "blocked"
                 details = "Minor delay: Awaiting final approval on ad copy."
-                readiness_date = planned_launch_date + timedelta(days=random.randint(1, 4))
-            else: # 15% chance of major delay
+                readiness_date = planned_launch_date + timedelta(
+                    days=random.randint(1, 4)
+                )
+            else:  # 15% chance of major delay
                 status = "blocked"
                 details = "Major delay: Key visual assets require significant rework."
-                readiness_date = planned_launch_date + timedelta(days=random.randint(7, 14))
+                readiness_date = planned_launch_date + timedelta(
+                    days=random.randint(7, 14)
+                )
 
-        print(f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}")
-        return {"agent": agent_name, "status": status, "details": details, "readiness_date": readiness_date}
+        print(
+            f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}"
+        )
+        return {
+            "agent": agent_name,
+            "status": status,
+            "details": details,
+            "readiness_date": readiness_date,
+        }

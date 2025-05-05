@@ -4,14 +4,10 @@ Auction protocol implementation for procurement in retail settings.
 This module implements various auction protocols used in procurement and supplier bidding scenarios.
 """
 
-from typing import Dict, List, Optional, Callable, Any
+from typing import Any
 from datetime import datetime
-import random
-import asyncio
 from enum import Enum
-from dataclasses import asdict
 
-from models.messaging import AgentMessage, Performative
 from models.procurement import PurchaseOrder, PurchaseOrderStatus, SupplierBid
 from models.supplier import Supplier
 
@@ -47,7 +43,7 @@ class ProcurementAuction:
         auction_type: AuctionType = AuctionType.REVERSE,
         max_rounds: int = 3,
         min_participants: int = 2,
-        reserve_price: Optional[float] = None,
+        reserve_price: float | None = None,
     ):
         """
         Initialize a procurement auction.
@@ -68,11 +64,11 @@ class ProcurementAuction:
         self.reserve_price = reserve_price
 
         self.status = AuctionStatus.PENDING
-        self.participants: Dict[str, Supplier] = {}  # supplier_id -> Supplier
-        self.bids: Dict[str, List[SupplierBid]] = {}  # supplier_id -> list of bids
+        self.participants: dict[str, Supplier] = {}  # supplier_id -> Supplier
+        self.bids: dict[str, list[SupplierBid]] = {}  # supplier_id -> list of bids
         self.current_round = 0
-        self.current_best_bid: Optional[SupplierBid] = None
-        self.auction_history: List[Dict[str, Any]] = []
+        self.current_best_bid: SupplierBid | None = None
+        self.auction_history: list[dict[str, Any]] = []
 
     def register_supplier(self, supplier: Supplier) -> bool:
         """
@@ -211,7 +207,7 @@ class ProcurementAuction:
 
         return True
 
-    async def finalize_auction(self) -> Optional[SupplierBid]:
+    async def finalize_auction(self) -> SupplierBid | None:
         """
         Finalize the auction and determine the winner.
 

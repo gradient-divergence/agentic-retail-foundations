@@ -3,10 +3,9 @@ Product Launch Coordinator agent.
 Coordinates activities across different functional agents for a product launch.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 import asyncio
 from datetime import datetime, timedelta
-import random
 
 # Import dependent agent types (adjust paths if needed)
 from agents.cross_functional import (
@@ -39,8 +38,8 @@ class ProductLaunchCoordinator:
         # print("ProductLaunchCoordinator initialized (Placeholder)") # Quieter init
 
     async def coordinate_product_launch(
-        self, product_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, product_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Coordinates the product launch by checking readiness across functional agents.
 
@@ -54,7 +53,7 @@ class ProductLaunchCoordinator:
         planned_launch_date = product_data.get("planned_launch_date", datetime.now() + timedelta(days=30))
         print(f"Coordinating launch for product {product_id}...")
 
-        # --- Call Agent Readiness Checks --- 
+        # --- Call Agent Readiness Checks ---
         # Store agents along with their check coroutines
         agent_check_map = {
             self.supply_chain_agent: self.supply_chain_agent.check_readiness(product_data),
@@ -68,11 +67,11 @@ class ProductLaunchCoordinator:
 
         agent_statuses = await asyncio.gather(*check_coroutines, return_exceptions=True)
 
-        # --- Process Results --- 
-        blockers: List[str] = []
+        # --- Process Results ---
+        blockers: list[str] = []
         all_ready = True
         latest_readiness_date = planned_launch_date # Start with planned date
-        failed_agents: List[str] = []
+        failed_agents: list[str] = []
 
         for i, result in enumerate(agent_statuses):
             agent_instance = agent_list[i] # Get the agent instance
@@ -89,7 +88,7 @@ class ProductLaunchCoordinator:
                 if failure_readiness_date > latest_readiness_date:
                      latest_readiness_date = failure_readiness_date
                 continue # Skip processing this result further
-            
+
             # Safely access keys now we know it's not an exception
             status = result.get("status", "unknown")
             details = result.get("details", "No details provided.")
@@ -110,9 +109,9 @@ class ProductLaunchCoordinator:
                 blockers.append(f"{agent_name}: Ready but after planned launch ({readiness_date.strftime('%Y-%m-%d')})")
                 if readiness_date > latest_readiness_date:
                     latest_readiness_date = readiness_date
-        
+
         # --- Determine Final Status and Remediation (Improved) ---
-        final_status: Dict[str, Any] = {
+        final_status: dict[str, Any] = {
              "product_id": product_id,
              "original_launch_date": planned_launch_date.strftime("%Y-%m-%d"),
              "blockers": blockers,
@@ -126,7 +125,7 @@ class ProductLaunchCoordinator:
         else:
             final_status["launch_status"] = "delayed"
             # Suggest new launch date based on latest readiness + buffer
-            suggested_launch_date = latest_readiness_date + timedelta(days=7) 
+            suggested_launch_date = latest_readiness_date + timedelta(days=7)
             final_status["suggested_new_launch_date"] = suggested_launch_date.strftime("%Y-%m-%d")
             # Basic remediation plan based on blockers
             remediation_steps = []
@@ -136,7 +135,7 @@ class ProductLaunchCoordinator:
                          "agent": result.get("agent"),
                          "blocker": result.get("details"),
                          "estimated_ready": result.get("readiness_date").strftime("%Y-%m-%d") # type: ignore[union-attr]
-                                             if isinstance(result.get("readiness_date"), datetime) 
+                                             if isinstance(result.get("readiness_date"), datetime)
                                              else "Unknown"
                      })
                  elif isinstance(result, BaseException):
@@ -148,7 +147,7 @@ class ProductLaunchCoordinator:
                           "blocker": f"Agent communication failed: {type(result).__name__}",
                           "estimated_ready": "Unknown"
                       })
-            
+
             final_status["remediation_plan"] = {
                 "latest_estimated_readiness": latest_readiness_date.strftime("%Y-%m-%d"),
                 "suggested_launch_date": suggested_launch_date.strftime("%Y-%m-%d"),
@@ -156,4 +155,4 @@ class ProductLaunchCoordinator:
             }
             print(f"--> Launch Delayed. Blockers found. Suggested new date: {final_status['suggested_new_launch_date']}")
 
-        return final_status 
+        return final_status

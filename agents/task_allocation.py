@@ -9,6 +9,7 @@ import asyncio
 import random
 from typing import Optional, Any
 from collections import defaultdict
+import logging
 
 # Import the data models from the models directory
 from models.task import TaskStatus, TaskType, Task, Bid
@@ -135,8 +136,8 @@ class RetailCoordinator:
                     tasks_to_execute.append(agent.execute_task(task))
                     agent_task_map[agent_id].append(task_id)
                 else:
-                    print(
-                        f"Warning: Agent {agent_id} assigned to task {task_id} not found during execution phase."
+                    logging.error(
+                        f"Agent {agent_id} assigned to task {task_id} not found during execution phase."
                     )
                     task.status = TaskStatus.FAILED
 
@@ -155,7 +156,7 @@ class RetailCoordinator:
             for task_id in task_ids:
                 result = results[i]
                 if isinstance(result, Exception):
-                    print(
+                    logging.error(
                         f"Error during execution of task {task_id} by agent {agent_id}: {result}"
                     )
                     if task_id in self.tasks:

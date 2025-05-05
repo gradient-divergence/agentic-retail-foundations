@@ -116,8 +116,8 @@ def test_observe_product_not_found(ooda_agent, caplog):
                 "inventory_status": "optimal",
                 "sales_assessment": "normal",
                 "market_situation": "balanced",
-                "avg_daily_sales_7d": 2.0,
-                "days_of_supply": 12.5,
+                "avg_daily_sales_7d": pytest.approx(1.714, 0.001),
+                "days_of_supply": pytest.approx(14.583, 0.001),
             }
         ),
         # Case 2: Low inventory, high sales -> high_demand_low_supply
@@ -156,8 +156,8 @@ def test_observe_product_not_found(ooda_agent, caplog):
                 "inventory_status": "high",
                 "sales_assessment": "slow_moving",
                 "market_situation": "low_demand_high_supply",
-                "avg_daily_sales_7d": pytest.approx(0.28, 0.01),
-                "days_of_supply": pytest.approx(80 / 0.28, 0.01),
+                "avg_daily_sales_7d": pytest.approx(2/7, abs=0.01),
+                "days_of_supply": pytest.approx(80 / (2/7), abs=0.1),
             }
         ),
         # Case 4: Premium price, stagnant sales -> price_sensitive_market
@@ -188,7 +188,7 @@ def test_observe_product_not_found(ooda_agent, caplog):
                 "current_price": 8.0, # Discount
                 "inventory": 40, # Optimal
                 "competitor_prices": {"CompA": 10.0, "CompB": 11.0}, # Avg = 10.5
-                "sales_last_7_days": [1, 2, 1, 3, 2, 1, 2], # Avg = 2.0
+                "sales_last_7_days": [1, 2, 1, 3, 2, 1, 2], # Avg = 12/7
             },
             {
                 "avg_competitor_price": 10.5,
@@ -196,8 +196,8 @@ def test_observe_product_not_found(ooda_agent, caplog):
                 "inventory_status": "optimal",
                 "sales_assessment": "normal",
                 "market_situation": "underpriced",
-                "avg_daily_sales_7d": 2.0,
-                "days_of_supply": 20.0,
+                "avg_daily_sales_7d": pytest.approx(12/7, abs=0.01),
+                "days_of_supply": pytest.approx(40 / (12/7), abs=0.1),
             }
         ),
         # Case 6: No competitor prices
@@ -216,8 +216,8 @@ def test_observe_product_not_found(ooda_agent, caplog):
                 "inventory_status": "optimal",
                 "sales_assessment": "normal",
                 "market_situation": "balanced",
-                "avg_daily_sales_7d": 2.0,
-                "days_of_supply": 12.5,
+                "avg_daily_sales_7d": pytest.approx(1.714, 0.001),
+                "days_of_supply": pytest.approx(14.583, 0.001),
             }
         ),
     ],
@@ -368,14 +368,13 @@ def test_orient_missing_data(ooda_agent, sample_product, caplog):
             8.5, 8.0, 15.0, # Current price is 8.5, min is 8.0
             {
                 "old_price": 8.5,
-                # total_change = -0.9 + 0.0 + -1.2 = -2.1 (within cap)
-                # new_price_raw = 8.5 * (1 - 2.1/100) = 8.3215
-                # psychology -> 8.99 -> But min_price is 8.0. Psychology applies *after* min/max?
-                # Let's check code: yes, min/max applied before psychology
-                # new_price = max(8.0, 8.3215) = 8.3215 -> psychology -> 8.99
+                # total_change = (-3.0*0.3) + (5.0*0.4) + (-4.0*0.3) = -0.9 + 2.0 - 1.2 = -0.1
+                # capped_change = -0.1
+                # new_price_raw = 8.5 * (1 - 0.1/100) = 8.4915
+                # psychology -> 8.99
                 "new_price": 8.99,
-                "capped_change_pct": pytest.approx(-2.1),
-                "primary_driver": "sales",
+                "capped_change_pct": pytest.approx(-0.1),
+                "primary_driver": "competitor",
             }
         ),
         # Case 7: Respect max_price constraint
@@ -389,12 +388,13 @@ def test_orient_missing_data(ooda_agent, sample_product, caplog):
             14.5, 8.0, 15.0, # Current price is 14.5, max is 15.0
             {
                 "old_price": 14.5,
-                # total_change = 0.6 + 0.0 + 0.75 = 1.35
-                # new_price_raw = 14.5 * (1 + 1.35/100) = 14.69575
-                # psychology -> 14.99 -> min(15.0, 14.99) = 14.99
-                "new_price": 14.99,
-                "capped_change_pct": pytest.approx(1.35),
-                "primary_driver": "sales",
+                # total_change = (2.0*0.3) + (-15.0*0.4) + (2.5*0.3) = 0.6 - 6.0 + 0.75 = -4.65
+                # capped_change = -4.65
+                # new_price_raw = 14.5 * (1 - 4.65/100) = 13.82575
+                # psychology -> 13.99 -> min(15.0, 13.99) = 13.99
+                "new_price": 13.99,
+                "capped_change_pct": pytest.approx(-4.65),
+                "primary_driver": "competitor",
             }
         ),
     ],

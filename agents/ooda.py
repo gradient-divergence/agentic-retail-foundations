@@ -77,9 +77,12 @@ class OODAPricingAgent:
         else:
             avg_comp = product.current_price
 
-        if product.current_price > avg_comp * 1.1:
+        # Use current_price from the observation for consistent comparison
+        observed_current_price = observation.get("current_price", product.current_price)
+
+        if observed_current_price > avg_comp * 1.1:
             price_pos = "premium"
-        elif product.current_price < avg_comp * 0.9:
+        elif observed_current_price < avg_comp * 0.9:
             price_pos = "discount"
         else:
             price_pos = "competitive"
@@ -190,7 +193,9 @@ class OODAPricingAgent:
             "sales": abs(sales_component * self.sales_weight),
         }
         main_driver = (
-            max(comps, key=lambda k: comps[k]) if any(v > 0 for v in comps.values()) else "none"
+            max(comps, key=lambda k: comps[k])
+            if any(v > 0 for v in comps.values())
+            else "none"
         )
 
         decision = {

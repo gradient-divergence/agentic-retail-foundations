@@ -53,7 +53,6 @@ def __cell2(mo, pathlib):
 
 @app.cell
 def _():
-
     return
 
 
@@ -93,7 +92,6 @@ def _(mo, pathlib):
 
 @app.cell
 def __cell4():
-
     return
 
 
@@ -187,7 +185,7 @@ def _(mo):
         """Runs specified analyses, handles errors, returns results dict."""
         results = {}
         print("\n--- START: Running Analyses --- ")
-        with mo.capture_stdout() as captured_stdout:
+        with mo.capture_stdout() as captured_stdout_context:
             for method in methods_to_run:
                 print(f"  Calling {method}_analysis...")
                 try:
@@ -609,9 +607,14 @@ def _(
         cf_results_dict = run_and_display_counterfactuals(analyzer)
 
         # Assign individual results if needed downstream (optional)
-        cf_result1 = cf_results_dict.get("Always On Promotion")
-        cf_result2 = cf_results_dict.get("Random Subset (30% promo)")
-        cf_result3 = cf_results_dict.get("All Prices Increase 10%")
+        cf_result2 = None # Only cf_result2 seems potentially used later
+        for name, result in cf_results_dict.items():
+            if name == "Always On Promotion":
+                cf_result2 = result
+            elif name == "Random Subset (30% promo)":
+                cf_result2 = result
+            elif name == "All Prices Increase 10%":
+                cf_result2 = result
 
     else:  # Analyzer was not initialized
         mo.md(
@@ -620,12 +623,10 @@ def _(
         # Ensure results variables exist but are None
         results_dict = {}
         roi_result = None
-        cf_result1, cf_result2, cf_result3 = None, None, None
+        cf_result2 = None # Only cf_result2 seems potentially used later
 
     # Returning relevant results. Adjust as needed for notebook flow.
-    # If these are needed by later cells, return them.
-    # Otherwise, return None or an empty tuple.
-    return (cf_result2,)
+    return results_dict, roi_result, cf_result2
 
 
 @app.cell

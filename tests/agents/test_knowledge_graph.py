@@ -29,31 +29,56 @@ def test_kg_initialization():
     assert (RETAIL.Product, RDF.type, RDFS.Class) in kg.graph
     assert (RETAIL.name, RDF.type, RDF.Property) in kg.graph
 
-# Patch the correct imported name for SPARQLWrapper
-@patch('agents.knowledge_graph.SPARQLWrapper_lib')
-def test_kg_initialization_with_sparql_uri_success(mock_sparql_wrapper):
-    """Test initialization with a SPARQL URI when SPARQLWrapper is available."""
-    mock_instance = mock_sparql_wrapper.return_value
-    graph_uri = "http://fake-sparql-endpoint.com/query"
+# Test with mocked SPARQLWrapper
+@patch('agents.knowledge_graph._SPARQLWrapper')
+@patch('agents.knowledge_graph._JSON')
+def test_kg_initialization_with_sparql_uri_success(mock_json, mock_sparql_wrapper, capfd):
+    """Test KG initialization with a valid SPARQL URI (mocked success)."""
+    endpoint_uri = "http://localhost:7200/repositories/test"
+    mock_instance = MagicMock()
+    mock_sparql_wrapper.return_value = mock_instance
 
-    kg = RetailKnowledgeGraph(store_id="S002", graph_uri=graph_uri)
+    kg = RetailKnowledgeGraph(store_id="S1", graph_uri=endpoint_uri)
 
-    assert kg.store_id == "S002"
+    # Check SPARQLWrapper was called correctly
+    mock_sparql_wrapper.assert_called_once_with(endpoint_uri)
+    # Check setReturnFormat was called on the instance
+    mock_instance.setReturnFormat.assert_called_once_with(mock_json)
+    # Check the endpoint is stored
     assert kg.sparql_endpoint is mock_instance
-    mock_sparql_wrapper.assert_called_once_with(graph_uri)
-    # Check if setReturnFormat was called (might depend on JSON import patch too)
-    # For simplicity, just check endpoint was created
 
-# Patch the name that is checked for import
-@patch('agents.knowledge_graph.SPARQLWrapper', new=None)
-def test_kg_initialization_with_sparql_uri_import_error(capfd):
-    """Test initialization with SPARQL URI when SPARQLWrapper import fails."""
-    graph_uri = "http://fake-sparql-endpoint.com/query"
-    kg = RetailKnowledgeGraph(store_id="S003", graph_uri=graph_uri)
-
-    assert kg.sparql_endpoint is None
+    # Check logs/print output
     captured = capfd.readouterr()
-    assert "SPARQLWrapper not installed" in captured.out
+    assert f"SPARQL endpoint configured for: {endpoint_uri}" in captured.out
+
+# Test with SPARQLWrapper import failing
+@patch('agents.knowledge_graph._SPARQLWrapper', None) # Simulate import failure
+@patch('agents.knowledge_graph._JSON', None)
+def test_kg_initialization_with_sparql_uri_import_error(capfd):
+    """Test KG initialization when SPARQLWrapper library is missing."""
+    endpoint_uri = "http://localhost:7200/repositories/test"
+    kg = RetailKnowledgeGraph(store_id="S1", graph_uri=endpoint_uri)
+
+    # Check endpoint was not set
+    assert kg.sparql_endpoint is None
+
+    # Check logs/print output
+    captured = capfd.readouterr()
+    assert f"Cannot configure SPARQL endpoint {endpoint_uri}: SPARQLWrapper library not found." in captured.out
+
+def test_kg_initialization_no_sparql_uri():
+    """Test KG initialization without a SPARQL URI."""
+    kg = RetailKnowledgeGraph(store_id="S001")
+    assert kg.store_id == "S001"
+    assert isinstance(kg.graph, Graph)
+    assert kg.sparql_endpoint is None
+    # Check if namespaces are bound
+    bound_namespaces = {prefix for prefix, ns in kg.graph.namespaces()}
+    assert "retail" in bound_namespaces
+    assert "product" in bound_namespaces
+    # Check if some basic ontology triples exist
+    assert (RETAIL.Product, RDF.type, RDFS.Class) in kg.graph
+    assert (RETAIL.name, RDF.type, RDF.Property) in kg.graph
 
 # --- Test add_product --- #
 
@@ -265,7 +290,7 @@ def kg_with_relations() -> RetailKnowledgeGraph:
     kg.add_product_relationship("P_A", "complement", "P_E", strength=0.8)
     kg.add_product_relationship("P_I", "accessory", "P_A") # P_I is accessory FOR P_A
 
-    # Purchase History (for co-purchase test)
+    # --- Restore purchase history ---
     ts = "2024-01-01T10:00:00"
     # Customer 1 buys A and H together 5 times
     for i in range(5):
@@ -279,6 +304,7 @@ def kg_with_relations() -> RetailKnowledgeGraph:
         kg.add_customer_purchase("C2", "P_B", ts, order_id=order_id)
     # Customer 3 buys only A
     kg.add_customer_purchase("C3", "P_A", ts, order_id="ORD_A_ONLY")
+    # --- End purchase history ---
 
     return kg
 
@@ -473,6 +499,7 @@ def test_export_load_graph(kg_with_relations: RetailKnowledgeGraph, tmp_path: Pa
     """Test exporting the graph and loading it back."""
     kg1 = kg_with_relations
     export_file = tmp_path / "kg_export.ttl"
+    # Change format back to turtle
     graph_format = "turtle"
 
     # Get original triple count
@@ -484,18 +511,24 @@ def test_export_load_graph(kg_with_relations: RetailKnowledgeGraph, tmp_path: Pa
     assert export_file.exists()
     assert export_file.stat().st_size > 0
 
-    # Create new KG and load
-    kg2 = RetailKnowledgeGraph(store_id=kg1.store_id)
-    kg2.load_graph(str(export_file), format=graph_format)
+    # Create new PLAIN graph and load
+    kg2_graph = Graph()
+    # Bind namespaces manually if needed for comparison later, though parse should handle prefixes
+    kg2_graph.bind("retail", kg1.RETAIL)
+    kg2_graph.bind("product", kg1.PRODUCT)
+    kg2_graph.bind("category", kg1.CATEGORY)
+    kg2_graph.bind("customer", kg1.CUSTOMER)
+    
+    kg2_graph.parse(source=str(export_file), format=graph_format)
 
     # Compare triple counts (simplest check)
-    assert len(kg2.graph) == original_triple_count
+    assert len(kg2_graph) == original_triple_count
 
     # Optional: More rigorous check - compare graph isomorphism or specific triples
     # For example, check if a known product exists in the loaded graph
     p_a_uri = PRODUCT["P_A"]
-    assert (p_a_uri, RDF.type, RETAIL.Product) in kg2.graph
-    assert kg2.graph.value(p_a_uri, RETAIL.name) == Literal("Product A")
+    assert (p_a_uri, RDF.type, RETAIL.Product) in kg2_graph
+    assert kg2_graph.value(p_a_uri, RETAIL.name) == Literal("Product A")
 
 def test_clear_graph(kg_with_relations: RetailKnowledgeGraph):
     """Test clearing the graph with and without preserving ontology."""

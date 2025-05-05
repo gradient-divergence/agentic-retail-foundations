@@ -13,10 +13,19 @@ Key Capabilities:
 Adapted from the in-notebook implementation in sensor-networks-and-cognitive-systems.py.
 """
 
-from typing import Any, List, Dict
+from typing import Any
 from datetime import datetime
 from rdflib import Graph, Literal, BNode, Namespace, RDF, URIRef
 from rdflib.namespace import RDFS, XSD
+import random
+
+# Attempt to import SPARQLWrapper at module level
+try:
+    from SPARQLWrapper import SPARQLWrapper as _SPARQLWrapper, JSON as _JSON
+except ImportError:
+    _SPARQLWrapper = None
+    _JSON = None
+    print("SPARQLWrapper not installed. External SPARQL endpoint functionality will be disabled.")
 
 
 class RetailKnowledgeGraph:
@@ -54,29 +63,19 @@ class RetailKnowledgeGraph:
         self.graph.bind("store", self.STORE)
         self.graph.bind("customer", self.CUSTOMER)
         self._load_ontology()
-        self.sparql_endpoint = None # Initialize as None
-        
-        # Only attempt SPARQL setup if graph_uri is provided
-        if graph_uri:
-            SPARQLWrapper = None # Local variable for check
-            JSON = None
+        self.sparql_endpoint = None  # Initialize as None
+
+        # Only attempt SPARQL setup if graph_uri is provided and import succeeded
+        if graph_uri and _SPARQLWrapper and _JSON:
             try:
-                # Attempt import only if needed
-                from SPARQLWrapper import SPARQLWrapper as SPARQLWrapper_lib, JSON as JSON_lib
-                SPARQLWrapper = SPARQLWrapper_lib
-                JSON = JSON_lib
-            except ImportError:
-                print("SPARQLWrapper not installed, SPARQL endpoint disabled.")
-                # sparql_endpoint remains None
-            
-            # If import succeeded, try to create instance
-            if SPARQLWrapper and JSON:
-                try:
-                    self.sparql_endpoint = SPARQLWrapper(graph_uri)
-                    self.sparql_endpoint.setReturnFormat(JSON)
-                except Exception as e:
-                    print(f"Failed to initialize SPARQLWrapper for {graph_uri}: {e}")
-                    self.sparql_endpoint = None # Ensure it's None on failure
+                self.sparql_endpoint = _SPARQLWrapper(graph_uri)
+                self.sparql_endpoint.setReturnFormat(_JSON)
+                print(f"SPARQL endpoint configured for: {graph_uri}")
+            except Exception as e:
+                print(f"Failed to initialize SPARQLWrapper for {graph_uri}: {e}")
+                self.sparql_endpoint = None  # Ensure it's None on failure
+        elif graph_uri and (not _SPARQLWrapper or not _JSON):
+             print(f"Cannot configure SPARQL endpoint {graph_uri}: SPARQLWrapper library not found.")
 
     def _load_ontology(self):
         """Load the retail domain ontology into the graph."""
@@ -103,7 +102,7 @@ class RetailKnowledgeGraph:
         self.graph.add((self.RETAIL.isSubstituteFor, RDFS.range, self.RETAIL.Product))
         self.graph.add((self.RETAIL.complementsWith, RDFS.domain, self.RETAIL.Product))
         self.graph.add((self.RETAIL.complementsWith, RDFS.range, self.RETAIL.Product))
-        # Symmetric and transitive properties
+        # Symmetric and transitive properties (Restore)
         self.graph.add(
             (self.RETAIL.complementsWith, RDF.type, self.RETAIL.SymmetricProperty)
         )
@@ -170,24 +169,46 @@ class RetailKnowledgeGraph:
         else:
             relation = self.RETAIL[relationship_type]
         self.graph.add((source_uri, relation, target_uri))
-        if strength is not None:
-            if 0.0 <= strength <= 1.0:
+
+        # --- Restore BNode/reification logic ---
+        # Only create BNode if needed for strength or metadata
+        relation_node = None
+        needs_statement_node = False
+        
+        if strength is not None and 0.0 <= strength <= 1.0:
+            needs_statement_node = True
+            relation_node = BNode()
+            self.graph.add((relation_node, RDF.type, RDF.Statement))
+            self.graph.add((relation_node, RDF.subject, source_uri))
+            self.graph.add((relation_node, RDF.predicate, relation))
+            self.graph.add((relation_node, RDF.object, target_uri))
+            self.graph.add(
+                (
+                    relation_node,
+                    self.RETAIL.strength,
+                    Literal(strength, datatype=XSD.decimal),
+                )
+            )
+        
+        if metadata:
+            needs_statement_node = True
+            # Create BNode if not already created for strength
+            if relation_node is None:
                 relation_node = BNode()
                 self.graph.add((relation_node, RDF.type, RDF.Statement))
                 self.graph.add((relation_node, RDF.subject, source_uri))
                 self.graph.add((relation_node, RDF.predicate, relation))
                 self.graph.add((relation_node, RDF.object, target_uri))
-                self.graph.add(
-                    (
-                        relation_node,
-                        self.RETAIL.strength,
-                        Literal(strength, datatype=XSD.decimal),
-                    )
-                )
-        if metadata:
+        
             for key, value in metadata.items():
                 meta_property = self.RETAIL[key]
-                self.graph.add((relation_node, meta_property, Literal(value)))
+                # Avoid adding RDF.type property if it already exists implicitly via schema
+                if not list(self.graph.triples((meta_property, RDF.type, RDF.Property))):
+                    self.graph.add((meta_property, RDF.type, RDF.Property))
+                # Ensure relation_node exists before using it
+                if relation_node:
+                    self.graph.add((relation_node, meta_property, Literal(value)))
+        # --- End restored logic ---
 
     def add_customer_purchase(
         self,
@@ -201,81 +222,110 @@ class RetailKnowledgeGraph:
         """Record a customer purchase in the knowledge graph."""
         customer_uri = self.CUSTOMER[customer_id]
         product_uri = self.PRODUCT[product_id]
-        purchase_node = BNode()
-        self.graph.add((purchase_node, RDF.type, self.RETAIL.Purchase))
-        self.graph.add((purchase_node, self.RETAIL.hasCustomer, customer_uri))
-        self.graph.add((purchase_node, self.RETAIL.hasProduct, product_uri))
+        
+        # Generate a unique URI for the purchase event instead of using BNode
+        # Include timestamp and a random element for uniqueness
+        # Replace potentially problematic characters in timestamp for URI
+        ts_part = timestamp.replace(":", "-").replace("T", "_")
+        purchase_id = f"purchase_{customer_id}_{product_id}_{ts_part}_{random.randint(1000,9999)}"
+        purchase_uri = self.RETAIL[purchase_id]
+
+        # Use purchase_uri instead of purchase_node
+        self.graph.add((purchase_uri, RDF.type, self.RETAIL.Purchase))
+        self.graph.add((purchase_uri, self.RETAIL.hasCustomer, customer_uri))
+        self.graph.add((purchase_uri, self.RETAIL.hasProduct, product_uri))
+        # Direct purchase link (keep this)
+        self.graph.add((customer_uri, self.RETAIL.purchased, product_uri))
+
         try:
             datetime.fromisoformat(timestamp)
             self.graph.add(
                 (
-                    purchase_node,
+                    purchase_uri, # Use purchase_uri
                     self.RETAIL.timestamp,
                     Literal(timestamp, datatype=XSD.dateTime),
                 )
             )
         except ValueError:
-            pass
+            pass 
         if quantity > 0:
             self.graph.add(
                 (
-                    purchase_node,
+                    purchase_uri, # Use purchase_uri
                     self.RETAIL.quantity,
                     Literal(quantity, datatype=XSD.integer),
                 )
             )
         if order_id:
-            self.graph.add((purchase_node, self.RETAIL.orderID, Literal(order_id)))
-        self.graph.add((purchase_node, self.RETAIL.channel, Literal(channel)))
-        self.graph.add((customer_uri, self.RETAIL.purchased, product_uri))
+            self.graph.add((purchase_uri, self.RETAIL.orderID, Literal(order_id))) # Use purchase_uri
+        self.graph.add((purchase_uri, self.RETAIL.channel, Literal(channel))) # Use purchase_uri
 
     def find_substitutes(
         self, product_id: str, max_results: int = 5
     ) -> list[dict[str, Any]]:
         """Find substitute products for a given product."""
+        # --- REMOVED TEMPORARY DEBUG QUERY --- #
+        # --- Modified Original Query Below --- #
+        # This query now determines strength within each UNION block
+        # and prevents explicit substitutes from also appearing as category matches.
         query = f"""
         PREFIX retail: <http://retail.example.org/ontology#>
         PREFIX product: <http://retail.example.org/product/>
-        SELECT ?substitute ?name ?price ?brand ?strength
+        PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+        SELECT ?substitute ?name ?price ?brand ?final_strength
         WHERE {{
-            {{ product:{product_id} retail:isSubstituteFor ?substitute .
-                OPTIONAL {{ 
+            {{
+                # Explicit forward substitute
+                product:{product_id} retail:isSubstituteFor ?substitute .
+                OPTIONAL {{
                     ?stmt rdf:type rdf:Statement ;
                           rdf:subject product:{product_id} ;
                           rdf:predicate retail:isSubstituteFor ;
                           rdf:object ?substitute ;
-                          retail:strength ?strength .
+                          retail:strength ?explicit_strength .
                 }}
+                BIND(COALESCE(?explicit_strength, 1.0) as ?str) # Default 1.0 for explicit
             }}
             UNION
-            {{ ?substitute retail:isSubstituteFor product:{product_id} .
-                OPTIONAL {{ 
+            {{
+                # Explicit reverse substitute
+                ?substitute retail:isSubstituteFor product:{product_id} .
+                 OPTIONAL {{
                     ?stmt rdf:type rdf:Statement ;
                           rdf:subject ?substitute ;
                           rdf:predicate retail:isSubstituteFor ;
                           rdf:object product:{product_id} ;
-                          retail:strength ?strength .
+                          retail:strength ?explicit_strength .
                 }}
+                BIND(COALESCE(?explicit_strength, 1.0) as ?str) # Default 1.0 for explicit
             }}
             UNION
-            {{ product:{product_id} retail:hasCategory ?category .
+            {{
+                # Category match (only if NOT an explicit substitute)
+                product:{product_id} retail:hasCategory ?category .
                 ?substitute retail:hasCategory ?category .
                 product:{product_id} retail:price ?originalPrice .
                 ?substitute retail:price ?price .
                 FILTER (?substitute != product:{product_id})
-                FILTER (?price >= ?originalPrice * 0.8 && ?price <= ?originalPrice * 1.2)
-                BIND(0.7 as ?strength)
+                FILTER (?price >= xsd:decimal(?originalPrice * 0.8) && ?price <= xsd:decimal(?originalPrice * 1.2))
+                # Exclude if it's already found via explicit relation
+                FILTER NOT EXISTS {{ product:{product_id} retail:isSubstituteFor ?substitute . }}
+                FILTER NOT EXISTS {{ ?substitute retail:isSubstituteFor product:{product_id} . }}
+                BIND(0.7 as ?str) # Assign 0.7 strength here for category match
             }}
+            # Get details for the matched substitute
             ?substitute retail:name ?name .
             ?substitute retail:price ?price .
             ?substitute retail:hasBrand ?brand .
-            BIND(COALESCE(?strength, 1.0) as ?strength)
+            BIND(?str AS ?final_strength) # Use the strength determined in the UNION part
         }}
-        ORDER BY DESC(?strength) ?price
+        ORDER BY DESC(?final_strength) ?price
         LIMIT {max_results}
         """
         results = self._execute_query(query)
         substitutes = []
+        # Process results using the calculated ?final_strength
         for row in results:
             try:
                 substitute_uri = str(row["substitute"])
@@ -286,7 +336,7 @@ class RetailKnowledgeGraph:
                         "name": str(row["name"]),
                         "price": float(row["price"]),
                         "brand": str(row["brand"]),
-                        "strength": float(row["strength"]),
+                        "strength": float(row["final_strength"]), # Use the correct variable
                     }
                 )
             except (KeyError, ValueError, TypeError):
@@ -377,36 +427,36 @@ class RetailKnowledgeGraph:
                 self.sparql_endpoint.setQuery(query_str)
                 sparql_results_raw = self.sparql_endpoint.query().convert()
                 if isinstance(sparql_results_raw, dict):
-                    bindings = sparql_results_raw.get("results", {}).get("bindings", []) # type: ignore[union-attr]
+                    bindings = sparql_results_raw.get("results", {}).get("bindings", [])  # type: ignore[union-attr]
                     return bindings if isinstance(bindings, list) else []
                 else:
                     print(f"Unexpected SPARQL result type: {type(sparql_results_raw)}")
-                    return [] 
+                    return []
             except Exception as e:
                 print(f"SPARQL query failed: {e}")
                 return []
         else:
-            local_results: List[Dict[str, Any]] = [] # type: ignore[no-redef] # Ignore potential redef if mypy confused
+            local_results: list[dict[str, Any]] = []  # type: ignore[no-redef] # Ignore potential redef if mypy confused
             try:
                 qres = self.graph.query(query_str)
-                binding_vars = [str(v) for v in getattr(qres, 'vars', [])]
+                binding_vars = [str(v) for v in getattr(qres, "vars", [])]
 
                 for row in qres:
-                    result_dict: Dict[str, Any] = {}
+                    result_dict: dict[str, Any] = {}
                     try:
-                        result_dict = row.asdict() # type: ignore[union-attr]
+                        result_dict = row.asdict()  # type: ignore[union-attr]
                     except AttributeError:
                         if isinstance(row, tuple) and len(row) == len(binding_vars):
                             for i, var_name in enumerate(binding_vars):
                                 value: Any = row[i]
                                 result_dict[var_name] = value
-                        
-                    if result_dict: 
-                        local_results.append(result_dict) # type: ignore[union-attr]
-                
+
+                    if result_dict:
+                        local_results.append(result_dict)  # type: ignore[union-attr]
+
             except Exception as e:
                 print(f"Local RDF query failed: {e}")
-            return local_results # type: ignore[return-value]
+            return local_results  # type: ignore[return-value]
 
     def generate_recommendations(
         self,
@@ -420,20 +470,30 @@ class RetailKnowledgeGraph:
         PREFIX customer: <http://retail.example.org/customer/>
         SELECT DISTINCT ?product ?name ?price ?brand ?score
         WHERE {{
-            {{ customer:{customer_id} retail:purchased ?purchasedProduct .
-                ?purchasedProduct retail:hasCategory ?category .
-                ?product retail:hasCategory ?category .
-                FILTER(?product != ?purchasedProduct)
-                BIND(0.5 AS ?baseScore)
-                ?product retail:name ?name .
-                ?product retail:price ?price .
-                ?product retail:hasBrand ?brand .
+            # Find products in categories the customer has purchased from
+            {{ SELECT DISTINCT ?product ?category WHERE {{
+                 customer:{customer_id} retail:purchased ?purchasedProduct .
+                 ?purchasedProduct retail:hasCategory ?category .
+                 ?product retail:hasCategory ?category .
+                 # Ensure candidate product is not one the customer already purchased
+                 FILTER NOT EXISTS {{ customer:{customer_id} retail:purchased ?product . }}
+               }}
             }}
+            # Get product details
+            ?product retail:name ?name .
+            ?product retail:price ?price .
+            ?product retail:hasBrand ?brand .
+            # Base score for being in a purchased category
+            BIND(0.5 AS ?baseScore)
+            # Optional boost if the product complements/is accessory for *any* purchased product
             OPTIONAL {{
                 customer:{customer_id} retail:purchased ?otherProduct .
-                ?product retail:complementsWith ?otherProduct .
+                {{ ?product retail:complementsWith ?otherProduct . }} # Complements
+                UNION
+                {{ ?product retail:isAccessoryFor ?otherProduct . }} # Is Accessory For
                 BIND(0.3 AS ?complementBoost)
             }}
+            # Calculate final score
             BIND(COALESCE(?baseScore, 0) + COALESCE(?complementBoost, 0) AS ?score)
         }}
         ORDER BY DESC(?score) ?name
@@ -460,17 +520,11 @@ class RetailKnowledgeGraph:
 
     def export_graph(self, file_path: str, format: str = "turtle"):
         """Export the knowledge graph in the specified format."""
-        try:
-            self.graph.serialize(destination=file_path, format=format)
-        except Exception:
-            pass
+        self.graph.serialize(destination=file_path, format=format)
 
     def load_graph(self, source: str | bytes, format: str = "turtle"):
         """Load data into the knowledge graph."""
-        try:
-            self.graph.parse(data=source, format=format)
-        except Exception:
-            pass
+        self.graph.parse(data=source, format=format)
 
     def clear_graph(self, preserve_ontology: bool = True):
         """Clear all data from the graph except the ontology."""
@@ -479,7 +533,7 @@ class RetailKnowledgeGraph:
                 triple
                 for triple in self.graph
                 # Convert subject to string before calling startswith
-                if str(triple[0]).startswith(str(self.RETAIL)) # Cast both to str 
+                if str(triple[0]).startswith(str(self.RETAIL))  # Cast both to str
                 and triple[1] in (RDF.type, RDFS.domain, RDFS.range)
             ]
             self.graph = Graph()

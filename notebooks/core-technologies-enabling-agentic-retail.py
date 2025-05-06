@@ -183,8 +183,9 @@ def _(mo):
 @app.cell
 def _(DummyInventorySystem, DummyPlanogramDB, ShelfMonitoringAgent):
     # Instantiation
-    model_path = ""  # <<<--- UPDATE
-    cam_urls = {"CAM01": "0", "CAM02": "1"}
+    model_path = "models/dummy_detection_model/"  # <<<--- UPDATED to dummy model path
+    # Remove camera 0 to prevent OpenCV error if no camera is present
+    cam_urls = {"CAM02": "1"} # Removed CAM01: "0"
 
     shelf_agent = ShelfMonitoringAgent(
         model_path,

@@ -12,7 +12,7 @@ from agents.causal_analysis.estimators import (
     estimate_regression_ate,
     estimate_matching_ate, # Add matching estimator
     estimate_dowhy_ate, # Add dowhy estimator
-    # estimate_causalforest_ate, # Add later
+    estimate_causalforest_ate, # Add causal forest
     # estimate_doubleml_irm_ate, # Add later
     _validate_input_data # Helper can be tested too
 )
@@ -408,6 +408,88 @@ def test_estimate_dowhy_ate_non_numeric_causes(mock_causal_model, estimator_data
     )
     assert ate == pytest.approx(106.5)
 
-# --- Tests for estimate_causalforest_ate (To be added later) ---
+# --- Tests for estimate_causalforest_ate ---
+
+# Mock EconML's CausalForestDML and its dependencies (like GradientBoostingRegressor)
+@patch('agents.causal_analysis.estimators.GradientBoostingRegressor')
+@patch('agents.causal_analysis.estimators.CausalForestDML')
+def test_estimate_causalforest_ate_success(mock_cf_dml, mock_gbr, estimator_data):
+    """Test successful CausalForest ATE estimation with mocks."""
+    # --- Mock Setup ---
+    mock_gbr_instance = MagicMock()
+    mock_gbr.return_value = mock_gbr_instance
+
+    mock_cf_dml_instance = MagicMock()
+    mock_cf_dml_instance.ate.return_value = 104.2 # Expected ATE
+    # Mock the interval method (return dummy interval)
+    mock_cf_dml_instance.ate_interval.return_value = (100.0, 108.4)
+    mock_cf_dml.return_value = mock_cf_dml_instance
+
+    # --- Run Test ---
+    ate = estimate_causalforest_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        n_estimators=50, # Example param
+        min_samples_leaf=5 # Example param
+    )
+
+    # --- Assertions ---
+    mock_gbr.assert_called() # Check that nuisance models were initialized
+    mock_cf_dml.assert_called_once_with(
+        model_y=mock_gbr_instance, # Check nuisance models passed
+        model_t=mock_gbr_instance,
+        discrete_treatment=True,
+        n_estimators=50,
+        min_samples_leaf=5,
+        random_state=123 # Default random state used in function
+    )
+    mock_cf_dml_instance.fit.assert_called_once() # Check fit was called
+    mock_cf_dml_instance.ate.assert_called_once()
+    mock_cf_dml_instance.ate_interval.assert_called_once_with(X=ANY, alpha=0.05)
+
+    assert ate == pytest.approx(104.2)
+
+@patch('agents.causal_analysis.estimators.CausalForestDML', None) # Mock CausalForestDML as None
+def test_estimate_causalforest_ate_not_installed(estimator_data):
+    """Test CausalForest ATE estimation when library is not installed."""
+    ate = estimate_causalforest_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing']
+    )
+    assert ate is None
+
+@patch('agents.causal_analysis.estimators.GradientBoostingRegressor')
+@patch('agents.causal_analysis.estimators.CausalForestDML')
+def test_estimate_causalforest_ate_fit_error(mock_cf_dml, mock_gbr, estimator_data):
+    """Test CausalForest ATE estimation handles errors during fit."""
+    mock_gbr.return_value = MagicMock()
+    mock_cf_dml_instance = MagicMock()
+    mock_cf_dml_instance.fit.side_effect = Exception("CFit failed")
+    mock_cf_dml.return_value = mock_cf_dml_instance
+
+    ate = estimate_causalforest_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing']
+    )
+    assert ate is None # Should return None on error
+
+def test_estimate_causalforest_ate_no_numeric_causes(estimator_data):
+    """Test CausalForest ATE estimation handles case with no numeric causes."""
+    # Create data with only non-numeric potential causes
+    data_no_numeric = estimator_data[['sales', 'promotion_applied', 'non_numeric']].copy()
+    ate = estimate_causalforest_ate(
+        data=data_no_numeric,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['non_numeric'] # Pass only the non-numeric cause
+    )
+    # Expect None because the function filters out non-numeric causes and finds none left
+    assert ate is None
 
 # --- Tests for estimate_doubleml_irm_ate (To be added later) --- 

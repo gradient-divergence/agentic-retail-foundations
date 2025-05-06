@@ -7,7 +7,7 @@ import time
 import logging
 
 # Import the refactored components
-from models.fulfillment import Item, Order, Associate
+from models.fulfillment import Item, Order, Associate, OrderLineItem
 from utils.planning import StoreLayout, FulfillmentPlanner
 
 # Configure logging
@@ -118,11 +118,33 @@ def demo_fulfillment_system(mo_instance=None):  # Allow passing mo for notebook 
     # Create orders
     orders = []
     for i in range(10):
-        num_items = random.randint(3, 8)
-        order_items = random.sample(items, num_items)
-        priority = random.randint(1, 3)
-        due_time = random.randint(30, 120)  # Due in 30-120 minutes
-        orders.append(Order(f"ORD{i}", order_items, priority, due_time))
+        num_items_in_order = random.randint(3, 8)
+        # Sample physical Item objects to decide which products are in the order
+        sampled_physical_items = random.sample(items, num_items_in_order)
+
+        # Create OrderLineItem objects based on the sampled physical items
+        order_line_items = []
+        for physical_item in sampled_physical_items:
+            # Use item_id from the physical Item as the product_id for the OrderLineItem
+            # Assign random quantity and price for the demo
+            order_line_items.append(
+                OrderLineItem(
+                    product_id=physical_item.item_id, # Use the correct ID
+                    quantity=random.randint(1, 5),
+                    price=round(random.uniform(1.0, 50.0), 2)
+                )
+            )
+
+        # Create the Order object using the correct constructor signature
+        # Add a dummy customer_id and remove the invalid priority/due_time args
+        orders.append(
+            Order(
+                order_id=f"ORD{i}",
+                items=order_line_items, # Pass the list of OrderLineItem
+                customer_id=f"CUST{random.randint(100, 999)}"
+                # created_at, status, etc., will use defaults from Order definition
+            )
+        )
     logger.info(f"Created {len(orders)} sample orders.")
     # Create associates
     associates = [

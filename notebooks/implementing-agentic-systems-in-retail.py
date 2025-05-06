@@ -6,20 +6,21 @@ app = marimo.App()
 
 
 @app.cell
-def __():
+def _():
     # Import all required modules
     from fastapi import FastAPI, HTTPException
     from psycopg2.extras import RealDictCursor
     from supabase import create_client
     import os
     import psycopg2
+    import marimo as mo
 
     # Return all modules needed by other cells
     return mo, FastAPI, HTTPException, RealDictCursor, create_client, os, psycopg2
 
 
 @app.cell
-def __(FastAPI, os, create_client):
+def _(FastAPI, os, create_client):
     # Initialize FastAPI app
     app_api = FastAPI()
 
@@ -38,7 +39,7 @@ def __(FastAPI, os, create_client):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         # Implementing Agentic Systems in Retail
@@ -54,7 +55,7 @@ def __(mo):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     # Define a simple InventoryAgent for testing
     class InventoryAgent:
         def __init__(self, safety_stock: int):
@@ -83,7 +84,7 @@ def __(mo):
 
 
 @app.cell
-def __(InventoryAgent, mo):
+def _(InventoryAgent, mo):
     # Test case for InventoryAgent
     def test_inventory_restock_logic():
         agent = InventoryAgent(safety_stock=10)
@@ -112,7 +113,7 @@ def __(InventoryAgent, mo):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         *Explanation:* We defined a rudimentary `InventoryAgent` with a method `evaluate_restock` that decides how many units to order for each item. The logic here is: if current stock is less than predicted demand plus a safety buffer, it will calculate an order quantity to meet that demand and buffer. In `test_inventory_restock_logic()`, we create an agent with a safety stock of 10 units. We then test two scenarios:
@@ -131,7 +132,7 @@ def __(mo):
 
 
 @app.cell
-def __(app_api, HTTPException, supabase):
+def _(app_api, HTTPException, supabase):
     @app_api.get("/metrics/agents")
     def get_agent_metrics():
         if supabase is None:
@@ -148,7 +149,7 @@ def __(app_api, HTTPException, supabase):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         ### Alternative Database Connection with psycopg2
@@ -200,7 +201,7 @@ def __(mo):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         ```javascript
@@ -216,7 +217,7 @@ def __(mo):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         ## Deployment Strategies and DevOps for Agents\index{deployment strategies}\index{DevOps!for agents}
@@ -233,7 +234,7 @@ def __(mo):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         ```yaml
@@ -270,7 +271,7 @@ def __(mo):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         ```yaml

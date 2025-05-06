@@ -28,7 +28,7 @@ def _():
 def _(mo):
     mo.md(
         r"""
-        # End-to-End Integration for Autonomous Retail\index{end-to-end integration}\index{autonomous retail}
+        # End-to-End Integration for Autonomous Retail
 
         Understand the principles and practices essential for end-to-end integration in autonomous retail systems. This chapter provides you with frameworks for system-wide coordination, real-time decision-making, and effective agent orchestration, positioning you to overcome integration challenges and optimize retail operations comprehensively.
         """
@@ -46,16 +46,39 @@ def _(mo):
 
 @app.cell
 def _(asyncio, mo, ord_orch_logs, run_ord_orch_button):
+    # This cell defines the button and log display
+    return mo.vstack([run_ord_orch_button, mo.md(f"```\n{''.join(ord_orch_logs.value)}\n```")])
+
+
+@app.cell
+def _(asyncio, ord_orch_logs):
+    # Import needed only when button is clicked
     from demos.order_orchestration_demo import run_orchestration_simulation
 
     async def run_demo():
         # Demo prints logs to console
-        await run_orchestration_simulation()
-        ord_orch_logs.set_value(["Order Orchestration Demo Completed (check console)."])
+        ord_orch_logs.set_value(["Running Order Orchestration Demo... (Check console)"]) # Update state
+        try:
+            await run_orchestration_simulation()
+            ord_orch_logs.set_value(["Order Orchestration Demo Completed (check console)."]) # Update state on success
+        except Exception as e:
+            ord_orch_logs.set_value([f"Error during demo: {e}"]) # Update state on error
 
-    _ = run_ord_orch_button.on_click(lambda: asyncio.create_task(run_demo()))
+    # Return the function so the next cell can use it
+    return run_demo, run_orchestration_simulation
 
-    return mo.vstack([run_ord_orch_button, mo.md("```\n{ord_orch_logs.value}\n```")])
+
+@app.cell
+def _(asyncio, mo, run_demo, run_ord_orch_button):
+    # This cell triggers the demo when the button is clicked
+    mo.stop(not run_ord_orch_button.value, "") # Only run if button clicked
+
+    # Trigger the demo function (which updates the state)
+    # Run in a task so it doesn't block Marimo's kernel
+    asyncio.create_task(run_demo())
+
+    # This cell doesn't need to return anything visible
+    return
 
 
 @app.cell

@@ -467,13 +467,17 @@ def estimate_doubleml_irm_ate(
 
         # Fit and estimate ATE
         dml_irm_model.fit()
-        ate = dml_irm_model.coef[0] # ATE is the coefficient for the treatment
+        # Explicitly get the value and cast, maybe helps with mock interaction?
+        ate_value = dml_irm_model.coef_[0]
+        ate = float(ate_value) if ate_value is not None else None
 
         print(f"\nDoubleML IRM Estimation ({ml_learner_name}):")
         print(dml_irm_model.summary)
+        # Use the casted float variable in the print statement
         print(f"Estimated ATE: {ate:.4f}")
 
-        return float(ate) if ate is not None else None
+        # Return the casted float
+        return ate
 
     except Exception as e:
         print(f"Error during DoubleML IRM estimation: {e}")

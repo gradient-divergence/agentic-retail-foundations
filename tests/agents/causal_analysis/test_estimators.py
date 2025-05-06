@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 from unittest.mock import patch, MagicMock, ANY
 import scipy.stats # Import scipy for mocking stats
+from sklearn.linear_model import LassoCV, LogisticRegressionCV # Import for mocking
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier # Import for mocking
 
 # Functions to test
 from agents.causal_analysis.estimators import (
@@ -13,7 +15,7 @@ from agents.causal_analysis.estimators import (
     estimate_matching_ate, # Add matching estimator
     estimate_dowhy_ate, # Add dowhy estimator
     estimate_causalforest_ate, # Add causal forest
-    # estimate_doubleml_irm_ate, # Add later
+    estimate_doubleml_irm_ate, # Add DoubleML estimator
     _validate_input_data # Helper can be tested too
 )
 
@@ -492,4 +494,141 @@ def test_estimate_causalforest_ate_no_numeric_causes(estimator_data):
     # Expect None because the function filters out non-numeric causes and finds none left
     assert ate is None
 
-# --- Tests for estimate_doubleml_irm_ate (To be added later) --- 
+# --- Tests for estimate_doubleml_irm_ate ---
+
+@patch('agents.causal_analysis.estimators.RandomForestClassifier')
+@patch('agents.causal_analysis.estimators.RandomForestRegressor')
+@patch('agents.causal_analysis.estimators.DoubleMLIRM')
+@patch('agents.causal_analysis.estimators.DoubleMLData')
+def test_estimate_doubleml_irm_rf_success(mock_dml_data, mock_dml_irm, mock_rf_reg, mock_rf_clf, estimator_data):
+    """Test successful DoubleML IRM (RandomForest) ATE estimation with mocks."""
+    # --- Mock Setup ---
+    mock_dml_data_instance = MagicMock()
+    mock_dml_data.return_value = mock_dml_data_instance
+    mock_rf_reg_instance = MagicMock()
+    mock_rf_reg.return_value = mock_rf_reg_instance
+    mock_rf_clf_instance = MagicMock()
+    mock_rf_clf.return_value = mock_rf_clf_instance
+
+    mock_dml_irm_instance = MagicMock()
+    # Simplification: Mock coef_ directly as a list containing the float
+    # The function accesses coef_[0], so this should work.
+    mock_dml_irm_instance.coef_ = [102.8] # Mock as a list directly
+    mock_dml_irm_instance.summary = "Mock DoubleML Summary (RF)"
+    mock_dml_irm.return_value = mock_dml_irm_instance
+
+    # --- Run Test ---
+    ate = estimate_doubleml_irm_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        ml_learner_name="RandomForest"
+    )
+
+    # --- Assertions ---
+    mock_dml_data.assert_called_once_with(ANY, y_col='sales', d_cols='promotion_applied', x_cols=['price', 'marketing'])
+    mock_rf_reg.assert_called_once()
+    mock_rf_clf.assert_called_once()
+    mock_dml_irm.assert_called_once_with(
+        mock_dml_data_instance,
+        ml_g=mock_rf_reg_instance,
+        ml_m=mock_rf_clf_instance
+    )
+    mock_dml_irm_instance.fit.assert_called_once()
+    # No longer need to assert __getitem__ called
+    assert ate == pytest.approx(102.8)
+
+@patch('agents.causal_analysis.estimators.LogisticRegressionCV')
+@patch('agents.causal_analysis.estimators.LassoCV')
+@patch('agents.causal_analysis.estimators.DoubleMLIRM')
+@patch('agents.causal_analysis.estimators.DoubleMLData')
+def test_estimate_doubleml_irm_lasso_success(mock_dml_data, mock_dml_irm, mock_lasso, mock_logit_cv, estimator_data):
+    """Test successful DoubleML IRM (Lasso) ATE estimation with mocks."""
+    # --- Mock Setup ---
+    mock_dml_data_instance = MagicMock()
+    mock_dml_data.return_value = mock_dml_data_instance
+    mock_lasso_instance = MagicMock()
+    mock_lasso.return_value = mock_lasso_instance
+    mock_logit_cv_instance = MagicMock()
+    mock_logit_cv.return_value = mock_logit_cv_instance
+
+    mock_dml_irm_instance = MagicMock()
+    # Simplification: Mock coef_ directly as a list containing the float
+    mock_dml_irm_instance.coef_ = [103.1] # Mock as a list directly
+    mock_dml_irm_instance.summary = "Mock DoubleML Summary (Lasso)"
+    mock_dml_irm.return_value = mock_dml_irm_instance
+
+    # --- Run Test ---
+    ate = estimate_doubleml_irm_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        ml_learner_name="Lasso"
+    )
+
+    # --- Assertions ---
+    mock_dml_data.assert_called_once()
+    mock_lasso.assert_called_once()
+    mock_logit_cv.assert_called_once()
+    mock_dml_irm.assert_called_once_with(
+        mock_dml_data_instance,
+        ml_g=mock_lasso_instance,
+        ml_m=mock_logit_cv_instance
+    )
+    mock_dml_irm_instance.fit.assert_called_once()
+    # No longer need to assert __getitem__ called
+    assert ate == pytest.approx(103.1)
+
+@patch('agents.causal_analysis.estimators.DoubleMLData', None) # Mock DoubleMLData as None
+@patch('agents.causal_analysis.estimators.DoubleMLIRM', None) # Mock DoubleMLIRM as None
+def test_estimate_doubleml_irm_not_installed(estimator_data):
+    """Test DoubleML IRM ATE estimation when library is not installed."""
+    ate = estimate_doubleml_irm_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing']
+    )
+    assert ate is None
+
+@patch('agents.causal_analysis.estimators.DoubleMLIRM')
+@patch('agents.causal_analysis.estimators.DoubleMLData')
+def test_estimate_doubleml_irm_fit_error(mock_dml_data, mock_dml_irm, estimator_data):
+    """Test DoubleML IRM ATE estimation handles errors during fit."""
+    mock_dml_data.return_value = MagicMock()
+    mock_dml_irm_instance = MagicMock()
+    mock_dml_irm_instance.fit.side_effect = Exception("DML fit failed")
+    mock_dml_irm.return_value = mock_dml_irm_instance
+
+    ate = estimate_doubleml_irm_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        ml_learner_name="RandomForest" # Learner doesn't matter here
+    )
+    assert ate is None # Should return None on error
+
+def test_estimate_doubleml_irm_unsupported_learner(estimator_data):
+    """Test DoubleML IRM ATE estimation with an unsupported learner name."""
+    ate = estimate_doubleml_irm_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        ml_learner_name="XGBoost" # Unsupported
+    )
+    assert ate is None
+
+def test_estimate_doubleml_irm_no_numeric_causes(estimator_data):
+    """Test DoubleML IRM ATE estimation handles case with no numeric causes."""
+    data_no_numeric = estimator_data[['sales', 'promotion_applied', 'non_numeric']].copy()
+    ate = estimate_doubleml_irm_ate(
+        data=data_no_numeric,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['non_numeric']
+    )
+    assert ate is None 

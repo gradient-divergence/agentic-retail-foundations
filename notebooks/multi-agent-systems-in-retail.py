@@ -145,7 +145,7 @@ def _(asyncio, communication_logs, mo, run_comm_button):
     # Import the demo function
     from demos.agent_communication_demo import demo_retail_agent_communication
 
-    _ = run_comm_button.on_click(lambda: communication_logs.set_value([]))
+    _ = run_comm_button._on_click(lambda: communication_logs.set_value([]))
 
     async def run_and_log_communication():
         """Runs the demo and captures logs to state."""
@@ -158,7 +158,7 @@ def _(asyncio, communication_logs, mo, run_comm_button):
             ["Communication Demo Completed (check console for logs)."]
         )
 
-    _ = run_comm_button.on_click(
+    _ = run_comm_button._on_click(
         lambda: asyncio.create_task(run_and_log_communication())
     )
 
@@ -201,14 +201,14 @@ def _(asyncio, cnp_logs, mo, run_cnp_button):
     # Import the demo function
     from demos.task_allocation_cnp_demo import demo_contract_net_protocol
 
-    _ = run_cnp_button.on_click(lambda: cnp_logs.set_value([]))
+    _ = run_cnp_button._on_click(lambda: cnp_logs.set_value([]))
 
     async def run_and_log_cnp():
         """Runs the CNP demo."""
         await demo_contract_net_protocol()
         cnp_logs.set_value(["CNP Demo Completed (check console for logs)."])
 
-    _ = run_cnp_button.on_click(lambda: asyncio.create_task(run_and_log_cnp()))
+    _ = run_cnp_button._on_click(lambda: asyncio.create_task(run_and_log_cnp()))
 
     mo.md(
         f"""
@@ -249,14 +249,14 @@ def _(asyncio, auction_logs, mo, run_auction_button):
     # Import the demo function
     from demos.procurement_auction_demo import demo_procurement_auction
 
-    _ = run_auction_button.on_click(lambda: auction_logs.set_value([]))
+    _ = run_auction_button._on_click(lambda: auction_logs.set_value([]))
 
     async def run_and_log_auction():
         """Runs the Auction demo."""
         await demo_procurement_auction()
         auction_logs.set_value(["Auction Demo Completed (check console for logs)."])
 
-    _ = run_auction_button.on_click(lambda: asyncio.create_task(run_and_log_auction()))
+    _ = run_auction_button._on_click(lambda: asyncio.create_task(run_and_log_auction()))
 
     mo.md(
         f"""
@@ -297,7 +297,7 @@ def _(asyncio, mo, run_sharing_button, sharing_logs):
     # Import the demo function
     from demos.inventory_sharing_demo import demo_collaborative_inventory_sharing
 
-    _ = run_sharing_button.on_click(lambda: sharing_logs.set_value([]))
+    _ = run_sharing_button._on_click(lambda: sharing_logs.set_value([]))
 
     async def run_and_log_sharing():
         """Runs the Inventory Sharing demo."""
@@ -306,7 +306,7 @@ def _(asyncio, mo, run_sharing_button, sharing_logs):
             ["Inventory Sharing Demo Completed (check console for logs)."]
         )
 
-    _ = run_sharing_button.on_click(lambda: asyncio.create_task(run_and_log_sharing()))
+    _ = run_sharing_button._on_click(lambda: asyncio.create_task(run_and_log_sharing()))
 
     mo.md(
         f"""
@@ -347,7 +347,7 @@ def _(asyncio, launch_logs, mo, run_launch_button):
     # Import the demo function
     from demos.product_launch_demo import demo_product_launch
 
-    _ = run_launch_button.on_click(lambda: launch_logs.set_value([]))
+    _ = run_launch_button._on_click(lambda: launch_logs.set_value([]))
 
     async def run_and_log_launch():
         """Runs the Product Launch demo."""
@@ -356,7 +356,7 @@ def _(asyncio, launch_logs, mo, run_launch_button):
             ["Product Launch Demo Completed (check console for logs)."]
         )
 
-    _ = run_launch_button.on_click(lambda: asyncio.create_task(run_and_log_launch()))
+    _ = run_launch_button._on_click(lambda: asyncio.create_task(run_and_log_launch()))
 
     mo.md(
         f"""

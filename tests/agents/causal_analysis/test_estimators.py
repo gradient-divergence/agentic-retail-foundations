@@ -11,7 +11,7 @@ from agents.causal_analysis.estimators import (
     estimate_naive_ate,
     estimate_regression_ate,
     estimate_matching_ate, # Add matching estimator
-    # estimate_dowhy_ate, # Add later
+    estimate_dowhy_ate, # Add dowhy estimator
     # estimate_causalforest_ate, # Add later
     # estimate_doubleml_irm_ate, # Add later
     _validate_input_data # Helper can be tested too
@@ -38,6 +38,11 @@ def estimator_data_with_nans(estimator_data) -> pd.DataFrame:
     data.loc[1, 'sales'] = np.nan
     data.loc[5, 'price'] = np.nan
     return data
+
+@pytest.fixture
+def sample_graph_str() -> str:
+    """A simple DOT graph string fixture."""
+    return "digraph { price -> promotion_applied; marketing -> promotion_applied; price -> sales; marketing -> sales; promotion_applied -> sales; }"
 
 # --- Tests for _validate_input_data helper ---
 
@@ -293,7 +298,115 @@ def test_estimate_matching_ate_empty_groups(estimator_data):
     assert "error" in results_no_control
     assert "solver needs samples of at least 2 classes" in results_no_control["error"]
 
-# --- Tests for estimate_dowhy_ate (To be added later) ---
+# --- Tests for estimate_dowhy_ate ---
+
+# Mock DoWhy's CausalModel
+@patch('agents.causal_analysis.estimators.CausalModel')
+def test_estimate_dowhy_ate_success(mock_causal_model, estimator_data, sample_graph_str):
+    """Test successful DoWhy ATE estimation with mocks."""
+    # --- Mock Setup ---
+    mock_estimand = MagicMock()
+    mock_estimate = MagicMock()
+    mock_estimate.value = 106.5 # Expected ATE value
+
+    mock_causal_model_instance = MagicMock()
+    mock_causal_model_instance.identify_effect.return_value = mock_estimand
+    mock_causal_model_instance.estimate_effect.return_value = mock_estimate
+    mock_causal_model.return_value = mock_causal_model_instance
+
+    # --- Run Test ---
+    ate = estimate_dowhy_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'], # Provide numeric causes
+        graph_str=sample_graph_str,
+        method_name="backdoor.linear_regression"
+    )
+
+    # --- Assertions ---
+    mock_causal_model.assert_called_once_with(
+        data=ANY, # Check data argument passed (ignore specifics for now)
+        treatment='promotion_applied',
+        outcome='sales',
+        graph=sample_graph_str,
+        common_causes=['price', 'marketing']
+    )
+    # Check that the data passed to CausalModel has the expected shape/columns if needed
+    call_args, call_kwargs = mock_causal_model.call_args
+    passed_data = call_kwargs.get('data', call_args[0] if call_args else None)
+    assert isinstance(passed_data, pd.DataFrame)
+    assert list(passed_data.columns) == ['sales', 'promotion_applied', 'price', 'marketing'] # Validated data cols
+
+    mock_causal_model_instance.identify_effect.assert_called_once_with(proceed_when_unidentified=True)
+    mock_causal_model_instance.estimate_effect.assert_called_once_with(
+        mock_estimand,
+        method_name="backdoor.linear_regression",
+        test_significance=True
+    )
+    assert ate == pytest.approx(106.5)
+
+
+@patch('agents.causal_analysis.estimators.CausalModel', None) # Mock CausalModel as None
+def test_estimate_dowhy_ate_not_installed(estimator_data, sample_graph_str):
+    """Test DoWhy ATE estimation when library is not installed."""
+    ate = estimate_dowhy_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        graph_str=sample_graph_str
+    )
+    assert ate is None
+
+@patch('agents.causal_analysis.estimators.CausalModel')
+def test_estimate_dowhy_ate_estimation_error(mock_causal_model, estimator_data, sample_graph_str):
+    """Test DoWhy ATE estimation handles errors during estimate_effect."""
+    mock_causal_model_instance = MagicMock()
+    mock_causal_model_instance.identify_effect.return_value = MagicMock()
+    mock_causal_model_instance.estimate_effect.side_effect = Exception("DoWhy estimation failed")
+    mock_causal_model.return_value = mock_causal_model_instance
+
+    ate = estimate_dowhy_ate(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        graph_str=sample_graph_str
+    )
+    assert ate is None # Should return None on error
+
+@patch('agents.causal_analysis.estimators.CausalModel')
+def test_estimate_dowhy_ate_non_numeric_causes(mock_causal_model, estimator_data, sample_graph_str):
+    """Test DoWhy ATE estimation filters non-numeric common causes."""
+    # --- Mock Setup (same as success case) ---
+    mock_estimand = MagicMock()
+    mock_estimate = MagicMock()
+    mock_estimate.value = 106.5
+    mock_causal_model_instance = MagicMock()
+    mock_causal_model_instance.identify_effect.return_value = mock_estimand
+    mock_causal_model_instance.estimate_effect.return_value = mock_estimate
+    mock_causal_model.return_value = mock_causal_model_instance
+
+    # --- Run Test --- with a non-numeric cause included
+    ate = estimate_dowhy_ate(
+        data=estimator_data, # Data includes 'non_numeric' column
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing', 'non_numeric'], # Include non-numeric cause
+        graph_str=sample_graph_str,
+    )
+
+    # --- Assertions ---
+    # Check that CausalModel was called with *only* the numeric common causes
+    mock_causal_model.assert_called_once_with(
+        data=ANY,
+        treatment='promotion_applied',
+        outcome='sales',
+        graph=sample_graph_str,
+        common_causes=['price', 'marketing'] # 'non_numeric' should be filtered out
+    )
+    assert ate == pytest.approx(106.5)
 
 # --- Tests for estimate_causalforest_ate (To be added later) ---
 

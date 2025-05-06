@@ -31,8 +31,10 @@ def mock_causal_forest_model() -> MagicMock:
     """Fixture for a mocked fitted CausalForestDML model."""
     model = MagicMock(name="MockCausalForestDML")
     # Mock the methods used by simulate_counterfactuals
-    model.effect.return_value = np.random.rand(8) * 10 # Mock CATE predictions
-    model.const_marginal_effect.return_value = np.random.rand(8) * 10 + 100 # Mock constant effect
+    # Use fixed random state for reproducible mock return values if needed
+    rng = np.random.RandomState(0)
+    model.effect.return_value = rng.rand(8) * 10 # Mock CATE predictions
+    model.const_marginal_effect.return_value = rng.rand(8) * 10 + 100 # Mock constant effect
     return model
 
 # --- Tests for fit_causal_forest_for_counterfactuals ---
@@ -55,14 +57,21 @@ def test_fit_causal_forest_success(mock_cf_dml, mock_gbr, cf_data):
     )
 
     mock_gbr.assert_called()
+    # Check specific kwargs passed to CausalForestDML constructor
     mock_cf_dml.assert_called_once_with(
         model_y=mock_gbr_instance,
         model_t=mock_gbr_instance,
         discrete_treatment=True,
         n_estimators=50,
-        random_state=123 # Default
+        random_state=123 # Default from function
     )
     mock_cf_dml_instance.fit.assert_called_once()
+    # Check fit arguments if necessary (e.g., shapes of Y, T, X)
+    # call_args, call_kwargs = mock_cf_dml_instance.fit.call_args
+    # assert call_args[0].shape == (cf_data.shape[0],) # Y shape
+    # assert call_args[1].shape == (cf_data.shape[0],) # T shape
+    # assert call_kwargs['X'].shape == (cf_data.shape[0], 2) # X shape
+
     assert fitted_model is mock_cf_dml_instance
 
 @patch('agents.causal_analysis.counterfactual.CausalForestDML', None)
@@ -80,12 +89,31 @@ def test_fit_causal_forest_missing_cols(cf_data):
     """Test fitting returns None when required columns are missing."""
     # The function catches the ValueError and should return None
     fitted_model = fit_causal_forest_for_counterfactuals(
-        data=cf_data.drop(columns=['sales']),
+        data=cf_data.drop(columns=['sales']), # Drop outcome
         treatment='promotion_applied',
         outcome='sales',
         common_causes=['price', 'marketing']
     )
     assert fitted_model is None
+
+    # Test missing treatment
+    fitted_model_no_treat = fit_causal_forest_for_counterfactuals(
+        data=cf_data.drop(columns=['promotion_applied']),
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing']
+    )
+    assert fitted_model_no_treat is None
+
+    # Test missing common cause
+    fitted_model_no_cc = fit_causal_forest_for_counterfactuals(
+        data=cf_data.drop(columns=['price']),
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing']
+    )
+    assert fitted_model_no_cc is None
+
 
 def test_fit_causal_forest_no_numeric_causes(cf_data):
     """Test fitting returns None if no numeric common causes are found."""
@@ -98,11 +126,34 @@ def test_fit_causal_forest_no_numeric_causes(cf_data):
     )
     assert fitted_model is None
 
+@patch('agents.causal_analysis.counterfactual.CausalForestDML')
+def test_fit_causal_forest_fit_exception(mock_cf_dml, cf_data):
+    """Test fitting returns None if model.fit() raises exception."""
+    mock_cf_dml_instance = MagicMock()
+    mock_cf_dml_instance.fit.side_effect = RuntimeError("Fit failed")
+    mock_cf_dml.return_value = mock_cf_dml_instance
+
+    fitted_model = fit_causal_forest_for_counterfactuals(
+        data=cf_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing']
+    )
+    assert fitted_model is None
+
 # --- Tests for simulate_counterfactuals ---
 
 def test_simulate_cf_set_treatment_1(mock_causal_forest_model, cf_data):
     """Test counterfactual simulation for setting treatment to 1."""
     scenario = {'set_treatment': 1}
+    # Need to reset mocks if the fixture is reused across tests
+    mock_causal_forest_model.reset_mock()
+    # Redefine return values if needed for this specific test
+    effect_val = np.array([1, 2, 3, 4, 5, 6, 7, 8])
+    const_effect_val = np.array([10, 11, 12, 13, 14, 15, 16, 17])
+    mock_causal_forest_model.effect.return_value = effect_val
+    mock_causal_forest_model.const_marginal_effect.return_value = const_effect_val
+
     results = simulate_counterfactuals(
         model=mock_causal_forest_model,
         data=cf_data,
@@ -118,11 +169,19 @@ def test_simulate_cf_set_treatment_1(mock_causal_forest_model, cf_data):
     assert "counterfactual_avg_effect" in results
     assert "difference" in results
     # Check counterfactual avg effect matches the mocked const_marginal_effect mean
-    assert results["counterfactual_avg_effect"] == pytest.approx(np.mean(mock_causal_forest_model.const_marginal_effect()))
+    assert results["factual_avg_effect"] == pytest.approx(np.mean(effect_val))
+    assert results["counterfactual_avg_effect"] == pytest.approx(np.mean(const_effect_val))
+    assert results["difference"] == pytest.approx(np.mean(const_effect_val) - np.mean(effect_val))
 
 def test_simulate_cf_set_treatment_0(mock_causal_forest_model, cf_data):
     """Test counterfactual simulation for setting treatment to 0."""
     scenario = {'set_treatment': 0}
+    mock_causal_forest_model.reset_mock()
+    effect_val = np.array([2, 3, 4, 5, 6, 7, 8, 9])
+    const_effect_val = np.array([20, 21, 22, 23, 24, 25, 26, 27])
+    mock_causal_forest_model.effect.return_value = effect_val
+    mock_causal_forest_model.const_marginal_effect.return_value = const_effect_val
+
     results = simulate_counterfactuals(
         model=mock_causal_forest_model,
         data=cf_data,
@@ -135,13 +194,18 @@ def test_simulate_cf_set_treatment_0(mock_causal_forest_model, cf_data):
     mock_causal_forest_model.effect.assert_called_once()
     mock_causal_forest_model.const_marginal_effect.assert_called_once()
     # When T=0, counterfactual effect should still be based on const_marginal_effect
-    # as per the simplified logic in the function.
-    assert results["counterfactual_avg_effect"] == pytest.approx(np.mean(mock_causal_forest_model.const_marginal_effect()))
+    assert results["factual_avg_effect"] == pytest.approx(np.mean(effect_val))
+    assert results["counterfactual_avg_effect"] == pytest.approx(np.mean(const_effect_val))
+    assert results["difference"] == pytest.approx(np.mean(const_effect_val) - np.mean(effect_val))
+
 
 def test_simulate_cf_adjust_feature(mock_causal_forest_model, cf_data):
     """Test counterfactual simulation for adjusting a feature (partially implemented)."""
     scenario = {'adjust_feature': {'feature_name': 'price', 'value': 15}}
-    # Expecting a warning and default behavior due to partial implementation
+    mock_causal_forest_model.reset_mock()
+    effect_val = np.array([1, 1, 1, 1, 1, 1, 1, 1])
+    mock_causal_forest_model.effect.return_value = effect_val
+
     results = simulate_counterfactuals(
         model=mock_causal_forest_model,
         data=cf_data,
@@ -151,15 +215,20 @@ def test_simulate_cf_adjust_feature(mock_causal_forest_model, cf_data):
     )
     assert results is not None
     assert results["scenario"] == scenario
-    # Check that const_marginal_effect was NOT called for this specific scenario type
-    # based on current implementation (prints warning, uses factual as placeholder)
+    # Check that const_marginal_effect was NOT called
     mock_causal_forest_model.const_marginal_effect.assert_not_called()
-    # Check difference is zero because counterfactual equals factual in placeholder
+    # Check difference is zero because counterfactual equals factual in placeholder logic
     assert results["difference"] == pytest.approx(0.0)
+    assert results["factual_avg_effect"] == pytest.approx(np.mean(effect_val))
+    assert results["counterfactual_avg_effect"] == pytest.approx(np.mean(effect_val))
 
 def test_simulate_cf_unsupported_scenario(mock_causal_forest_model, cf_data):
     """Test counterfactual simulation with an unsupported scenario."""
     scenario = {'unknown_action': 'do_something'}
+    mock_causal_forest_model.reset_mock()
+    effect_val = np.array([2, 2, 2, 2, 2, 2, 2, 2])
+    mock_causal_forest_model.effect.return_value = effect_val
+
     results = simulate_counterfactuals(
         model=mock_causal_forest_model,
         data=cf_data,
@@ -172,6 +241,8 @@ def test_simulate_cf_unsupported_scenario(mock_causal_forest_model, cf_data):
     mock_causal_forest_model.const_marginal_effect.assert_not_called()
     # Expect factual = counterfactual
     assert results["difference"] == pytest.approx(0.0)
+    assert results["factual_avg_effect"] == pytest.approx(np.mean(effect_val))
+    assert results["counterfactual_avg_effect"] == pytest.approx(np.mean(effect_val))
 
 def test_simulate_cf_no_model(cf_data):
     """Test simulation returns None if no model is provided."""
@@ -223,4 +294,4 @@ def test_perform_counterfactual_analysis_wrapper(mock_simulate, mock_causal_fore
         common_causes=["c1"],
         scenario=scenario
     )
-    assert result == {"test": "result"} 
+    assert result == {"test": "result"}

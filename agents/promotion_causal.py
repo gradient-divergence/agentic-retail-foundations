@@ -10,6 +10,7 @@ for data preparation, graph definition, estimation, counterfactuals, and ROI cal
 import pandas as pd
 from typing import Any, Dict, Optional, List
 import traceback # Keep for potential error handling within orchestrator
+import logging # Import logging
 
 # Import from the new causal_analysis package
 # Ensure this relative import works based on how the project is structured/run.
@@ -112,6 +113,9 @@ class PromotionCausalAnalyzer:
         # Store the user-provided default common causes separately
         self._user_default_common_causes = default_common_causes
 
+        # Initialize logger
+        self.logger = logging.getLogger(__name__)
+
         # State variables to be populated
         self.analysis_data: Optional[pd.DataFrame] = None
         self.causal_graph_str: Optional[str] = None
@@ -125,7 +129,7 @@ class PromotionCausalAnalyzer:
 
     def _initialize_data_and_graph(self):
         """Prepares data and defines the causal graph upon initialization."""
-        print("Initializing PromotionCausalAnalyzer...")
+        self.logger.info("Initializing PromotionCausalAnalyzer...")
         # 1. Prepare Analysis Data
         try:
             self.analysis_data = prepare_analysis_data(
@@ -134,24 +138,21 @@ class PromotionCausalAnalyzer:
                 store_data=self.store_data_raw,
                 promotion_data=self.promotion_data_raw,
             )
-            print("Data preparation successful.")
+            self.logger.info("Data preparation successful.")
         except ValueError as e:
-            print(f"ERROR during data preparation: {e}")
+            self.logger.error(f"ERROR during data preparation: {e}")
             self.analysis_data = None
-            # Stop initialization if data prep fails critically
-            print("Initialization failed due to data preparation error.")
+            self.logger.error("Initialization failed due to data preparation error.")
             return
         except Exception as e:
-            print(f"UNEXPECTED ERROR during data preparation: {e}")
-            traceback.print_exc()
+            self.logger.error(f"UNEXPECTED ERROR during data preparation: {e}", exc_info=True)
             self.analysis_data = None
-            print("Initialization failed due to unexpected data preparation error.")
+            self.logger.error("Initialization failed due to unexpected data preparation error.")
             return
 
         # 2. Define Causal Graph (only if data prep succeeded)
-        # Ensure analysis_data is not None before proceeding
         if self.analysis_data is None:
-             print("Cannot define causal graph because data preparation failed.")
+             self.logger.warning("Cannot define causal graph because data preparation failed.")
              return
 
         try:
@@ -168,33 +169,30 @@ class PromotionCausalAnalyzer:
             )
             self.causal_graph_str = graph_str
             self.common_causes = common_causes_found # Store the actual common causes used
-            print("Causal graph definition successful.")
+            self.logger.info("Causal graph definition successful.")
         except ValueError as e:
-            print(f"ERROR during causal graph definition: {e}")
+            self.logger.error(f"ERROR during causal graph definition: {e}")
             # Proceeding without a graph might be possible but limit certain analyses
             self.causal_graph_str = None
             self.common_causes = None # Set to None if graph def fails
         except Exception as e:
-            print(f"UNEXPECTED ERROR during causal graph definition: {e}")
-            traceback.print_exc()
+            self.logger.error(f"UNEXPECTED ERROR during causal graph definition: {e}", exc_info=True)
             self.causal_graph_str = None
             self.common_causes = None
 
-        print("Initialization complete.")
+        self.logger.info("Initialization complete.")
 
     # --- Core Functionality Methods ---
 
     def visualize_graph(self, save_path: Optional[str] = None):
         """Visualizes the defined causal graph."""
         if self.causal_graph_str:
-            # Call the function from the graph module
             try:
                  visualize_causal_graph(self.causal_graph_str, save_path)
             except Exception as e:
-                 print(f"Error during graph visualization call: {e}")
-                 traceback.print_exc()
+                 self.logger.error(f"Error during graph visualization call: {e}", exc_info=True)
         else:
-            print("Error: Causal graph is not available (was not defined or failed during initialization).")
+            self.logger.error("Error: Causal graph is not available (was not defined or failed during initialization).")
 
     def run_all_analyses(self, run_estimators: Optional[List[str]] = None) -> Dict[str, Any]:
         """
@@ -213,12 +211,11 @@ class PromotionCausalAnalyzer:
         """
         if self.analysis_data is None:
             msg = "Error: Analysis data not properly initialized. Cannot run analyses."
-            print(msg)
+            self.logger.error(msg)
             return {"error": msg}
 
-        # Initialize results dict
         results: Dict[str, Any] = {}
-        print("\n--- Running Causal Analyses ---")
+        self.logger.info("\n--- Running Causal Analyses ---")
 
         default_set = ['naive', 'regression', 'matching', 'causal_forest'] # Default estimators
         estimators_to_run = set(run_estimators if run_estimators is not None else default_set)
@@ -228,14 +225,14 @@ class PromotionCausalAnalyzer:
         has_graph = self.causal_graph_str is not None
 
         if not has_common_causes:
-             print("Warning: Common causes not available. Estimators requiring confounders will be skipped or may fail.")
+             self.logger.warning("Warning: Common causes not available. Estimators requiring confounders will be skipped or may fail.")
         if not has_graph:
-             print("Warning: Causal graph not available. Graph-based estimators (DoWhy) will be skipped.")
+             self.logger.warning("Warning: Causal graph not available. Graph-based estimators (DoWhy) will be skipped.")
 
         # --- Execute selected estimators by calling functions ---
 
         if 'naive' in estimators_to_run:
-            print("Running Naive Estimator...")
+            self.logger.info("Running Naive Estimator...")
             try:
                 results["naive"] = estimate_naive_ate(
                     data=self.analysis_data,
@@ -243,13 +240,13 @@ class PromotionCausalAnalyzer:
                     outcome=self.outcome
                 )
             except Exception as e:
-                print(f"  ERROR running naive estimator: {e}")
+                self.logger.error(f"  ERROR running naive estimator: {e}")
                 results["naive"] = {"error": str(e)}
 
         # Methods requiring common causes
         if 'regression' in estimators_to_run:
             if has_common_causes:
-                print("Running Regression Adjustment...")
+                self.logger.info("Running Regression Adjustment...")
                 try:
                     results["regression"] = estimate_regression_ate(
                         data=self.analysis_data,
@@ -258,15 +255,15 @@ class PromotionCausalAnalyzer:
                         common_causes=self.common_causes
                     )
                 except Exception as e:
-                    print(f"  ERROR running regression estimator: {e}")
+                    self.logger.error(f"  ERROR running regression estimator: {e}")
                     results["regression"] = {"error": str(e)}
             else:
-                print("Skipping Regression Adjustment (no common causes).")
+                self.logger.warning("Skipping Regression Adjustment (no common causes).")
                 results["regression"] = {"error": "Common causes not available."}
 
         if 'matching' in estimators_to_run:
             if has_common_causes:
-                print("Running Propensity Score Matching...")
+                self.logger.info("Running Propensity Score Matching...")
                 try:
                     # Can add matching params (caliper, ratio) here if needed
                     results["matching"] = estimate_matching_ate(
@@ -276,16 +273,16 @@ class PromotionCausalAnalyzer:
                         common_causes=self.common_causes,
                     )
                 except Exception as e:
-                    print(f"  ERROR running matching estimator: {e}")
+                    self.logger.error(f"  ERROR running matching estimator: {e}")
                     results["matching"] = {"error": str(e)}
             else:
-                print("Skipping Propensity Score Matching (no common causes).")
+                self.logger.warning("Skipping Propensity Score Matching (no common causes).")
                 results["matching"] = {"error": "Common causes not available."}
 
         # Methods requiring graph and common causes
         if 'dowhy_regression' in estimators_to_run:
             if has_graph and has_common_causes:
-                 print("Running DoWhy (Linear Regression)...")
+                 self.logger.info("Running DoWhy (Linear Regression)...")
                  try:
                      # estimate_dowhy_ate returns Optional[float], handle potential None
                      ate = estimate_dowhy_ate(
@@ -298,16 +295,16 @@ class PromotionCausalAnalyzer:
                      )
                      results["dowhy_regression"] = {"ate": ate} if ate is not None else {"error": "DoWhy estimation returned None"}
                  except Exception as e:
-                     print(f"  ERROR running dowhy_regression estimator: {e}")
+                     self.logger.error(f"  ERROR running dowhy_regression estimator: {e}")
                      results["dowhy_regression"] = {"error": str(e)}
             else:
                  reason = "causal graph" if not has_graph else "common causes"
-                 print(f"Skipping DoWhy (Linear Regression) (no {reason}).")
+                 self.logger.warning(f"Skipping DoWhy (Linear Regression) (no {reason}).")
                  results["dowhy_regression"] = {"error": f"{reason.capitalize()} not available."}
 
         if 'dowhy_matching' in estimators_to_run:
              if has_graph and has_common_causes:
-                 print("Running DoWhy (Propensity Score Matching)...")
+                 self.logger.info("Running DoWhy (Propensity Score Matching)...")
                  try:
                      ate = estimate_dowhy_ate(
                          data=self.analysis_data,
@@ -319,18 +316,18 @@ class PromotionCausalAnalyzer:
                      )
                      results["dowhy_matching"] = {"ate": ate} if ate is not None else {"error": "DoWhy estimation returned None"}
                  except Exception as e:
-                     print(f"  ERROR running dowhy_matching estimator: {e}")
+                     self.logger.error(f"  ERROR running dowhy_matching estimator: {e}")
                      results["dowhy_matching"] = {"error": str(e)}
              else:
                  reason = "causal graph" if not has_graph else "common causes"
-                 print(f"Skipping DoWhy (Propensity Score Matching) (no {reason}).")
+                 self.logger.warning(f"Skipping DoWhy (Propensity Score Matching) (no {reason}).")
                  results["dowhy_matching"] = {"error": f"{reason.capitalize()} not available."}
 
 
         # ML based methods requiring common causes
         if 'causal_forest' in estimators_to_run:
             if has_common_causes:
-                print("Running Causal Forest DML...")
+                self.logger.info("Running Causal Forest DML...")
                 try:
                     # Can add causal forest params (n_estimators, etc.) here if needed
                     ate = estimate_causalforest_ate(
@@ -341,15 +338,15 @@ class PromotionCausalAnalyzer:
                     )
                     results["causal_forest"] = {"ate": ate} if ate is not None else {"error": "Causal Forest estimation returned None"}
                 except Exception as e:
-                    print(f"  ERROR running causal_forest estimator: {e}")
+                    self.logger.error(f"  ERROR running causal_forest estimator: {e}")
                     results["causal_forest"] = {"error": str(e)}
             else:
-                 print("Skipping Causal Forest DML (no common causes).")
+                 self.logger.warning("Skipping Causal Forest DML (no common causes).")
                  results["causal_forest"] = {"error": "Common causes not available."}
 
         if 'doubleml_rf' in estimators_to_run:
             if has_common_causes:
-                 print("Running DoubleML IRM (Random Forest)...")
+                 self.logger.info("Running DoubleML IRM (Random Forest)...")
                  try:
                      ate = estimate_doubleml_irm_ate(
                          data=self.analysis_data,
@@ -360,16 +357,16 @@ class PromotionCausalAnalyzer:
                      )
                      results["doubleml_rf"] = {"ate": ate} if ate is not None else {"error": "DoubleML estimation returned None"}
                  except Exception as e:
-                     print(f"  ERROR running doubleml_rf estimator: {e}")
+                     self.logger.error(f"  ERROR running doubleml_rf estimator: {e}")
                      results["doubleml_rf"] = {"error": str(e)}
             else:
-                 print("Skipping DoubleML IRM (Random Forest) (no common causes).")
+                 self.logger.warning("Skipping DoubleML IRM (Random Forest) (no common causes).")
                  results["doubleml_rf"] = {"error": "Common causes not available."}
 
 
         if 'doubleml_lasso' in estimators_to_run:
              if has_common_causes:
-                 print("Running DoubleML IRM (Lasso)...")
+                 self.logger.info("Running DoubleML IRM (Lasso)...")
                  try:
                      ate = estimate_doubleml_irm_ate(
                          data=self.analysis_data,
@@ -380,14 +377,14 @@ class PromotionCausalAnalyzer:
                      )
                      results["doubleml_lasso"] = {"ate": ate} if ate is not None else {"error": "DoubleML estimation returned None"}
                  except Exception as e:
-                     print(f"  ERROR running doubleml_lasso estimator: {e}")
+                     self.logger.error(f"  ERROR running doubleml_lasso estimator: {e}")
                      results["doubleml_lasso"] = {"error": str(e)}
              else:
-                 print("Skipping DoubleML IRM (Lasso) (no common causes).")
+                 self.logger.warning("Skipping DoubleML IRM (Lasso) (no common causes).")
                  results["doubleml_lasso"] = {"error": "Common causes not available."}
 
 
-        print("\n--- Causal Analyses Complete ---")
+        self.logger.info("\n--- Causal Analyses Complete ---")
         self.last_run_results = results # Store results
         return results
 
@@ -404,19 +401,19 @@ class PromotionCausalAnalyzer:
             The fitted model object, or None if fitting fails.
         """
         if self.analysis_data is None:
-            print("Error: Analysis data not initialized. Cannot fit model.")
+            self.logger.error("Error: Analysis data not initialized. Cannot fit model.")
             return None
         if self.common_causes is None:
              # Check if common causes are strictly required for the model type
              if model_key in ["causal_forest"]: # Add other types requiring confounders
-                 print(f"Error: Common causes not available. Cannot fit '{model_key}' model.")
+                 self.logger.error(f"Error: Common causes not available. Cannot fit '{model_key}' model.")
                  return None
              else:
-                  print(f"Warning: Common causes not available, proceeding to fit '{model_key}' if possible without them.")
+                  self.logger.warning(f"Warning: Common causes not available, proceeding to fit '{model_key}' if possible without them.")
 
 
         model = None
-        print(f"\n--- Fitting Model for Counterfactuals ({model_key}) ---")
+        self.logger.info(f"\n--- Fitting Model for Counterfactuals ({model_key}) ---")
         if model_key == "causal_forest":
             try:
                 # Ensure common_causes is a list, even if empty, for the function call
@@ -429,22 +426,21 @@ class PromotionCausalAnalyzer:
                     **kwargs
                 )
             except Exception as e:
-                print(f"  ERROR fitting {model_key} model: {e}")
-                traceback.print_exc()
+                self.logger.error(f"  ERROR fitting {model_key} model: {e}", exc_info=True)
                 model = None
         # Add elif blocks here for other model types ('regression', etc.) if needed
         # elif model_key == 'regression':
         #     # Fit and store a regression model (e.g., from statsmodels results)
         #     pass
         else:
-            print(f"Model type '{model_key}' not currently supported for dedicated counterfactual fitting.")
+            self.logger.warning(f"Model type '{model_key}' not currently supported for dedicated counterfactual fitting.")
             return None # Explicitly return None if type not supported
 
         if model:
             self.fitted_models[model_key] = model
-            print(f"Model '{model_key}' fitted and stored.")
+            self.logger.info(f"Model '{model_key}' fitted and stored.")
         else:
-             print(f"Failed to fit model '{model_key}'.")
+             self.logger.warning(f"Failed to fit model '{model_key}'.")
         return model
 
     def run_counterfactual_analysis(
@@ -462,23 +458,23 @@ class PromotionCausalAnalyzer:
             Dictionary with counterfactual results, or None if simulation failed.
         """
         if self.analysis_data is None:
-            print("Error: Analysis data not initialized. Cannot run counterfactuals.")
+            self.logger.error("Error: Analysis data not initialized. Cannot run counterfactuals.")
             return None
         if self.common_causes is None:
              # Check if model type strictly needs common causes for prediction
              if model_key in ["causal_forest"]:
-                 print(f"Error: Common causes not available, cannot run counterfactuals for '{model_key}'.")
+                 self.logger.error(f"Error: Common causes not available, cannot run counterfactuals for '{model_key}'.")
                  return None
              else:
-                  print(f"Warning: Common causes not available, proceeding with counterfactuals for '{model_key}' if possible.")
+                  self.logger.warning(f"Warning: Common causes not available, proceeding with counterfactuals for '{model_key}' if possible.")
 
 
         model = self.fitted_models.get(model_key)
         if model is None:
-            print(f"Error: Model '{model_key}' not found or not fitted. Fit the model first using `fit_model_for_counterfactuals`.")
+            self.logger.error(f"Error: Model '{model_key}' not found or not fitted. Fit the model first using `fit_model_for_counterfactuals`.")
             return None
 
-        print(f"\n--- Running Counterfactual Analysis (Model: {model_key}, Scenario: {scenario}) ---")
+        self.logger.info(f"\n--- Running Counterfactual Analysis (Model: {model_key}, Scenario: {scenario}) ---")
         try:
             # Ensure common_causes is a list, even if empty
             sim_common_causes = self.common_causes if self.common_causes is not None else []
@@ -491,18 +487,17 @@ class PromotionCausalAnalyzer:
             )
             # Print results here for immediate feedback
             if results:
-                 print("Counterfactual Simulation Results:")
+                 self.logger.info("Counterfactual Simulation Results:")
                  for key, val in results.items():
                       if isinstance(val, float):
-                           print(f"  {key.replace('_',' ').title()}: {val:.4f}")
+                           self.logger.info(f"  {key.replace('_',' ').title()}: {val:.4f}")
                       else:
-                           print(f"  {key.replace('_',' ').title()}: {val}")
+                           self.logger.info(f"  {key.replace('_',' ').title()}: {val}")
             else:
-                 print("Counterfactual simulation returned None.")
+                 self.logger.warning("Counterfactual simulation returned None.")
             return results
         except Exception as e:
-            print(f"  ERROR during counterfactual simulation call: {e}")
-            traceback.print_exc()
+            self.logger.error(f"  ERROR during counterfactual simulation call: {e}", exc_info=True)
             return None
 
     def run_roi_analysis(
@@ -532,19 +527,19 @@ class PromotionCausalAnalyzer:
             Example: {'roi_calculation': {...}, 'interpretation': "..."}
         """
         if self.analysis_data is None:
-            print("Error: Analysis data not available for ROI calculation.")
+            self.logger.error("Error: Analysis data not available for ROI calculation.")
             return None
 
         # Determine the ATE to use
         final_ate: Optional[float] = estimated_ate # Use override if provided
         if final_ate is None:
             if not self.last_run_results:
-                print(f"Error: No previous analysis results found in `last_run_results`. Run `run_all_analyses` first or provide `estimated_ate`.")
+                self.logger.error(f"Error: No previous analysis results found in `last_run_results`. Run `run_all_analyses` first or provide `estimated_ate`.")
                 return None
             source_result = self.last_run_results.get(ate_source)
             if source_result is None:
-                 print(f"Error: Result for ATE source '{ate_source}' not found in last run results.")
-                 print(f"Available results: {list(self.last_run_results.keys())}")
+                 self.logger.error(f"Error: Result for ATE source '{ate_source}' not found in last run results.")
+                 self.logger.info(f"Available results: {list(self.last_run_results.keys())}")
                  return None
             # Extract ATE, handling different result structures (dict vs float)
             if isinstance(source_result, dict):
@@ -553,15 +548,15 @@ class PromotionCausalAnalyzer:
                  elif "naive_ate" in source_result and isinstance(source_result["naive_ate"], (int, float)): # Handle naive structure
                       final_ate = float(source_result["naive_ate"])
                  elif "error" in source_result:
-                      print(f"Error: Cannot use ATE from '{ate_source}' due to previous error: {source_result['error']}")
+                      self.logger.error(f"Error: Cannot use ATE from '{ate_source}' due to previous error: {source_result['error']}")
                       return None
             elif isinstance(source_result, (int, float)): # Handle cases where only ATE float might have been stored
                  final_ate = float(source_result)
 
             if final_ate is None:
-                 print(f"Error: Could not extract a valid numeric ATE value from result for '{ate_source}': {source_result}")
+                 self.logger.error(f"Error: Could not extract a valid numeric ATE value from result for '{ate_source}': {source_result}")
                  return None
-            print(f"Using ATE={final_ate:.4f} from '{ate_source}' for ROI calculation.")
+            self.logger.info(f"Using ATE={final_ate:.4f} from '{ate_source}' for ROI calculation.")
 
         # Calculate baseline sales and treated units if not provided
         if num_treated_units is None:
@@ -571,11 +566,10 @@ class PromotionCausalAnalyzer:
                       raise KeyError(f"Treatment column '{self.treatment}' not found.")
                  num_treated_units = int(self.analysis_data[self.treatment].sum())
              except KeyError as e:
-                 print(f"Error calculating num_treated_units: {e}")
+                 self.logger.error(f"Error calculating num_treated_units: {e}")
                  return None
              except Exception as e:
-                 print(f"Unexpected Error calculating num_treated_units: {e}")
-                 traceback.print_exc()
+                 self.logger.error(f"Unexpected Error calculating num_treated_units: {e}", exc_info=True)
                  return None
 
         if average_baseline_sales is None:
@@ -591,22 +585,21 @@ class PromotionCausalAnalyzer:
                      # Handle potential NaNs in outcome for controls
                      avg_val = control_sales.dropna().mean()
                      if pd.isna(avg_val):
-                          print("Warning: Average baseline sales calculation resulted in NaN (maybe all controls had NaN outcome?). Using 0.0")
+                          self.logger.warning("Warning: Average baseline sales calculation resulted in NaN (maybe all controls had NaN outcome?). Using 0.0")
                           average_baseline_sales = 0.0
                      else:
                           average_baseline_sales = float(avg_val)
                  else:
-                     print("Warning: No control units found (treatment == 0). Cannot calculate average baseline sales. Using 0.0")
+                     self.logger.warning("Warning: No control units found (treatment == 0). Cannot calculate average baseline sales. Using 0.0")
                      average_baseline_sales = 0.0
              except KeyError as e:
-                 print(f"Error calculating average_baseline_sales: {e}")
+                 self.logger.error(f"Error calculating average_baseline_sales: {e}")
                  return None
              except Exception as e:
-                 print(f"Unexpected Error calculating average_baseline_sales: {e}")
-                 traceback.print_exc()
+                 self.logger.error(f"Unexpected Error calculating average_baseline_sales: {e}", exc_info=True)
                  return None
 
-        print(f"\n--- Running ROI Analysis (ATE Source: {ate_source if estimated_ate is None else 'Directly Provided'}) ---")
+        self.logger.info(f"\n--- Running ROI Analysis (ATE Source: {ate_source if estimated_ate is None else 'Directly Provided'}) ---")
         try:
             roi_results = calculate_promotion_roi(
                 estimated_ate=final_ate, # Use the determined ATE
@@ -623,12 +616,11 @@ class PromotionCausalAnalyzer:
             # Structure the return value consistently
             final_result = {"roi_calculation": roi_results, "interpretation": interpretation}
             # Print interpretation here as well for convenience
-            print(f"ROI Interpretation: {interpretation}")
+            self.logger.info(f"ROI Interpretation: {interpretation}")
             return final_result
 
         except Exception as e:
-            print(f"  ERROR during ROI calculation/interpretation call: {e}")
-            traceback.print_exc()
+            self.logger.error(f"  ERROR during ROI calculation/interpretation call: {e}", exc_info=True)
             return {"error": f"ROI calculation failed: {e}", "roi_calculation": None, "interpretation": None}
 
 
@@ -645,7 +637,7 @@ class PromotionCausalAnalyzer:
              holidays = pd.to_datetime(["2023-01-01", "2023-07-04", "2023-12-25"]).date # Example dates
              return date_objects.isin(holidays)
         except Exception as e:
-             print(f"Warning: Failed to check holidays - {e}. Returning False for all dates.")
+             self.logger.warning(f"Warning: Failed to check holidays - {e}. Returning False for all dates.")
              return pd.Series([False] * len(dates), index=dates.index)
 
 

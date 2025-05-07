@@ -283,12 +283,33 @@ def test_run_all_analyses_custom_estimators_success(
         results = analyzer.run_all_analyses(run_estimators=custom_estimators_to_run)
     mock_estimate_naive_ate.assert_called_once()
     assert mock_estimate_dowhy_ate.call_count == 2
-    assert mock_estimate_doubleml_irm_ate.call_count == 2
-    assert "Running DoWhy (Linear Regression)..." in caplog.text
-    assert "Running DoWhy (Propensity Score Matching)..." in caplog.text
-    assert "Running DoubleML IRM (Random Forest)..." in caplog.text
-    assert "Running DoubleML IRM (Lasso)..." in caplog.text
-    assert "--- Causal Analyses Complete ---" in caplog.text
+    mock_estimate_doubleml_irm_ate.assert_any_call(data=analyzer.analysis_data, treatment=analyzer.treatment, outcome=analyzer.outcome, common_causes=analyzer.common_causes, ml_learner_name="RandomForest")
+    mock_estimate_doubleml_irm_ate.assert_any_call(data=analyzer.analysis_data, treatment=analyzer.treatment, outcome=analyzer.outcome, common_causes=analyzer.common_causes, ml_learner_name="Lasso")
+
+    mock_estimate_regression_ate.assert_not_called()
+    mock_estimate_matching_ate.assert_not_called()
+    mock_estimate_causalforest_ate.assert_not_called()
+
+    assert "naive" in results
+    assert "dowhy_regression" in results
+    assert results["dowhy_regression"]["ate"] == 0.4 
+    assert "dowhy_matching" in results
+    assert results["dowhy_matching"]["ate"] == 0.4   
+    assert "doubleml_rf" in results
+    assert results["doubleml_rf"]["ate"] == 0.6     
+    assert "doubleml_lasso" in results
+    assert results["doubleml_lasso"]["ate"] == 0.6  
+
+    assert analyzer.last_run_results == results
+    
+    # Check for specific log messages, more robustly
+    logged_messages = '\n'.join([rec.message for rec in caplog.records])
+    assert "Running Naive Estimator..." in logged_messages # This one is from the custom list
+    assert "Running DoWhy (Linear Regression)..." in logged_messages
+    assert "Running DoWhy (Propensity Score Matching)..." in logged_messages
+    assert "Running DoubleML IRM (RandomForest)..." in logged_messages # Check correct capitalization
+    assert "Running DoubleML IRM (Lasso)..." in logged_messages
+    assert "--- Causal Analyses Complete ---" in logged_messages
 
 @apply_patches(ESTIMATOR_PATCHES)
 @patch('agents.promotion_causal.define_causal_graph')

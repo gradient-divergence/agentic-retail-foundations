@@ -16,7 +16,9 @@ from agents.causal_analysis.estimators import (
     estimate_dowhy_ate, # Add dowhy estimator
     estimate_causalforest_ate, # Add causal forest
     estimate_doubleml_irm_ate, # Add DoubleML estimator
-    _validate_input_data # Helper can be tested too
+    _validate_input_data, # Helper can be tested too
+    run_dowhy_analysis, # Add run_dowhy_analysis wrapper
+    run_double_ml_forest # Add run_double_ml_forest wrapper
 )
 
 # --- Fixtures ---
@@ -631,4 +633,46 @@ def test_estimate_doubleml_irm_no_numeric_causes(estimator_data):
         outcome='sales',
         common_causes=['non_numeric']
     )
-    assert ate is None 
+    assert ate is None
+
+# --- Tests for Wrapper Functions ---
+
+@patch('agents.causal_analysis.estimators.estimate_dowhy_ate')
+def test_run_dowhy_analysis_wrapper(mock_estimate_dowhy, estimator_data, sample_graph_str):
+    """Test the run_dowhy_analysis wrapper function."""
+    mock_estimate_dowhy.return_value = 0.75 # Mock the ATE value
+    expected_method_name = "backdoor.propensity_score_matching"
+
+    result = run_dowhy_analysis(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        graph_str=sample_graph_str,
+        method_name=expected_method_name
+    )
+
+    mock_estimate_dowhy.assert_called_once_with(
+        estimator_data, 'promotion_applied', 'sales', ['price', 'marketing'], sample_graph_str, expected_method_name
+    )
+    assert result == {f"dowhy_{expected_method_name.split('.')[-1]}_ate": 0.75}
+
+@patch('agents.causal_analysis.estimators.estimate_causalforest_ate')
+def test_run_double_ml_forest_wrapper(mock_estimate_causalforest, estimator_data):
+    """Test the run_double_ml_forest wrapper function."""
+    # Note: The wrapper is named run_double_ml_forest but calls estimate_causalforest_ate
+    mock_estimate_causalforest.return_value = 0.88
+    extra_kwargs = {"n_estimators": 200}
+
+    result = run_double_ml_forest(
+        data=estimator_data,
+        treatment='promotion_applied',
+        outcome='sales',
+        common_causes=['price', 'marketing'],
+        **extra_kwargs
+    )
+
+    mock_estimate_causalforest.assert_called_once_with(
+        estimator_data, 'promotion_applied', 'sales', ['price', 'marketing'], **extra_kwargs
+    )
+    assert result == {"causal_forest_ate": 0.88} 

@@ -184,6 +184,110 @@ class PromotionCausalAnalyzer:
 
     # --- Core Functionality Methods ---
 
+    def _run_naive_estimator(self, results: Dict[str, Any]):
+        self.logger.info("Running Naive Estimator...")
+        try:
+            results["naive"] = estimate_naive_ate(
+                data=self.analysis_data,
+                treatment=self.treatment,
+                outcome=self.outcome
+            )
+        except Exception as e:
+            self.logger.error(f"  ERROR running naive estimator: {e}")
+            results["naive"] = {"error": str(e)}
+
+    def _run_regression_estimator(self, results: Dict[str, Any], has_common_causes: bool):
+        if has_common_causes:
+            self.logger.info("Running Regression Adjustment...")
+            try:
+                results["regression"] = estimate_regression_ate(
+                    data=self.analysis_data,
+                    treatment=self.treatment,
+                    outcome=self.outcome,
+                    common_causes=self.common_causes
+                )
+            except Exception as e:
+                self.logger.error(f"  ERROR running regression estimator: {e}")
+                results["regression"] = {"error": str(e)}
+        else:
+            self.logger.warning("Skipping Regression Adjustment (no common causes).")
+            results["regression"] = {"error": "Common causes not available."}
+
+    def _run_matching_estimator(self, results: Dict[str, Any], has_common_causes: bool):
+        if has_common_causes:
+            self.logger.info("Running Propensity Score Matching...")
+            try:
+                results["matching"] = estimate_matching_ate(
+                    data=self.analysis_data,
+                    treatment=self.treatment,
+                    outcome=self.outcome,
+                    common_causes=self.common_causes,
+                )
+            except Exception as e:
+                self.logger.error(f"  ERROR running matching estimator: {e}")
+                results["matching"] = {"error": str(e)}
+        else:
+            self.logger.warning("Skipping Propensity Score Matching (no common causes).")
+            results["matching"] = {"error": "Common causes not available."}
+
+    def _run_dowhy_estimator(self, results: Dict[str, Any], method_key: str, dowhy_method_name: str, has_graph: bool, has_common_causes: bool):
+        if has_graph and has_common_causes:
+            self.logger.info(f"Running DoWhy ({dowhy_method_name.split('.')[-1].replace('_', ' ').title()})...")
+            try:
+                ate = estimate_dowhy_ate(
+                    data=self.analysis_data,
+                    treatment=self.treatment,
+                    outcome=self.outcome,
+                    common_causes=self.common_causes,
+                    graph_str=self.causal_graph_str,
+                    method_name=dowhy_method_name
+                )
+                results[method_key] = {"ate": ate} if ate is not None else {"error": "DoWhy estimation returned None"}
+            except Exception as e:
+                self.logger.error(f"  ERROR running {method_key} estimator: {e}")
+                results[method_key] = {"error": str(e)}
+        else:
+            reason = "causal graph" if not has_graph else "common causes"
+            self.logger.warning(f"Skipping DoWhy ({dowhy_method_name.split('.')[-1].replace('_', ' ').title()}) (no {reason}).")
+            results[method_key] = {"error": f"{reason.capitalize()} not available."}
+
+    def _run_causalforest_estimator(self, results: Dict[str, Any], has_common_causes: bool):
+        if has_common_causes:
+            self.logger.info("Running Causal Forest DML...")
+            try:
+                ate = estimate_causalforest_ate(
+                    data=self.analysis_data,
+                    treatment=self.treatment,
+                    outcome=self.outcome,
+                    common_causes=self.common_causes
+                )
+                results["causal_forest"] = {"ate": ate} if ate is not None else {"error": "Causal Forest estimation returned None"}
+            except Exception as e:
+                self.logger.error(f"  ERROR running causal_forest estimator: {e}")
+                results["causal_forest"] = {"error": str(e)}
+        else:
+            self.logger.warning("Skipping Causal Forest DML (no common causes).")
+            results["causal_forest"] = {"error": "Common causes not available."}
+
+    def _run_doubleml_estimator(self, results: Dict[str, Any], method_key: str, ml_learner_name: str, has_common_causes: bool):
+        if has_common_causes:
+            self.logger.info(f"Running DoubleML IRM ({ml_learner_name})...")
+            try:
+                ate = estimate_doubleml_irm_ate(
+                    data=self.analysis_data,
+                    treatment=self.treatment,
+                    outcome=self.outcome,
+                    common_causes=self.common_causes,
+                    ml_learner_name=ml_learner_name
+                )
+                results[method_key] = {"ate": ate} if ate is not None else {"error": "DoubleML estimation returned None"}
+            except Exception as e:
+                self.logger.error(f"  ERROR running {method_key} estimator: {e}")
+                results[method_key] = {"error": str(e)}
+        else:
+            self.logger.warning(f"Skipping DoubleML IRM ({ml_learner_name}) (no common causes).")
+            results[method_key] = {"error": "Common causes not available."}
+
     def visualize_graph(self, save_path: Optional[str] = None):
         """Visualizes the defined causal graph."""
         if self.causal_graph_str:
@@ -231,158 +335,28 @@ class PromotionCausalAnalyzer:
 
         # --- Execute selected estimators by calling functions ---
 
-        if 'naive' in estimators_to_run:
-            self.logger.info("Running Naive Estimator...")
-            try:
-                results["naive"] = estimate_naive_ate(
-                    data=self.analysis_data,
-                    treatment=self.treatment,
-                    outcome=self.outcome
-                )
-            except Exception as e:
-                self.logger.error(f"  ERROR running naive estimator: {e}")
-                results["naive"] = {"error": str(e)}
+        self._run_naive_estimator(results)
 
-        # Methods requiring common causes
         if 'regression' in estimators_to_run:
-            if has_common_causes:
-                self.logger.info("Running Regression Adjustment...")
-                try:
-                    results["regression"] = estimate_regression_ate(
-                        data=self.analysis_data,
-                        treatment=self.treatment,
-                        outcome=self.outcome,
-                        common_causes=self.common_causes
-                    )
-                except Exception as e:
-                    self.logger.error(f"  ERROR running regression estimator: {e}")
-                    results["regression"] = {"error": str(e)}
-            else:
-                self.logger.warning("Skipping Regression Adjustment (no common causes).")
-                results["regression"] = {"error": "Common causes not available."}
+            self._run_regression_estimator(results, has_common_causes)
 
         if 'matching' in estimators_to_run:
-            if has_common_causes:
-                self.logger.info("Running Propensity Score Matching...")
-                try:
-                    # Can add matching params (caliper, ratio) here if needed
-                    results["matching"] = estimate_matching_ate(
-                        data=self.analysis_data,
-                        treatment=self.treatment,
-                        outcome=self.outcome,
-                        common_causes=self.common_causes,
-                    )
-                except Exception as e:
-                    self.logger.error(f"  ERROR running matching estimator: {e}")
-                    results["matching"] = {"error": str(e)}
-            else:
-                self.logger.warning("Skipping Propensity Score Matching (no common causes).")
-                results["matching"] = {"error": "Common causes not available."}
+            self._run_matching_estimator(results, has_common_causes)
 
-        # Methods requiring graph and common causes
         if 'dowhy_regression' in estimators_to_run:
-            if has_graph and has_common_causes:
-                 self.logger.info("Running DoWhy (Linear Regression)...")
-                 try:
-                     # estimate_dowhy_ate returns Optional[float], handle potential None
-                     ate = estimate_dowhy_ate(
-                         data=self.analysis_data,
-                         treatment=self.treatment,
-                         outcome=self.outcome,
-                         common_causes=self.common_causes,
-                         graph_str=self.causal_graph_str,
-                         method_name="backdoor.linear_regression"
-                     )
-                     results["dowhy_regression"] = {"ate": ate} if ate is not None else {"error": "DoWhy estimation returned None"}
-                 except Exception as e:
-                     self.logger.error(f"  ERROR running dowhy_regression estimator: {e}")
-                     results["dowhy_regression"] = {"error": str(e)}
-            else:
-                 reason = "causal graph" if not has_graph else "common causes"
-                 self.logger.warning(f"Skipping DoWhy (Linear Regression) (no {reason}).")
-                 results["dowhy_regression"] = {"error": f"{reason.capitalize()} not available."}
+            self._run_dowhy_estimator(results, 'dowhy_regression', "backdoor.linear_regression", has_graph, has_common_causes)
 
         if 'dowhy_matching' in estimators_to_run:
-             if has_graph and has_common_causes:
-                 self.logger.info("Running DoWhy (Propensity Score Matching)...")
-                 try:
-                     ate = estimate_dowhy_ate(
-                         data=self.analysis_data,
-                         treatment=self.treatment,
-                         outcome=self.outcome,
-                         common_causes=self.common_causes,
-                         graph_str=self.causal_graph_str,
-                         method_name="backdoor.propensity_score_matching"
-                     )
-                     results["dowhy_matching"] = {"ate": ate} if ate is not None else {"error": "DoWhy estimation returned None"}
-                 except Exception as e:
-                     self.logger.error(f"  ERROR running dowhy_matching estimator: {e}")
-                     results["dowhy_matching"] = {"error": str(e)}
-             else:
-                 reason = "causal graph" if not has_graph else "common causes"
-                 self.logger.warning(f"Skipping DoWhy (Propensity Score Matching) (no {reason}).")
-                 results["dowhy_matching"] = {"error": f"{reason.capitalize()} not available."}
+            self._run_dowhy_estimator(results, 'dowhy_matching', "backdoor.propensity_score_matching", has_graph, has_common_causes)
 
-
-        # ML based methods requiring common causes
         if 'causal_forest' in estimators_to_run:
-            if has_common_causes:
-                self.logger.info("Running Causal Forest DML...")
-                try:
-                    # Can add causal forest params (n_estimators, etc.) here if needed
-                    ate = estimate_causalforest_ate(
-                        data=self.analysis_data,
-                        treatment=self.treatment,
-                        outcome=self.outcome,
-                        common_causes=self.common_causes
-                    )
-                    results["causal_forest"] = {"ate": ate} if ate is not None else {"error": "Causal Forest estimation returned None"}
-                except Exception as e:
-                    self.logger.error(f"  ERROR running causal_forest estimator: {e}")
-                    results["causal_forest"] = {"error": str(e)}
-            else:
-                 self.logger.warning("Skipping Causal Forest DML (no common causes).")
-                 results["causal_forest"] = {"error": "Common causes not available."}
+            self._run_causalforest_estimator(results, has_common_causes)
 
         if 'doubleml_rf' in estimators_to_run:
-            if has_common_causes:
-                 self.logger.info("Running DoubleML IRM (Random Forest)...")
-                 try:
-                     ate = estimate_doubleml_irm_ate(
-                         data=self.analysis_data,
-                         treatment=self.treatment,
-                         outcome=self.outcome,
-                         common_causes=self.common_causes,
-                         ml_learner_name="RandomForest"
-                     )
-                     results["doubleml_rf"] = {"ate": ate} if ate is not None else {"error": "DoubleML estimation returned None"}
-                 except Exception as e:
-                     self.logger.error(f"  ERROR running doubleml_rf estimator: {e}")
-                     results["doubleml_rf"] = {"error": str(e)}
-            else:
-                 self.logger.warning("Skipping DoubleML IRM (Random Forest) (no common causes).")
-                 results["doubleml_rf"] = {"error": "Common causes not available."}
-
+            self._run_doubleml_estimator(results, 'doubleml_rf', "RandomForest", has_common_causes)
 
         if 'doubleml_lasso' in estimators_to_run:
-             if has_common_causes:
-                 self.logger.info("Running DoubleML IRM (Lasso)...")
-                 try:
-                     ate = estimate_doubleml_irm_ate(
-                         data=self.analysis_data,
-                         treatment=self.treatment,
-                         outcome=self.outcome,
-                         common_causes=self.common_causes,
-                         ml_learner_name="Lasso"
-                     )
-                     results["doubleml_lasso"] = {"ate": ate} if ate is not None else {"error": "DoubleML estimation returned None"}
-                 except Exception as e:
-                     self.logger.error(f"  ERROR running doubleml_lasso estimator: {e}")
-                     results["doubleml_lasso"] = {"error": str(e)}
-             else:
-                 self.logger.warning("Skipping DoubleML IRM (Lasso) (no common causes).")
-                 results["doubleml_lasso"] = {"error": "Common causes not available."}
-
+            self._run_doubleml_estimator(results, 'doubleml_lasso', "Lasso", has_common_causes)
 
         self.logger.info("\n--- Causal Analyses Complete ---")
         self.last_run_results = results # Store results
@@ -500,12 +474,92 @@ class PromotionCausalAnalyzer:
             self.logger.error(f"  ERROR during counterfactual simulation call: {e}", exc_info=True)
             return None
 
+    def _get_ate_for_roi(self, ate_source: str, estimated_ate_override: Optional[float]) -> Optional[float]:
+        """Determines the ATE to use for ROI calculation."""
+        if estimated_ate_override is not None:
+            self.logger.info(f"Using directly provided ATE={estimated_ate_override:.4f} for ROI calculation.")
+            return float(estimated_ate_override)
+
+        if not self.last_run_results:
+            self.logger.error("Error: No previous analysis results found in `last_run_results` to get ATE for ROI.")
+            return None
+        
+        source_result = self.last_run_results.get(ate_source)
+        if source_result is None:
+            self.logger.error(f"Error: Result for ATE source '{ate_source}' not found in last run results.")
+            self.logger.info(f"Available results: {list(self.last_run_results.keys())}")
+            return None
+
+        final_ate: Optional[float] = None
+        if isinstance(source_result, dict):
+            if "ate" in source_result and isinstance(source_result["ate"], (int, float)):
+                final_ate = float(source_result["ate"])
+            elif "naive_ate" in source_result and isinstance(source_result["naive_ate"], (int, float)):
+                final_ate = float(source_result["naive_ate"])
+            elif "error" in source_result:
+                self.logger.error(f"Error: Cannot use ATE from '{ate_source}' due to previous error: {source_result['error']}")
+                return None
+        elif isinstance(source_result, (int, float)):
+            final_ate = float(source_result)
+
+        if final_ate is None:
+            self.logger.error(f"Error: Could not extract a valid numeric ATE value from result for '{ate_source}': {source_result}")
+            return None
+        
+        self.logger.info(f"Using ATE={final_ate:.4f} from '{ate_source}' for ROI calculation.")
+        return final_ate
+
+    def _calculate_num_treated_units_for_roi(self) -> Optional[int]:
+        """Calculates the number of treated units from analysis_data."""
+        if self.analysis_data is None: # Should be checked before calling this helper ideally
+            self.logger.error("Cannot calculate num_treated_units: analysis_data is None.")
+            return None
+        try:
+            if self.treatment not in self.analysis_data.columns:
+                raise KeyError(f"Treatment column '{self.treatment}' not found.")
+            return int(self.analysis_data[self.treatment].sum())
+        except KeyError as e:
+            self.logger.error(f"Error calculating num_treated_units: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Unexpected Error calculating num_treated_units: {e}", exc_info=True)
+            return None
+
+    def _calculate_avg_baseline_sales_for_roi(self) -> Optional[float]:
+        """Calculates average baseline sales from analysis_data."""
+        if self.analysis_data is None: # Should be checked before calling this helper
+            self.logger.error("Cannot calculate avg_baseline_sales: analysis_data is None.")
+            return None
+        try:
+            if self.treatment not in self.analysis_data.columns:
+                raise KeyError(f"Treatment column '{self.treatment}' not found.")
+            if self.outcome not in self.analysis_data.columns:
+                raise KeyError(f"Outcome column '{self.outcome}' not found.")
+
+            control_mask = (self.analysis_data[self.treatment] == 0)
+            if control_mask.any():
+                control_sales = self.analysis_data.loc[control_mask, self.outcome]
+                avg_val = control_sales.dropna().mean()
+                if pd.isna(avg_val):
+                    self.logger.warning("Warning: Average baseline sales calculation resulted in NaN. Using 0.0")
+                    return 0.0
+                return float(avg_val)
+            else:
+                self.logger.warning("Warning: No control units found. Cannot calculate average baseline sales. Using 0.0")
+                return 0.0
+        except KeyError as e:
+            self.logger.error(f"Error calculating average_baseline_sales: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Unexpected Error calculating average_baseline_sales: {e}", exc_info=True)
+            return None
+
     def run_roi_analysis(
         self,
-        ate_source: str = "causal_forest", # Method whose ATE to use (e.g., 'causal_forest', 'regression')
-        promotion_cost_per_instance: float = 0.0, # Default to 0 cost if not specified
-        margin_percent: float = 0.0, # Default to 0 margin if not specified
-        estimated_ate: Optional[float] = None, # Allow overriding ATE directly
+        ate_source: str = "causal_forest",
+        promotion_cost_per_instance: float = 0.0,
+        margin_percent: float = 0.0,
+        estimated_ate: Optional[float] = None,
         average_baseline_sales: Optional[float] = None,
         num_treated_units: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
@@ -530,81 +584,28 @@ class PromotionCausalAnalyzer:
             self.logger.error("Error: Analysis data not available for ROI calculation.")
             return None
 
-        # Determine the ATE to use
-        final_ate: Optional[float] = estimated_ate # Use override if provided
+        final_ate = self._get_ate_for_roi(ate_source, estimated_ate)
         if final_ate is None:
-            if not self.last_run_results:
-                self.logger.error(f"Error: No previous analysis results found in `last_run_results`. Run `run_all_analyses` first or provide `estimated_ate`.")
-                return None
-            source_result = self.last_run_results.get(ate_source)
-            if source_result is None:
-                 self.logger.error(f"Error: Result for ATE source '{ate_source}' not found in last run results.")
-                 self.logger.info(f"Available results: {list(self.last_run_results.keys())}")
-                 return None
-            # Extract ATE, handling different result structures (dict vs float)
-            if isinstance(source_result, dict):
-                 if "ate" in source_result and isinstance(source_result["ate"], (int, float)):
-                     final_ate = float(source_result["ate"])
-                 elif "naive_ate" in source_result and isinstance(source_result["naive_ate"], (int, float)): # Handle naive structure
-                      final_ate = float(source_result["naive_ate"])
-                 elif "error" in source_result:
-                      self.logger.error(f"Error: Cannot use ATE from '{ate_source}' due to previous error: {source_result['error']}")
-                      return None
-            elif isinstance(source_result, (int, float)): # Handle cases where only ATE float might have been stored
-                 final_ate = float(source_result)
+            return None # Error already logged by helper
 
-            if final_ate is None:
-                 self.logger.error(f"Error: Could not extract a valid numeric ATE value from result for '{ate_source}': {source_result}")
-                 return None
-            self.logger.info(f"Using ATE={final_ate:.4f} from '{ate_source}' for ROI calculation.")
+        calc_num_treated_units = num_treated_units
+        if calc_num_treated_units is None:
+            calc_num_treated_units = self._calculate_num_treated_units_for_roi()
+            if calc_num_treated_units is None:
+                return None # Error logged by helper
 
-        # Calculate baseline sales and treated units if not provided
-        if num_treated_units is None:
-             try:
-                 # Ensure treatment column exists and is numeric/boolean
-                 if self.treatment not in self.analysis_data.columns:
-                      raise KeyError(f"Treatment column '{self.treatment}' not found.")
-                 num_treated_units = int(self.analysis_data[self.treatment].sum())
-             except KeyError as e:
-                 self.logger.error(f"Error calculating num_treated_units: {e}")
-                 return None
-             except Exception as e:
-                 self.logger.error(f"Unexpected Error calculating num_treated_units: {e}", exc_info=True)
-                 return None
-
-        if average_baseline_sales is None:
-             try:
-                 if self.treatment not in self.analysis_data.columns:
-                     raise KeyError(f"Treatment column '{self.treatment}' not found.")
-                 if self.outcome not in self.analysis_data.columns:
-                      raise KeyError(f"Outcome column '{self.outcome}' not found.")
-
-                 control_mask = (self.analysis_data[self.treatment] == 0)
-                 if control_mask.any():
-                     control_sales = self.analysis_data.loc[control_mask, self.outcome]
-                     # Handle potential NaNs in outcome for controls
-                     avg_val = control_sales.dropna().mean()
-                     if pd.isna(avg_val):
-                          self.logger.warning("Warning: Average baseline sales calculation resulted in NaN (maybe all controls had NaN outcome?). Using 0.0")
-                          average_baseline_sales = 0.0
-                     else:
-                          average_baseline_sales = float(avg_val)
-                 else:
-                     self.logger.warning("Warning: No control units found (treatment == 0). Cannot calculate average baseline sales. Using 0.0")
-                     average_baseline_sales = 0.0
-             except KeyError as e:
-                 self.logger.error(f"Error calculating average_baseline_sales: {e}")
-                 return None
-             except Exception as e:
-                 self.logger.error(f"Unexpected Error calculating average_baseline_sales: {e}", exc_info=True)
-                 return None
+        calc_average_baseline_sales = average_baseline_sales
+        if calc_average_baseline_sales is None:
+            calc_average_baseline_sales = self._calculate_avg_baseline_sales_for_roi()
+            if calc_average_baseline_sales is None:
+                return None # Error logged by helper
 
         self.logger.info(f"\n--- Running ROI Analysis (ATE Source: {ate_source if estimated_ate is None else 'Directly Provided'}) ---")
         try:
             roi_results = calculate_promotion_roi(
-                estimated_ate=final_ate, # Use the determined ATE
-                average_baseline_sales=average_baseline_sales,
-                num_treated_units=num_treated_units,
+                estimated_ate=final_ate, 
+                average_baseline_sales=calc_average_baseline_sales,
+                num_treated_units=calc_num_treated_units,
                 promotion_cost_per_instance=promotion_cost_per_instance,
                 margin_percent=margin_percent,
                 treatment_variable=self.treatment,

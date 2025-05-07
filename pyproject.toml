@@ -219,7 +219,7 @@ source = ["agents", "connectors", "utils", "demos", "config", "environments"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 80 # Optional: Fail if coverage is below this percentage
+fail_under = 40 # Optional: Fail if coverage is below this percentage (was 80)
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

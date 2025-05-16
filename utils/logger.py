@@ -8,7 +8,8 @@ import logging
 
 def get_logger(name: str | None = None) -> logging.Logger:
     """
-    Returns a logger with the specified name, configured with a standard format and INFO level by default.
+    Returns a logger with the specified name, configured with a standard format
+    and INFO level by default.
     If no name is provided, returns the root logger.
     """
     logger = logging.getLogger(name)

@@ -1,21 +1,24 @@
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-import asyncio
 import logging
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from agents.store import StoreAgent
 
 # Module to test
 from agents.task_allocation import RetailCoordinator
 
 # Dependent models/classes (mocked or imported)
-from models.task import Task, TaskStatus, TaskType, Bid
-from agents.store import StoreAgent
+from models.task import Bid, Task, TaskStatus, TaskType
 
 # --- Fixtures --- #
+
 
 @pytest.fixture
 def coordinator() -> RetailCoordinator:
     """Provides a RetailCoordinator instance."""
     return RetailCoordinator()
+
 
 @pytest.fixture
 def mock_store_agent() -> MagicMock:
@@ -23,19 +26,23 @@ def mock_store_agent() -> MagicMock:
     # Use spec=StoreAgent to make the mock pass isinstance checks
     # Set standard attributes via constructor, set .name separately due to conflict
     agent = MagicMock(spec=StoreAgent, agent_id="S001", assigned_tasks=[])
-    agent.name = "Mock Store 1" # Set the name attribute directly
+    agent.name = "Mock Store 1"  # Set the name attribute directly
     agent.calculate_bid = MagicMock()
     agent.execute_task = AsyncMock()
     return agent
 
+
 # --- Test Initialization --- #
+
 
 def test_coordinator_initialization(coordinator: RetailCoordinator):
     """Test coordinator initializes with empty agent and task lists."""
     assert coordinator.agents == {}
     assert coordinator.tasks == {}
 
+
 # --- Test register_agent --- #
+
 
 def test_register_agent_success(coordinator: RetailCoordinator, mock_store_agent: MagicMock):
     """Test registering a valid StoreAgent."""
@@ -43,6 +50,7 @@ def test_register_agent_success(coordinator: RetailCoordinator, mock_store_agent
     coordinator.register_agent(mock_store_agent)
     assert len(coordinator.agents) == 1
     assert coordinator.agents[mock_store_agent.agent_id] is mock_store_agent
+
 
 def test_register_agent_reregister(coordinator: RetailCoordinator, mock_store_agent: MagicMock, capsys):
     """Test re-registering the same agent logs a warning but updates."""
@@ -56,13 +64,16 @@ def test_register_agent_reregister(coordinator: RetailCoordinator, mock_store_ag
     captured = capsys.readouterr()
     assert f"Warning: Re-registering agent {mock_store_agent.agent_id}" in captured.out
 
+
 def test_register_agent_invalid_type(coordinator: RetailCoordinator):
     """Test registering an object that is not a StoreAgent raises TypeError."""
     invalid_agent = {"agent_id": "invalid"}
     with pytest.raises(TypeError, match="Registered entity must be a StoreAgent instance."):
-        coordinator.register_agent(invalid_agent) # type: ignore
+        coordinator.register_agent(invalid_agent)  # type: ignore
+
 
 # --- Test create_task --- #
+
 
 def test_create_task(coordinator: RetailCoordinator):
     """Test creating a new task."""
@@ -79,7 +90,7 @@ def test_create_task(coordinator: RetailCoordinator):
         urgency=urgency,
         required_capacity=required_capacity,
         location=location,
-        data=data
+        data=data,
     )
 
     assert isinstance(task_id, str)
@@ -95,11 +106,13 @@ def test_create_task(coordinator: RetailCoordinator):
     assert created_task.required_capacity == required_capacity
     assert created_task.location == location
     assert created_task.data == data
-    assert created_task.status == TaskStatus.ANNOUNCED # Initial status
+    assert created_task.status == TaskStatus.ANNOUNCED  # Initial status
     assert created_task.assigned_agent_id is None
     assert created_task.winning_bid is None
 
+
 # --- Test allocate_task --- #
+
 
 @pytest.mark.asyncio
 async def test_allocate_task_success(coordinator: RetailCoordinator):
@@ -124,7 +137,7 @@ async def test_allocate_task_success(coordinator: RetailCoordinator):
 
     # Mock bids
     bid1 = Bid(agent_id="A1", task_id=task_id, bid_value=10.0)
-    bid2 = Bid(agent_id="A2", task_id=task_id, bid_value=8.0) # Winning bid
+    bid2 = Bid(agent_id="A2", task_id=task_id, bid_value=8.0)  # Winning bid
     bid3 = Bid(agent_id="A3", task_id=task_id, bid_value=12.0)
     agent1.calculate_bid = MagicMock(return_value=bid1)
     agent2.calculate_bid = MagicMock(return_value=bid2)
@@ -151,6 +164,7 @@ async def test_allocate_task_success(coordinator: RetailCoordinator):
     assert len(agent1.assigned_tasks) == 0
     assert len(agent3.assigned_tasks) == 0
 
+
 @pytest.mark.asyncio
 async def test_allocate_task_no_bids(coordinator: RetailCoordinator):
     """Test allocation when no agents can bid."""
@@ -170,8 +184,9 @@ async def test_allocate_task_no_bids(coordinator: RetailCoordinator):
     # Assertions
     assert winner_id is None
     agent1.calculate_bid.assert_called_once_with(task)
-    assert task.status == TaskStatus.FAILED # Status updated on failure
+    assert task.status == TaskStatus.FAILED  # Status updated on failure
     assert task.assigned_agent_id is None
+
 
 @pytest.mark.asyncio
 async def test_allocate_task_not_found(coordinator: RetailCoordinator, capsys):
@@ -180,6 +195,7 @@ async def test_allocate_task_not_found(coordinator: RetailCoordinator, capsys):
     assert winner_id is None
     captured = capsys.readouterr()
     assert "Task INVALID_ID not found" in captured.out
+
 
 @pytest.mark.asyncio
 async def test_allocate_task_wrong_status(coordinator: RetailCoordinator, capsys):
@@ -195,7 +211,9 @@ async def test_allocate_task_wrong_status(coordinator: RetailCoordinator, capsys
     captured = capsys.readouterr()
     assert f"Task {task_id} is not in ANNOUNCED state" in captured.out
 
+
 # --- Test execute_allocated_tasks --- #
+
 
 @pytest.mark.asyncio
 async def test_execute_allocated_tasks_success(coordinator: RetailCoordinator):
@@ -213,7 +231,7 @@ async def test_execute_allocated_tasks_success(coordinator: RetailCoordinator):
     # Create and allocate tasks
     task1_id = coordinator.create_task(TaskType.PICKUP, "Task 1", 5, 2)
     task2_id = coordinator.create_task(TaskType.DELIVERY, "Task 2", 6, 3)
-    task3_id = coordinator.create_task(TaskType.RESTOCKING, "Task 3", 7, 4)
+    _task3_id = coordinator.create_task(TaskType.RESTOCKING, "Task 3", 7, 4)
     # Manually allocate for simplicity in this test
     coordinator.tasks[task1_id].status = TaskStatus.ALLOCATED
     coordinator.tasks[task1_id].assigned_agent_id = "A1"
@@ -228,8 +246,10 @@ async def test_execute_allocated_tasks_success(coordinator: RetailCoordinator):
     # Check execute_task was called for allocated tasks
     agent1.execute_task.assert_awaited_once_with(coordinator.tasks[task1_id])
     agent2.execute_task.assert_awaited_once_with(coordinator.tasks[task2_id])
-    # Status should be updated by the mocked execute_task, but we didn't mock that side effect here.
-    # In a real scenario, the agent's execute_task would change the status.
+    # Status should be updated by the mocked execute_task, but we didn't mock that
+    # side effect here. In a real scenario, the agent's execute_task would change
+    # the status.
+
 
 @pytest.mark.asyncio
 async def test_execute_allocated_tasks_failure_and_exception(coordinator: RetailCoordinator, caplog, capsys):
@@ -269,15 +289,16 @@ async def test_execute_allocated_tasks_failure_and_exception(coordinator: Retail
     agent3.execute_task.assert_awaited_once_with(coordinator.tasks[task3_id])
 
     # Check task status updated for exception case
-    # Note: The agent's execute_task is responsible for status update on normal failure (return False)
-    # The coordinator only handles exceptions during gather.
-    assert coordinator.tasks[task1_id].status == TaskStatus.ALLOCATED # Status not changed by coordinator on False return
-    assert coordinator.tasks[task2_id].status == TaskStatus.FAILED # Status changed by coordinator on Exception
-    assert coordinator.tasks[task3_id].status == TaskStatus.ALLOCATED # Status not changed by coordinator on True return
+    # Note: The agent's execute_task is responsible for status update on normal
+    # failure (return False). The coordinator only handles exceptions during gather.
+    assert coordinator.tasks[task1_id].status == TaskStatus.ALLOCATED  # Status not changed by coordinator on False return
+    assert coordinator.tasks[task2_id].status == TaskStatus.FAILED  # Status changed by coordinator on Exception
+    assert coordinator.tasks[task3_id].status == TaskStatus.ALLOCATED  # Status not changed by coordinator on True return
 
     # Check error log for the exception case using caplog
     assert f"Error during execution of task {task2_id}" in caplog.text
     assert "Agent crashed!" in caplog.text
+
 
 @pytest.mark.asyncio
 async def test_execute_allocated_tasks_agent_not_found(coordinator: RetailCoordinator, caplog):
@@ -297,5 +318,6 @@ async def test_execute_allocated_tasks_agent_not_found(coordinator: RetailCoordi
     # Check error logged in caplog instead of printed output
     assert f"Agent A_MISSING assigned to task {task_id} not found" in caplog.text
 
+
 # Placeholder tests
-# async def test_execute_allocated_tasks...(): ... 
+# async def test_execute_allocated_tasks...(): ...

@@ -28,34 +28,32 @@ def _(mo):
 
 @app.cell
 def _():
-    import os
     import asyncio
-    import pandas as pd
-    import marimo as mo
 
     # Setup basic logging
     import logging
+    import os
+
+    import marimo as mo
+    import pandas as pd
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
     # Import DummyDB and DummyOrderSystem from connectors
+    # Import ShelfMonitoringAgent
+    from agents.cv import ShelfMonitoringAgent
     from connectors.dummy_db import DummyDB
+    from connectors.dummy_inventory_system import DummyInventorySystem
     from connectors.dummy_order_system import DummyOrderSystem
 
     # Import DummyPlanogramDB and DummyInventorySystem from connectors
     from connectors.dummy_planogram_db import DummyPlanogramDB
-    from connectors.dummy_inventory_system import DummyInventorySystem
-
-    # Import ShelfMonitoringAgent
-    from agents.cv import ShelfMonitoringAgent
 
     return (
         DummyDB,
@@ -105,14 +103,10 @@ def _():
 @app.cell
 def _(DummyDB, DummyOrderSystem, RetailCustomerServiceAgent, os):
     # Define dummy database/system connectors for demonstration
-    policy_guidelines = {
-        "returns": {"return_window_days": 30, "methods": ["Mail", "Store"]}
-    }
+    policy_guidelines = {"returns": {"return_window_days": 30, "methods": ["Mail", "Store"]}}
     api_key = os.environ.get("OPENAI_API_KEY", "YOUR_API_KEY_HERE")
 
-    customer_service_agent = RetailCustomerServiceAgent(
-        DummyDB(), DummyOrderSystem(), DummyDB(), policy_guidelines, api_key
-    )
+    customer_service_agent = RetailCustomerServiceAgent(DummyDB(), DummyOrderSystem(), DummyDB(), policy_guidelines, api_key)
     return (customer_service_agent,)
 
 
@@ -129,26 +123,14 @@ def _(customer_service_agent, mo):
         ]
         responses_md = []
 
-        if (
-            not hasattr(customer_service_agent, "client")
-            or customer_service_agent.client is None
-        ):
-            return mo.md(
-                "**Error:** OpenAI client not initialized. Cannot run LLM demo. "
-                "Please set `OPENAI_API_KEY`."
-            )
+        if not hasattr(customer_service_agent, "client") or customer_service_agent.client is None:
+            return mo.md("**Error:** OpenAI client not initialized. Cannot run LLM demo. Please set `OPENAI_API_KEY`.")
 
         responses_md.append(mo.md("### Customer Service Agent Demo"))
         for msg in messages:
-            response = await customer_service_agent.process_customer_inquiry(
-                customer_id, msg
-            )
+            response = await customer_service_agent.process_customer_inquiry(customer_id, msg)
             responses_md.append(
-                mo.md(
-                    f"**You:** {msg}\n\n"
-                    + f"**Agent:** {response.get('message', 'Error')}\n"
-                    + f"_(Actions: {response.get('actions', [])})_"
-                )
+                mo.md(f"**You:** {msg}\n\n" + f"**Agent:** {response.get('message', 'Error')}\n" + f"_(Actions: {response.get('actions', [])})_")
             )
             responses_md.append("---")
 
@@ -185,7 +167,7 @@ def _(DummyInventorySystem, DummyPlanogramDB, ShelfMonitoringAgent):
     # Instantiation
     model_path = "models/dummy_detection_model/"  # <<<--- UPDATED to dummy model path
     # Remove camera 0 to prevent OpenCV error if no camera is present
-    cam_urls = {"CAM02": "1"} # Removed CAM01: "0"
+    cam_urls = {"CAM02": "1"}  # Removed CAM01: "0"
 
     shelf_agent = ShelfMonitoringAgent(
         model_path,
@@ -207,17 +189,11 @@ def _(asyncio, logger, mo, pd, shelf_agent):
             # Use mo.stop() to prevent further execution if setup fails
             mo.stop(
                 True,
-                mo.md(
-                    "**Error:** Shelf Agent/Model not loaded. "
-                    "Check `model_path` & TF install."
-                ),
+                mo.md("**Error:** Shelf Agent/Model not loaded. Check `model_path` & TF install."),
             )
             # The return below is now technically unreachable due to mo.stop,
             # but kept for clarity if mo.stop is removed later.
-            return mo.md(
-                "**Error:** Shelf Agent/Model not loaded. "
-                "Check `model_path` & TF install."
-            )
+            return mo.md("**Error:** Shelf Agent/Model not loaded. Check `model_path` & TF install.")
 
         loc = "LOC1"
         sections = ["SEC001"]  # Only monitor SEC001 (CAM01='0') by default
@@ -225,16 +201,11 @@ def _(asyncio, logger, mo, pd, shelf_agent):
         output = [
             mo.md("## Shelf Monitoring Demo"),
             mo.md(f"Monitoring sections: {sections} at {loc}..."),
-            mo.md(
-                f"_Ensure CAM01 (src: '{cam1_src}') active & sees target items "
-                f"(e.g., cans/bottles). Check console logs._"
-            ),
+            mo.md(f"_Ensure CAM01 (src: '{cam1_src}') active & sees target items (e.g., cans/bottles). Check console logs._"),
         ]
 
         try:
-            start_tasks = [
-                shelf_agent.start_monitoring_section(loc, s) for s in sections
-            ]
+            start_tasks = [shelf_agent.start_monitoring_section(loc, s) for s in sections]
             await asyncio.gather(*start_tasks)
 
             duration = 35  # seconds

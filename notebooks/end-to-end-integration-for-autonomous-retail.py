@@ -7,11 +7,12 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     # Keep essential imports for notebook structure and potential future use
-    import marimo as mo
-    import logging
     import asyncio
-    import pandas as pd  # Keep if used in any display logic
+    import logging
     from datetime import datetime, timedelta  # Keep if used
+
+    import marimo as mo
+    import pandas as pd  # Keep if used in any display logic
 
     # Configure logging once
     logging.basicConfig(
@@ -57,12 +58,12 @@ def _(asyncio, ord_orch_logs):
 
     async def run_demo():
         # Demo prints logs to console
-        ord_orch_logs.set_value(["Running Order Orchestration Demo... (Check console)"]) # Update state
+        ord_orch_logs.set_value(["Running Order Orchestration Demo... (Check console)"])  # Update state
         try:
             await run_orchestration_simulation()
-            ord_orch_logs.set_value(["Order Orchestration Demo Completed (check console)."]) # Update state on success
+            ord_orch_logs.set_value(["Order Orchestration Demo Completed (check console)."])  # Update state on success
         except Exception as e:
-            ord_orch_logs.set_value([f"Error during demo: {e}"]) # Update state on error
+            ord_orch_logs.set_value([f"Error during demo: {e}"])  # Update state on error
 
     # Return the function so the next cell can use it
     return run_demo, run_orchestration_simulation
@@ -71,7 +72,7 @@ def _(asyncio, ord_orch_logs):
 @app.cell
 def _(asyncio, mo, run_demo, run_ord_orch_button):
     # This cell triggers the demo when the button is clicked
-    mo.stop(not run_ord_orch_button.value, "") # Only run if button clicked
+    mo.stop(not run_ord_orch_button.value, "")  # Only run if button clicked
 
     # Trigger the demo function (which updates the state)
     # Run in a task so it doesn't block Marimo's kernel

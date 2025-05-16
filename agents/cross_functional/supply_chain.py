@@ -2,10 +2,10 @@
 SupplyChainAgent for planning initial distribution and supply chain remediation in retail MAS.
 """
 
-from datetime import datetime, timedelta
-from typing import Any
 import asyncio
 import random
+from datetime import datetime, timedelta
+from typing import Any
 
 
 class SupplyChainAgent:
@@ -20,9 +20,7 @@ class SupplyChainAgent:
         """Placeholder: Plan initial inventory based on forecast."""
         forecast = product_data.get("first_month_forecast", 0)
         lead_time = product_data.get("lead_time_days", 30)
-        print(
-            f"SupplyChain: Planning inventory for {forecast} units (lead time: {lead_time} days)..."
-        )
+        print(f"SupplyChain: Planning inventory for {forecast} units (lead time: {lead_time} days)...")
         await asyncio.sleep(0.3)  # Simulate planning time
         print("SupplyChain: Initial inventory plan complete.")
         return {"status": "inventory_planned", "initial_order_placed": True}
@@ -32,9 +30,7 @@ class SupplyChainAgent:
         agent_name = self.__class__.__name__
         product_id = product_data.get("id", "Unknown Product")
         planned_launch_date = product_data.get("planned_launch_date")
-        lead_time = product_data.get(
-            "lead_time_days", 30
-        )  # Default lead time if not specified
+        lead_time = product_data.get("lead_time_days", 30)  # Default lead time if not specified
         print(f"SupplyChain: Checking readiness for {product_id}...")
         await asyncio.sleep(random.uniform(0.1, 0.3))
 
@@ -51,9 +47,7 @@ class SupplyChainAgent:
         else:
             required_order_date = planned_launch_date - timedelta(days=lead_time)
             # Simulate that orders are placed roughly on time, but sometimes delays occur
-            simulated_order_date = required_order_date - timedelta(
-                days=random.randint(-3, 5)
-            )  # Order placed up to 3 days early or 5 days late
+            simulated_order_date = required_order_date - timedelta(days=random.randint(-3, 5))  # Order placed up to 3 days early or 5 days late
             estimated_arrival_date = simulated_order_date + timedelta(days=lead_time)
 
             if estimated_arrival_date <= planned_launch_date:
@@ -85,9 +79,7 @@ class SupplyChainAgent:
         """
         Plan initial distribution of product to stores.
         """
-        print(
-            f"Supply Chain: Planning distribution for {product_id}, {forecast_units} units"
-        )
+        print(f"Supply Chain: Planning distribution for {product_id}, {forecast_units} units")
         await asyncio.sleep(0.5)
         return {
             "status": "ready",
@@ -96,9 +88,7 @@ class SupplyChainAgent:
             "completion_date": datetime.now() + timedelta(days=3),
         }
 
-    async def suggest_remediation(
-        self, product_id: str, current_status: str
-    ) -> dict[str, Any]:
+    async def suggest_remediation(self, product_id: str, current_status: str) -> dict[str, Any]:
         """
         Suggest remediation steps for supply chain issues.
         """

@@ -10,17 +10,15 @@ import json
 import logging
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
 import redis.asyncio as redis
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 # Import models and utilities
 from utils.crdt import PNCounter  # Use the extracted CRDT
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("state-manager")
 
 # Initialize FastAPI app
@@ -57,12 +55,8 @@ class InventoryStateResponse(BaseModel):
 async def startup_event():
     global event_redis, state_redis
     try:
-        event_redis = redis.Redis(
-            host="localhost", port=6379, db=2, decode_responses=True
-        )
-        state_redis = redis.Redis(
-            host="localhost", port=6379, db=3, decode_responses=True
-        )
+        event_redis = redis.Redis(host="localhost", port=6379, db=2, decode_responses=True)
+        state_redis = redis.Redis(host="localhost", port=6379, db=3, decode_responses=True)
         await event_redis.ping()
         await state_redis.ping()
         logger.info("Connected to Redis databases (DB2 for events, DB3 for state).")
@@ -161,18 +155,12 @@ async def update_inventory(update: InventoryUpdate):
     try:
         if update.increment is not None and update.increment > 0:
             counter.increment(update.node_id, update.increment)
-            logger.info(
-                f"Applied INCREMENT from {update.node_id} ({update.increment}) to {counter.product_id}:{counter.location_id}"
-            )
+            logger.info(f"Applied INCREMENT from {update.node_id} ({update.increment}) to {counter.product_id}:{counter.location_id}")
         elif update.decrement is not None and update.decrement > 0:
             counter.decrement(update.node_id, update.decrement)
-            logger.info(
-                f"Applied DECREMENT from {update.node_id} ({update.decrement}) to {counter.product_id}:{counter.location_id}"
-            )
+            logger.info(f"Applied DECREMENT from {update.node_id} ({update.decrement}) to {counter.product_id}:{counter.location_id}")
         else:
-            raise HTTPException(
-                400, "Update must contain a positive increment or decrement."
-            )
+            raise HTTPException(400, "Update must contain a positive increment or decrement.")
 
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -191,9 +179,7 @@ async def update_inventory(update: InventoryUpdate):
     )
 
 
-@app.get(
-    "/inventory/state/{location_id}/{product_id}", response_model=InventoryStateResponse
-)
+@app.get("/inventory/state/{location_id}/{product_id}", response_model=InventoryStateResponse)
 async def get_inventory_state(location_id: str, product_id: str):
     """Get the current merged value and raw state of the CRDT counter."""
     if not state_redis:

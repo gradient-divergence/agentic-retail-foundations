@@ -31,9 +31,7 @@ class Agent:
         self.name = name
         self.instructions = instructions
         self.tools = {tool.name: tool for tool in tools}
-        logger.info(
-            f"Agent '{self.name}' initialized with tools: {list(self.tools.keys())}"
-        )
+        logger.info(f"Agent '{self.name}' initialized with tools: {list(self.tools.keys())}")
 
     def run(self, task: str):
         """Simulates the agent running a task (highly simplified)."""
@@ -46,48 +44,32 @@ class Agent:
             update_tool = self.tools.get("update_price")
 
             if not price_tool or not stock_tool or not update_tool:
-                return type(
-                    "Result", (), {"final_output": "Error: Missing required tools."}
-                )()
+                return type("Result", (), {"final_output": "Error: Missing required tools."})()
 
             competitor_price = price_tool.func(product_id="product_456")
             current_stock = stock_tool.func(product_id="product_456")
-            logger.info(
-                f"Checked product_456: Competitor Price=${competitor_price}, Current Stock={current_stock}"
-            )
+            logger.info(f"Checked product_456: Competitor Price=${competitor_price}, Current Stock={current_stock}")
 
             # Simple pricing logic simulation
             current_price = current_prices.get("product_456", 0)  # Get current price
             new_price = current_price  # Default to no change
 
-            if (
-                competitor_price
-                and current_stock <= 5
-                and competitor_price > current_price
-            ):
+            if competitor_price and current_stock <= 5 and competitor_price > current_price:
                 # Low stock, competitor is higher -> Increase price (e.g., halfway to competitor)
                 new_price = current_price + (competitor_price - current_price) * 0.5
-                logger.info(
-                    f"Low stock and competitor price higher. Suggesting price increase to ${new_price:.2f}"
-                )
+                logger.info(f"Low stock and competitor price higher. Suggesting price increase to ${new_price:.2f}")
             elif competitor_price and competitor_price < current_price:
                 # Competitor is lower -> Decrease price (e.g., match competitor)
                 new_price = competitor_price
-                logger.info(
-                    f"Competitor price lower. Suggesting price decrease to ${new_price:.2f}"
-                )
+                logger.info(f"Competitor price lower. Suggesting price decrease to ${new_price:.2f}")
             # Add more rules as needed (e.g., high stock -> decrease)
 
             if new_price != current_price:
-                update_result = update_tool.func(
-                    product_id="product_456", new_price=new_price
-                )
+                update_result = update_tool.func(product_id="product_456", new_price=new_price)
                 return type("Result", (), {"final_output": update_result})()
             else:
                 logger.info("No price adjustment needed based on current rules.")
-                return type(
-                    "Result", (), {"final_output": "No price change recommended."}
-                )()
+                return type("Result", (), {"final_output": "No price change recommended."})()
 
         else:
             logger.warning("Simplified agent logic cannot handle this task.")
@@ -118,9 +100,7 @@ inventory_levels = {"product_456": 5}
 def get_competitor_price(product_id: str) -> float | None:
     """Fetch the latest competitor price for a product."""
     price = competitor_prices.get(product_id, None)
-    logger.debug(
-        f"Tool 'get_competitor_price' called for {product_id}. Returning {price}"
-    )
+    logger.debug(f"Tool 'get_competitor_price' called for {product_id}. Returning {price}")
     return price
 
 
@@ -180,24 +160,16 @@ def run_pricing_demo():
     logger.info(f"Task: {task}")
 
     # Print initial state
-    logger.info(
-        f"Initial price (product_456): ${current_prices.get('product_456', 0):.2f}"
-    )
-    logger.info(
-        f"Competitor price (product_456): ${competitor_prices.get('product_456', 0):.2f}"
-    )
-    logger.info(
-        f"Current inventory (product_456): {inventory_levels.get('product_456', 0)} units"
-    )
+    logger.info(f"Initial price (product_456): ${current_prices.get('product_456', 0):.2f}")
+    logger.info(f"Competitor price (product_456): ${competitor_prices.get('product_456', 0):.2f}")
+    logger.info(f"Current inventory (product_456): {inventory_levels.get('product_456', 0)} units")
 
     # Run the agent
     result = Runner.run_sync(pricing_agent, task)
 
     # Print the final result and updated price
     logger.info(f"Agent Result: {result.final_output}")
-    logger.info(
-        f"Final price (product_456): ${current_prices.get('product_456', 0):.2f}"
-    )
+    logger.info(f"Final price (product_456): ${current_prices.get('product_456', 0):.2f}")
     logger.info("--- Dynamic Pricing Agent Demo Finished ---")
     return result.final_output  # Return result for potential display in Marimo
 

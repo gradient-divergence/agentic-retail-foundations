@@ -13,9 +13,7 @@ import logging
 from agents.dynamic_pricing_feedback import DynamicPricingAgent
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("dynamic-pricing-demo")
 
 

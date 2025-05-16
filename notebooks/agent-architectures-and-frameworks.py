@@ -12,11 +12,11 @@ def _():
     - Logging setup
     - Return frequently used objects so other cells can receive them
     """
+    import logging
+    import random
     from datetime import datetime, timedelta
 
     import marimo as mo
-    import logging
-    import random
 
     from agents.bdi import InventoryBDIAgent
     from agents.ooda import OODAPricingAgent
@@ -130,7 +130,7 @@ def _(mo):
     Core data models for inventory, product, and sales information. Used as beliefs in the BDI agent. Imported from `models.inventory`.
     """
     )
-    from models.inventory import ProductInfo, InventoryItem, SalesData
+    from models.inventory import InventoryItem, ProductInfo, SalesData
 
     return InventoryItem, ProductInfo, SalesData
 
@@ -186,18 +186,10 @@ def _(mo):
 @app.cell
 def _(mo):
     # --- UI Controls ---
-    stockout_slider = mo.ui.slider(
-        0.0, 1.0, step=0.05, value=1.0, label="Minimize Stockouts"
-    )
-    excess_slider = mo.ui.slider(
-        0.0, 1.0, step=0.05, value=0.7, label="Minimize Excess Inventory"
-    )
-    profit_slider = mo.ui.slider(
-        0.0, 1.0, step=0.05, value=0.5, label="Maximize Profit Margin"
-    )
-    fresh_slider = mo.ui.slider(
-        0.0, 1.0, step=0.05, value=0.8, label="Ensure Fresh Products"
-    )
+    stockout_slider = mo.ui.slider(0.0, 1.0, step=0.05, value=1.0, label="Minimize Stockouts")
+    excess_slider = mo.ui.slider(0.0, 1.0, step=0.05, value=0.7, label="Minimize Excess Inventory")
+    profit_slider = mo.ui.slider(0.0, 1.0, step=0.05, value=0.5, label="Maximize Profit Margin")
+    fresh_slider = mo.ui.slider(0.0, 1.0, step=0.05, value=0.8, label="Ensure Fresh Products")
 
     apples_stock = mo.ui.number(0, 200, value=25, label="Apples: Initial Stock")
     apples_reorder = mo.ui.number(0, 200, value=20, label="Apples: Reorder Point")
@@ -363,15 +355,11 @@ def _(
         output = []
         for day in range(sim_days.value):
             current_sim_date = agent.current_date
-            output.append(
-                mo.md(f"**Day {day + 1} ({current_sim_date.strftime('%Y-%m-%d')})**")
-            )
+            output.append(mo.md(f"**Day {day + 1} ({current_sim_date.strftime('%Y-%m-%d')})**"))
             # Show inventory before
             inv_status = []
             for pid, item in sorted(agent.inventory.items()):
-                inv_status.append(
-                    f"{products_data[pid].name}: Stock={item.current_stock}, Pending={item.pending_order_quantity}"
-                )
+                inv_status.append(f"{products_data[pid].name}: Stock={item.current_stock}, Pending={item.pending_order_quantity}")
             output.append(mo.md("  ".join(inv_status)))
             # Run agent cycle
             actions = agent.run_cycle()
@@ -386,11 +374,7 @@ def _(
                 new_sales = agent.sales_data.copy()
                 for pid, it in agent.inventory.items():
                     # Deliver order if due
-                    if (
-                        it.pending_order_quantity > 0
-                        and it.expected_delivery_date
-                        and it.expected_delivery_date.date() == current_sim_date.date()
-                    ):
+                    if it.pending_order_quantity > 0 and it.expected_delivery_date and it.expected_delivery_date.date() == current_sim_date.date():
                         delivered = it.pending_order_quantity
                         it.current_stock += delivered
                         it.pending_order_quantity = 0
@@ -514,12 +498,8 @@ def _(
 
         for day in range(3):
             current_sim_date = agent.current_date
-            logger.info(
-                f"\n--- Day {day + 1} ({current_sim_date.strftime('%Y-%m-%d')}) ---"
-            )
-            print(
-                f"\n[Day {day + 1} - {current_sim_date.strftime('%Y-%m-%d')}] BEFORE Cycle:"
-            )
+            logger.info(f"\n--- Day {day + 1} ({current_sim_date.strftime('%Y-%m-%d')}) ---")
+            print(f"\n[Day {day + 1} - {current_sim_date.strftime('%Y-%m-%d')}] BEFORE Cycle:")
             for pid, item in sorted(agent.inventory.items()):
                 print(
                     f"  {pid} Stock={item.current_stock:<3} Pending={item.pending_order_quantity:<3}"
@@ -543,11 +523,7 @@ def _(
                 new_sales = agent.sales_data.copy()
                 for pid, it in agent.inventory.items():
                     # Maybe we deliver an order
-                    if (
-                        it.pending_order_quantity > 0
-                        and it.expected_delivery_date
-                        and it.expected_delivery_date.date() == current_sim_date.date()
-                    ):
+                    if it.pending_order_quantity > 0 and it.expected_delivery_date and it.expected_delivery_date.date() == current_sim_date.date():
                         delivered = it.pending_order_quantity
                         it.current_stock += delivered
                         it.pending_order_quantity = 0
@@ -745,9 +721,7 @@ def _(OODAPricingAgent, PricingProduct, logger, random):
 
             print(f"\nState after Cycle {cycle + 1}:")
             for pid, prod in sorted(agent.products.items()):
-                print(
-                    f"  {prod.name:<18} [{pid}] Price=${prod.current_price:.2f} Inv={prod.inventory}"
-                )
+                print(f"  {prod.name:<18} [{pid}] Price=${prod.current_price:.2f} Inv={prod.inventory}")
 
         logger.info("\n===== OODA Pricing Agent Demonstration End =====")
 

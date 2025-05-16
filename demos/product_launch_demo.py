@@ -4,8 +4,9 @@ Demonstrates the Product Launch Coordinator.
 
 import asyncio
 import logging
-import pandas as pd
 from datetime import datetime, timedelta
+
+import pandas as pd
 
 # Import necessary components from the project structure
 from agents.coordinators.product_launch import ProductLaunchCoordinator
@@ -18,9 +19,7 @@ from agents.cross_functional import (
 )
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -69,9 +68,7 @@ async def demo_product_launch():
         "planned_launch_date": datetime.now() + timedelta(days=45),
         "lead_time_days": 30,  # Supply chain lead time
     }
-    logger.info(
-        f"Defined launch data for {product_launch_data['name']} (ID: {product_launch_data['id']})."
-    )
+    logger.info(f"Defined launch data for {product_launch_data['name']} (ID: {product_launch_data['id']}).")
 
     # Simulate initial planning phase (optional)
     logger.info("Simulating initial planning phase...")
@@ -96,11 +93,7 @@ async def demo_product_launch():
     # Print Launch Status Summary using the new structure
     print("\n--- Launch Readiness Status ---")
     overall_status = launch_status.get("launch_status", "Unknown")
-    projected_date_key = (
-        "final_launch_date"
-        if overall_status == "confirmed"
-        else "suggested_new_launch_date"
-    )
+    projected_date_key = "final_launch_date" if overall_status == "confirmed" else "suggested_new_launch_date"
     projected_date = launch_status.get(projected_date_key, "N/A")
 
     print(f"Overall Status: {overall_status.upper()}")
@@ -115,10 +108,7 @@ async def demo_product_launch():
     # Display agent statuses (more robustly)
     agent_results = launch_status.get("agent_statuses", [])
     agent_summary_data = []
-    agent_name_list = [
-        a.__class__.__name__
-        for a in [supply_chain, pricing, marketing, store_ops, customer_service]
-    ]  # Get names in order
+    agent_name_list = [a.__class__.__name__ for a in [supply_chain, pricing, marketing, store_ops, customer_service]]  # Get names in order
 
     for i, result in enumerate(agent_results):
         agent_name = agent_name_list[i]
@@ -130,11 +120,7 @@ async def demo_product_launch():
             status = result.get("status", "unknown")
             details = result.get("details", "-")
             readiness_date = result.get("readiness_date")
-            readiness_date_str = (
-                readiness_date.strftime("%Y-%m-%d")
-                if isinstance(readiness_date, datetime)
-                else "N/A"
-            )
+            readiness_date_str = readiness_date.strftime("%Y-%m-%d") if isinstance(readiness_date, datetime) else "N/A"
 
         agent_summary_data.append(
             {
@@ -149,21 +135,15 @@ async def demo_product_launch():
         print("\nAgent Readiness Details:")
         summary_df = pd.DataFrame(agent_summary_data)
         # Select and rename columns for better display
-        display_df = summary_df[
-            ["agent", "status", "readiness_date", "details"]
-        ].rename(columns={"readiness_date": "Est. Ready Date"})
+        display_df = summary_df[["agent", "status", "readiness_date", "details"]].rename(columns={"readiness_date": "Est. Ready Date"})
         print(display_df.to_string(index=False))
 
     # Display Remediation Plan if needed
     if overall_status == "delayed":
         remediation_plan = launch_status.get("remediation_plan", {})
         print("\nRemediation Plan:")
-        print(
-            f"- Latest Estimated Readiness: {remediation_plan.get('latest_estimated_readiness', 'N/A')}"
-        )
-        print(
-            f"- Suggested New Launch Date: {remediation_plan.get('suggested_launch_date', 'N/A')}"
-        )
+        print(f"- Latest Estimated Readiness: {remediation_plan.get('latest_estimated_readiness', 'N/A')}")
+        print(f"- Suggested New Launch Date: {remediation_plan.get('suggested_launch_date', 'N/A')}")
         remediation_steps = remediation_plan.get("steps", [])
         if remediation_steps:
             print("\nRemediation Steps:")

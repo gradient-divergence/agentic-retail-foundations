@@ -3,14 +3,15 @@ Master Orchestrator Agent for coordinating complex retail processes.
 """
 
 import logging
-from typing import Any
 from datetime import datetime, timedelta
+from typing import Any
 
-# Import base class, models, and utilities
-from .base import BaseAgent
 from models.enums import AgentType, OrderStatus  # OrderStatus needed?
 from models.events import RetailEvent
 from utils.event_bus import EventBus
+
+# Import base class, models, and utilities
+from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +60,8 @@ class MasterOrchestrator(BaseAgent):
         order_id = event.payload.get("order_id")
         if not order_id:
             # Log warning only if the event type *usually* has an order_id
-            if event.event_type.startswith("order.") or event.event_type.startswith(
-                "fulfillment."
-            ):
-                logger.warning(
-                    f"Event missing order_id: {event.event_type} from {event.source.value}"
-                )
+            if event.event_type.startswith("order.") or event.event_type.startswith("fulfillment."):
+                logger.warning(f"Event missing order_id: {event.event_type} from {event.source.value}")
             return
 
         # Update tracking state
@@ -94,27 +91,19 @@ class MasterOrchestrator(BaseAgent):
                 order_status_enum = OrderStatus(status)
                 self.orders[order_id]["current_status"] = order_status_enum.value
             except ValueError:
-                self.orders[order_id]["current_status"] = (
-                    status  # Store raw status if not in enum
-                )
+                self.orders[order_id]["current_status"] = status  # Store raw status if not in enum
         elif event.event_type == "fulfillment.shipped":
             self.orders[order_id]["current_status"] = OrderStatus.SHIPPED.value
         # Add other status mappings as needed...
 
         # Log for monitoring
-        logger.info(
-            f"Order {order_id} - Event: {event.event_type} from {event.source.value}. Status: {self.orders[order_id].get('current_status')}"
-        )
+        logger.info(f"Order {order_id} - Event: {event.event_type} from {event.source.value}. Status: {self.orders[order_id].get('current_status')}")
 
         # Handle specific events that require orchestrator action
         if event.event_type == "order.exception":
             await self.handle_exception_event(event)
-        elif (
-            event.event_type == "order.stalled"
-        ):  # Assuming another process detects stall
-            await self._apply_recovery_strategy(
-                order_id, event
-            )  # Or specific stall handling
+        elif event.event_type == "order.stalled":  # Assuming another process detects stall
+            await self._apply_recovery_strategy(order_id, event)  # Or specific stall handling
 
         # Periodic check for stalled orders (could run as a separate task)
         # await self._check_for_stalled_orders()
@@ -164,14 +153,9 @@ class MasterOrchestrator(BaseAgent):
                     OrderStatus.EXCEPTION.value,
                 ]:
                     stalled_orders.append(order_id)
-                    logger.warning(
-                        f"Order {order_id} appears stalled in status "
-                        f"'{details.get('current_status')}' (last update: {last_update_iso})"
-                    )
+                    logger.warning(f"Order {order_id} appears stalled in status '{details.get('current_status')}' (last update: {last_update_iso})")
             except ValueError:
-                logger.error(
-                    f"Invalid timestamp format for order {order_id}: {last_update_iso}"
-                )
+                logger.error(f"Invalid timestamp format for order {order_id}: {last_update_iso}")
 
         # Trigger recovery or alerts for stalled orders
         for order_id in stalled_orders:
@@ -197,23 +181,16 @@ class MasterOrchestrator(BaseAgent):
         error_context = error_details.get("context", {})
         source_agent_type = event.source if event else None
 
-        logger.info(
-            f"Applying recovery strategy for order {order_id}. Error type: {error_type}, Source: {source_agent_type}"
-        )
+        logger.info(f"Applying recovery strategy for order {order_id}. Error type: {error_type}, Source: {source_agent_type}")
 
         # Example recovery logic
-        if (
-            source_agent_type == AgentType.INVENTORY
-            and "allocation" in error_context.get("stage", "")
-        ):
+        if source_agent_type == AgentType.INVENTORY and "allocation" in error_context.get("stage", ""):
             await self._handle_inventory_allocation_failure(order_id)
         elif source_agent_type == AgentType.PAYMENT:
             await self._handle_payment_failure(order_id, error_type)
         else:
             # Generic fallback: Escalate to human
-            logger.warning(
-                f"Unknown error source/context for order {order_id}. Escalating."
-            )
+            logger.warning(f"Unknown error source/context for order {order_id}. Escalating.")
             await self._escalate_to_human(order_id, error_details)
 
     async def _handle_inventory_allocation_failure(self, order_id: str) -> None:
@@ -230,9 +207,7 @@ class MasterOrchestrator(BaseAgent):
 
     async def _handle_payment_failure(self, order_id: str, error_type: str) -> None:
         """Handle payment processing failures."""
-        logger.info(
-            f"Handling payment failure for order {order_id} (Error: {error_type})."
-        )
+        logger.info(f"Handling payment failure for order {order_id} (Error: {error_type}).")
         if error_type in [
             "TemporaryProcessingError",
             "GatewayTimeout",
@@ -252,9 +227,7 @@ class MasterOrchestrator(BaseAgent):
                 {"order_id": order_id, "original_error": error_type},
             )
 
-    async def _escalate_to_human(
-        self, order_id: str, error_details: dict[str, Any]
-    ) -> None:
+    async def _escalate_to_human(self, order_id: str, error_details: dict[str, Any]) -> None:
         """Escalate exception to human operator by creating a support ticket."""
         logger.warning(f"Escalating issue for order {order_id} to human support.")
         # Create a support ticket event

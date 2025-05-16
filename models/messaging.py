@@ -2,10 +2,10 @@
 Data models for agent communication messages.
 """
 
+import uuid
+from datetime import datetime
 from enum import Enum
 from typing import Any
-from datetime import datetime
-import uuid
 
 
 class Performative(Enum):
@@ -43,9 +43,7 @@ class AgentMessage:
         timestamp: datetime | None = None,  # Allow passing timestamp
     ):
         if not isinstance(performative, Performative):
-            raise TypeError(
-                f"performative must be a Performative enum member, not {type(performative)}"
-            )
+            raise TypeError(f"performative must be a Performative enum member, not {type(performative)}")
 
         self.performative = performative
         self.sender = sender
@@ -53,9 +51,7 @@ class AgentMessage:
         self.content = content
         self.ontology = ontology
         self.conversation_id = conversation_id or str(uuid.uuid4())
-        self.message_id = message_id or str(
-            uuid.uuid4()
-        )  # Generate unique ID if not provided
+        self.message_id = message_id or str(uuid.uuid4())  # Generate unique ID if not provided
         self.timestamp = timestamp or datetime.now()  # Use provided or generate now
         self.reply_with = reply_with  # Identifier for expected replies
         self.in_reply_to = in_reply_to  # Correlates reply to a previous message_id
@@ -99,22 +95,20 @@ class AgentMessage:
 
         try:
             performative = Performative(data["performative"])
-        except ValueError:
-            raise ValueError(f"Invalid performative value: {data['performative']}")
+        except ValueError as e:
+            raise ValueError(f"Invalid performative value: {data['performative']}") from e
 
         try:
             timestamp = datetime.fromisoformat(data["timestamp"])
-        except (TypeError, ValueError):
-            raise ValueError(f"Invalid timestamp format: {data['timestamp']}")
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Invalid timestamp format: {data['timestamp']}") from e
 
         return cls(
             performative=performative,
             sender=data["sender"],
             receiver=data["receiver"],
             content=data["content"],
-            ontology=data.get(
-                "ontology", "retail-general"
-            ),  # Provide default if missing
+            ontology=data.get("ontology", "retail-general"),  # Provide default if missing
             conversation_id=data["conversation_id"],
             message_id=data["message_id"],
             timestamp=timestamp,
@@ -135,9 +129,7 @@ class AgentMessage:
         if not self.sender:
             raise ValueError("Cannot create reply, original sender is unknown.")
 
-        reply_sender = (
-            sender if sender is not None else self.receiver
-        )  # The recipient of the original msg replies
+        reply_sender = sender if sender is not None else self.receiver  # The recipient of the original msg replies
         if not reply_sender:
             raise ValueError("Cannot determine sender for the reply message.")
 

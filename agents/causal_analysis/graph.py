@@ -1,15 +1,15 @@
-import pandas as pd
-import networkx as nx
 import matplotlib.pyplot as plt
-from typing import List, Optional
+import networkx as nx
+import pandas as pd
+
 
 def define_causal_graph(
     analysis_data: pd.DataFrame,
     treatment: str = "promotion_applied",
     outcome: str = "sales",
-    common_causes: Optional[List[str]] = None,
-    exclude_cols: Optional[List[str]] = None,
-) -> tuple[str, str, str, List[str]]:
+    common_causes: list[str] | None = None,
+    exclude_cols: list[str] | None = None,
+) -> tuple[str, str, str, list[str]]:
     """
     Defines the causal graph structure as a string and identifies common causes.
 
@@ -30,7 +30,7 @@ def define_causal_graph(
         - list[str]: The list of common cause variable names used.
     """
     if exclude_cols is None:
-        exclude_cols = ["date"] # Default columns to exclude from inference
+        exclude_cols = ["date"]  # Default columns to exclude from inference
 
     if common_causes is None:
         # Infer potential common causes from columns, excluding treatment, outcome, and specified cols
@@ -38,9 +38,7 @@ def define_causal_graph(
             col
             for col in analysis_data.columns
             if col not in [treatment, outcome] + exclude_cols
-            and pd.api.types.is_numeric_dtype(
-                analysis_data[col]
-            ) # Basic check for numeric features
+            and pd.api.types.is_numeric_dtype(analysis_data[col])  # Basic check for numeric features
         ]
         # Heuristic: Use all numeric ones found, could be refined with domain knowledge
         common_causes = potential_causes
@@ -53,8 +51,8 @@ def define_causal_graph(
 
     # Basic graph: Common causes affect both treatment and outcome
     graph = "digraph {\n"
-    graph += f'  "{treatment}" [label="{treatment.replace("_", " ").title()}"];\n' # Use actual name
-    graph += f'  "{outcome}" [label="{outcome.replace("_", " ").title()}"];\n'   # Use actual name
+    graph += f'  "{treatment}" [label="{treatment.replace("_", " ").title()}"];\n'  # Use actual name
+    graph += f'  "{outcome}" [label="{outcome.replace("_", " ").title()}"];\n'  # Use actual name
 
     # Add nodes for common causes
     for cause in common_causes:
@@ -72,7 +70,8 @@ def define_causal_graph(
 
     return graph, treatment, outcome, common_causes
 
-def visualize_causal_graph(graph_str: str, save_path: Optional[str] = None):
+
+def visualize_causal_graph(graph_str: str, save_path: str | None = None):
     """
     Visualizes the causal graph defined in DOT format using NetworkX and Matplotlib.
 
@@ -84,29 +83,30 @@ def visualize_causal_graph(graph_str: str, save_path: Optional[str] = None):
     """
     try:
         # Use NetworkX to parse the DOT string and draw
-        G = nx.drawing.nx_pydot.read_dot(graph_str) # Requires pydot
+        G = nx.drawing.nx_pydot.read_dot(graph_str)  # Requires pydot
 
         plt.figure(figsize=(10, 6))
         # Use a layout that works well for directed graphs
-        pos = nx.drawing.nx_pydot.graphviz_layout(G, prog="dot") # Requires graphviz
+        pos = nx.drawing.nx_pydot.graphviz_layout(G, prog="dot")  # Requires graphviz
 
         nx.draw(
             G,
             pos,
             with_labels=True,
-            labels=nx.get_node_attributes(G, "label"), # Use labels from DOT
+            labels=nx.get_node_attributes(G, "label"),  # Use labels from DOT
             node_size=3000,
             node_color="skyblue",
             font_size=10,
             font_weight="bold",
             arrows=True,
-            arrowstyle="-|>")
+            arrowstyle="-|>",
+        )
 
         plt.title("Causal Graph")
         if save_path:
             plt.savefig(save_path, bbox_inches="tight")
             print(f"Causal graph saved to {save_path}")
-            plt.close() # Close the plot window if saving
+            plt.close()  # Close the plot window if saving
         else:
             plt.show()
 
@@ -123,4 +123,5 @@ def visualize_causal_graph(graph_str: str, save_path: Optional[str] = None):
     except Exception as e:
         print(f"An unexpected error occurred during graph visualization: {e}")
         import traceback
-        traceback.print_exc() 
+
+        traceback.print_exc()

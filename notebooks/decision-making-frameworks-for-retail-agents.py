@@ -6,8 +6,9 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
-    import marimo as mo
     import logging
+
+    import marimo as mo
 
     # Configure logging once at the start
     logging.basicConfig(
@@ -49,9 +50,7 @@ def _():
 def _(demo_bayesian_recommendations):
     # Example usage
     def demonstrate_bayesian_recommendations(mo_instance):
-        recommendations_c1, agent, all_products, product_catalog = (
-            demo_bayesian_recommendations()
-        )
+        recommendations_c1, agent, all_products, product_catalog = demo_bayesian_recommendations()
 
         output_c1 = [mo_instance.md("**Top 5 recommendations for customer C1:**")]
         for i, pid in enumerate(recommendations_c1):
@@ -82,11 +81,7 @@ def _(demo_bayesian_recommendations):
                 mo_instance.md("---"),
                 *output_c2,
                 mo_instance.md("### Customer C1 Preference Distributions"),
-                (
-                    fig_c1
-                    if fig_c1
-                    else mo_instance.md("_No interactions to visualize for C1._")
-                ),
+                (fig_c1 if fig_c1 else mo_instance.md("_No interactions to visualize for C1._")),
             ]
         )
 
@@ -155,15 +150,9 @@ def _(mo):
     season_length_weeks = mo.ui.slider(4, 52, value=12, label="Season Length (weeks)")
     base_price = mo.ui.slider(10, 200, value=50, step=1, label="Base Price ($)")
     base_demand = mo.ui.slider(1, 50, value=10, step=1, label="Base Demand")
-    price_elasticity = mo.ui.slider(
-        0.1, 5.0, value=1.5, step=0.1, label="Price Elasticity"
-    )
-    holding_cost_per_unit = mo.ui.slider(
-        0.0, 5.0, value=0.5, step=0.1, label="Holding Cost per Unit"
-    )
-    end_season_salvage_value = mo.ui.slider(
-        0.0, 100.0, value=15.0, step=1, label="End-of-Season Salvage Value"
-    )
+    price_elasticity = mo.ui.slider(0.1, 5.0, value=1.5, step=0.1, label="Price Elasticity")
+    holding_cost_per_unit = mo.ui.slider(0.0, 5.0, value=0.5, step=0.1, label="Holding Cost per Unit")
+    end_season_salvage_value = mo.ui.slider(0.0, 100.0, value=15.0, step=1, label="End-of-Season Salvage Value")
     available_discounts = mo.ui.multiselect(
         options=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
         value=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
@@ -171,24 +160,12 @@ def _(mo):
     )
 
     # Agent hyperparameters
-    learning_rate = mo.ui.slider(
-        0.01, 1.0, value=0.1, step=0.01, label="Learning Rate (alpha)"
-    )
-    discount_factor = mo.ui.slider(
-        0.5, 1.0, value=0.95, step=0.01, label="Discount Factor (gamma)"
-    )
-    exploration_rate = mo.ui.slider(
-        0.0, 1.0, value=1.0, step=0.01, label="Initial Exploration Rate (epsilon)"
-    )
-    exploration_decay = mo.ui.slider(
-        0.90, 1.0, value=0.995, step=0.001, label="Exploration Decay"
-    )
-    min_exploration_rate = mo.ui.slider(
-        0.0, 0.5, value=0.01, step=0.01, label="Min Exploration Rate"
-    )
-    num_training_episodes = mo.ui.slider(
-        100, 20000, value=5000, step=100, label="Training Episodes"
-    )
+    learning_rate = mo.ui.slider(0.01, 1.0, value=0.1, step=0.01, label="Learning Rate (alpha)")
+    discount_factor = mo.ui.slider(0.5, 1.0, value=0.95, step=0.01, label="Discount Factor (gamma)")
+    exploration_rate = mo.ui.slider(0.0, 1.0, value=1.0, step=0.01, label="Initial Exploration Rate (epsilon)")
+    exploration_decay = mo.ui.slider(0.90, 1.0, value=0.995, step=0.001, label="Exploration Decay")
+    min_exploration_rate = mo.ui.slider(0.0, 0.5, value=0.01, step=0.01, label="Min Exploration Rate")
+    num_training_episodes = mo.ui.slider(100, 20000, value=5000, step=100, label="Training Episodes")
     run_button = mo.ui.run_button(label="Run Simulation")
 
     return (
@@ -343,9 +320,7 @@ def _(mo, results):
         value=env.initial_inventory // 2,
         label="Q-Explorer: Inventory",
     )
-    q_disc = mo.ui.slider(
-        0, len(env.available_discounts) - 1, value=0, label="Q-Explorer: Discount Index"
-    )
+    q_disc = mo.ui.slider(0, len(env.available_discounts) - 1, value=0, label="Q-Explorer: Discount Index")
 
     return env, q_disc, q_inv, q_week, week_slider
 
@@ -410,8 +385,8 @@ def _(mo):
 @app.cell
 def _():
     import matplotlib.pyplot as plt
-    import pandas as pd
     import numpy as np
+    import pandas as pd
 
     return np, pd, plt
 
@@ -481,9 +456,7 @@ def _(mo):
 @app.cell
 def _(episode_returns, plt):
     fig_hist, ax_hist = plt.subplots(figsize=(8, 4))
-    ax_hist.hist(
-        episode_returns, bins=30, color="skyblue", edgecolor="black", alpha=0.7
-    )
+    ax_hist.hist(episode_returns, bins=30, color="skyblue", edgecolor="black", alpha=0.7)
     ax_hist.set_xlabel("Total Return (Profit)")
     ax_hist.set_ylabel("Episode Count")
     ax_hist.set_title("Distribution of Episode Rewards")
@@ -519,9 +492,7 @@ def _(alt, env, mo, pd, policy, week_slider):
         alt.Chart(heatmap_df)
         .mark_rect()
         .encode(
-            x=alt.X(
-                "Inventory:O", title="Inventory Level", sort=alt.SortField("Inventory")
-            ),
+            x=alt.X("Inventory:O", title="Inventory Level", sort=alt.SortField("Inventory")),
             y=alt.Y("Current Discount Index:O", title="Current Discount Index"),
             color=alt.Color(
                 "Best Action:O",
@@ -530,9 +501,7 @@ def _(alt, env, mo, pd, policy, week_slider):
             ),
             tooltip=["Inventory", "Current Discount Index", "Best Action"],
         )
-        .properties(
-            width=400, height=300, title=f"Policy Heatmap (Week={week_slider.value})"
-        )
+        .properties(width=400, height=300, title=f"Policy Heatmap (Week={week_slider.value})")
         .interactive()
     )
     heatmap_ui = mo.ui.altair_chart(heatmap_chart)
@@ -548,24 +517,15 @@ def _(mo):
 @app.cell
 def _(env, mo, np, pd, pricing_agent, q_disc, q_inv, q_week):
     q_state = (q_week.value, q_inv.value, q_disc.value)
-    q_values = pricing_agent.q_table.get(
-        q_state, np.zeros(len(env.available_discounts))
-    )
+    q_values = pricing_agent.q_table.get(q_state, np.zeros(len(env.available_discounts)))
     q_df = pd.DataFrame(
         {
             "Discount Index": list(range(len(env.available_discounts))),
-            "Discount (%)": [
-                env.available_discounts[i] * 100
-                for i in range(len(env.available_discounts))
-            ],
+            "Discount (%)": [env.available_discounts[i] * 100 for i in range(len(env.available_discounts))],
             "Q-Value": q_values,
         }
     )
-    q_best_action_idx = (
-        int(np.argmax(q_values))
-        if len(q_values) > 0 and q_state in pricing_agent.q_table
-        else None
-    )
+    q_best_action_idx = int(np.argmax(q_values)) if len(q_values) > 0 and q_state in pricing_agent.q_table else None
     q_explorer_md_content = (
         f"""
     **Q-Explorer State:** Week={q_week.value}, Inventory={q_inv.value}, 
@@ -611,13 +571,8 @@ def _(env, mo, policy, pricing_agent):
         if valid_state in policy:
             action_idx = policy[valid_state]
             action_discount = env.available_discounts[action_idx] * 100
-            q_values_str = ", ".join(
-                [f"{q:.2f}" for q in pricing_agent.q_table.get(valid_state, [])]
-            )
-            policy_rows.append(
-                f"| {valid_state} | {action_idx} ({action_discount:.0f}%) | "
-                f"[{q_values_str}] |"
-            )
+            q_values_str = ", ".join([f"{q:.2f}" for q in pricing_agent.q_table.get(valid_state, [])])
+            policy_rows.append(f"| {valid_state} | {action_idx} ({action_discount:.0f}%) | [{q_values_str}] |")
         else:
             policy_rows.append(f"| {valid_state} | *State not visited* | - |")
     policy_md_content = r"""
@@ -637,11 +592,7 @@ def _(mo):
 
 @app.cell
 def _(env, pricing_agent):
-    q_table_df = (
-        pricing_agent.get_q_table_df(env.available_discounts)
-        if hasattr(pricing_agent, "get_q_table_df")
-        else None
-    )  # Check if method exists
+    q_table_df = pricing_agent.get_q_table_df(env.available_discounts) if hasattr(pricing_agent, "get_q_table_df") else None  # Check if method exists
     return (q_table_df,)
 
 
@@ -656,9 +607,7 @@ def _(mo, q_table_df):
     q_table_md_content = "### Q-Table Sample\n\n"
     if q_table_df is not None and not q_table_df.empty:
         q_table_md_content += q_table_df.head(15).to_html()
-        q_table_md_content += (
-            f"\n\n*(Showing first 15 rows of {len(q_table_df)} total learned states)*"
-        )
+        q_table_md_content += f"\n\n*(Showing first 15 rows of {len(q_table_df)} total learned states)*"
     else:
         q_table_md_content += "*Q-table is empty or agent did not learn any states.*"
     q_table_md = mo.md(q_table_md_content)

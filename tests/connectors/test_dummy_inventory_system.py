@@ -1,8 +1,8 @@
 import pytest
-import asyncio
 
 # Module to test
 from connectors.dummy_inventory_system import DummyInventorySystem
+
 
 @pytest.fixture(autouse=True)
 def clear_class_state():
@@ -13,19 +13,24 @@ def clear_class_state():
     # Clear again after test run (optional, but good practice)
     DummyInventorySystem._audit_reports.clear()
 
+
 @pytest.fixture
 def inventory_system() -> DummyInventorySystem:
     """Provides a DummyInventorySystem instance for testing."""
     return DummyInventorySystem()
 
+
 # --- Test Initialization (mostly about class state) --- #
+
 
 def test_initial_state(inventory_system):
     """Verify initial class state is empty."""
     # The fixture already clears this, but double-check
     assert DummyInventorySystem._audit_reports == []
 
+
 # --- Test report_visual_audit --- #
+
 
 @pytest.mark.asyncio
 async def test_report_visual_audit_appends_report(inventory_system):
@@ -42,6 +47,7 @@ async def test_report_visual_audit_appends_report(inventory_system):
     assert len(DummyInventorySystem._audit_reports) == 2
     assert DummyInventorySystem._audit_reports[1] == report2
 
+
 @pytest.mark.asyncio
 async def test_report_visual_audit_print_output(inventory_system, capsys):
     """Test that report_visual_audit prints the report."""
@@ -52,10 +58,11 @@ async def test_report_visual_audit_print_output(inventory_system, capsys):
     assert "[DummyInventorySystem] Visual audit report received:" in captured.out
     assert str(report) in captured.out
 
+
 @pytest.mark.asyncio
 async def test_report_visual_audit_class_state(inventory_system):
     """Test that reports accumulate across different instances (due to class state)."""
-    inventory_system_2 = DummyInventorySystem() # Create a second instance
+    inventory_system_2 = DummyInventorySystem()  # Create a second instance
 
     report1 = {"instance": 1}
     report2 = {"instance": 2}
@@ -66,4 +73,4 @@ async def test_report_visual_audit_class_state(inventory_system):
     # Check the class variable contains both reports
     assert len(DummyInventorySystem._audit_reports) == 2
     assert report1 in DummyInventorySystem._audit_reports
-    assert report2 in DummyInventorySystem._audit_reports 
+    assert report2 in DummyInventorySystem._audit_reports

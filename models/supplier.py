@@ -2,8 +2,11 @@
 Data models for suppliers.
 """
 
-from enum import Enum
+import logging
 from dataclasses import dataclass, field
+from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class SupplierRating(Enum):
@@ -59,9 +62,7 @@ class Supplier:
             raise TypeError("Supplier status must be a SupplierStatus Enum member.")
         # Add validation for factors if needed (e.g., must be positive)
         if self.cost_factor <= 0 or self.speed_factor <= 0 or self.quality_factor <= 0:
-            print(
-                f"Warning: Supplier factors for {self.name} should ideally be positive."
-            )
+            logger.warning(f"Warning: Supplier factors for {self.name} should ideally be positive.")
 
     def can_supply(self, product_id: str) -> bool:
         """

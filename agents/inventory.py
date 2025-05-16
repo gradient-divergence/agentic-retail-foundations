@@ -4,21 +4,18 @@ Defines the InventoryAgent class for inventory management using (s, S) policy.
 """
 
 import logging
-from models.messaging import AgentMessage, Performative
+
 from agents.messaging import MessageBroker  # Assuming MessageBroker is defined here
+from models.messaging import AgentMessage, Performative
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 
-async def inventory_agent_handler(
-    msg: AgentMessage, broker: MessageBroker, log_messages: list
-):
+async def inventory_agent_handler(msg: AgentMessage, broker: MessageBroker, log_messages: list):
     """Handles messages directed to the inventory agent."""
     logger.info(f"Inventory agent received: {msg.performative.value} from {msg.sender}")
-    log_messages.append(
-        f"Inventory agent received: {msg.performative.value} from {msg.sender}"
-    )
+    log_messages.append(f"Inventory agent received: {msg.performative.value} from {msg.sender}")
 
     if msg.performative == Performative.QUERY:
         product_id = msg.content.get("product_id")
@@ -31,18 +28,12 @@ async def inventory_agent_handler(
             {"product_id": product_id, "stock_level": stock_level},
         )
         await broker.deliver_message(response)
-        log_messages.append(
-            f"Inventory agent responded with stock level: {stock_level}"
-        )
-        logger.info(
-            f"Inventory agent responded to query for {product_id} with stock level: {stock_level}"
-        )
+        log_messages.append(f"Inventory agent responded with stock level: {stock_level}")
+        logger.info(f"Inventory agent responded to query for {product_id} with stock level: {stock_level}")
 
     elif msg.performative == Performative.SUBSCRIBE:
         # Assuming broker handles subscription logic
-        topic = msg.content.get(
-            "topic", "inventory_alerts"
-        )  # Get topic from message content or default
+        topic = msg.content.get("topic", "inventory_alerts")  # Get topic from message content or default
         try:
             broker.subscribe(msg.sender, topic)
             log_messages.append(f"Registered {msg.sender} for {topic}")
@@ -76,9 +67,7 @@ class InventoryAgent:
     """
 
     def __init__(self, reorder_threshold, max_capacity):
-        self.reorder_threshold = (
-            reorder_threshold  # When stock falls below this, agent should reorder
-        )
+        self.reorder_threshold = reorder_threshold  # When stock falls below this, agent should reorder
         self.max_capacity = max_capacity  # Max storage capacity or desired stock level
         self.current_stock = 0
 
@@ -107,9 +96,7 @@ class InventoryAgent:
         """Execute the decided action (e.g., place an order)."""
         if decision["action"] == "reorder":
             amount = decision["amount"]
-            print(
-                f"Placing order for {amount} units."
-            )  # In real system, call supplier API
+            print(f"Placing order for {amount} units.")  # In real system, call supplier API
             # For simulation, assume order immediately refills stock:
             self.current_stock += amount
 

@@ -4,8 +4,8 @@ Module: connectors.dummy_db
 Provides a dummy in-memory database for customers and products for testing agents.
 """
 
-from typing import Any
 import asyncio
+from typing import Any
 
 
 class DummyDB:
@@ -53,9 +53,7 @@ class DummyDB:
     async def get_customer(self, cid: str) -> dict[str, Any]:
         """Get customer info by ID."""
         await asyncio.sleep(0.01)
-        return self._customers.get(
-            cid, {"name": f"Cust {cid}", "loyalty_tier": "Standard"}
-        )
+        return self._customers.get(cid, {"name": f"Cust {cid}", "loyalty_tier": "Standard"})
 
     async def search_products(self, query: str) -> list[dict[str, Any]]:
         """Search for products by name or ID (simple substring match)."""

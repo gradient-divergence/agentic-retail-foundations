@@ -1,24 +1,39 @@
 """Retrieves context data needed for LLM customer service agent based on intent."""
 
-from typing import Dict, Any, Optional, List
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
 
 # Define dummy classes for Database/System interfaces if they aren't defined elsewhere
 # In a real application, these would be proper implementations or interfaces.
 class DummyProductDB:
-    async def get_product(self, product_id: str) -> Optional[Dict[str, Any]]: return {"name": f"Product {product_id}", "price": 10.0} if product_id else None
-    async def get_inventory(self, product_id: str) -> Optional[Dict[str, Any]]: return {"stock_level": 50} if product_id else None
-    async def resolve_product_id(self, identifier: str) -> Optional[str]: return identifier if identifier and "fail" not in identifier else None
+    async def get_product(self, product_id: str) -> dict[str, Any] | None:
+        return {"name": f"Product {product_id}", "price": 10.0} if product_id else None
+
+    async def get_inventory(self, product_id: str) -> dict[str, Any] | None:
+        return {"stock_level": 50} if product_id else None
+
+    async def resolve_product_id(self, identifier: str) -> str | None:
+        return identifier if identifier and "fail" not in identifier else None
+
 
 class DummyOrderSystem:
-    async def get_order_details(self, order_id: str) -> Optional[Dict[str, Any]]: return {"order_id": order_id, "status": "Shipped", "items": []} if order_id else None
-    async def check_return_eligibility(self, order_id: str) -> Optional[Dict[str, Any]]: return {"eligible": True, "reason": None} if order_id else None
-    async def get_recent_orders(self, customer_id: str, limit: int = 3) -> List[Dict]: return [] # Needs real implementation or fixture data
+    async def get_order_details(self, order_id: str) -> dict[str, Any] | None:
+        return {"order_id": order_id, "status": "Shipped", "items": []} if order_id else None
+
+    async def check_return_eligibility(self, order_id: str) -> dict[str, Any] | None:
+        return {"eligible": True, "reason": None} if order_id else None
+
+    async def get_recent_orders(self, customer_id: str, limit: int = 3) -> list[dict]:
+        return []  # Needs real implementation or fixture data
+
 
 class DummyCustomerDB:
-     async def get_customer(self, customer_id: str) -> Optional[Dict[str, Any]]: return {"name": f"Cust {customer_id}"} if customer_id else None
+    async def get_customer(self, customer_id: str) -> dict[str, Any] | None:
+        return {"name": f"Cust {customer_id}"} if customer_id else None
+
 
 class LLMContextRetriever:
     """
@@ -28,10 +43,10 @@ class LLMContextRetriever:
 
     def __init__(
         self,
-        product_database: Any, # Should be Protocol/Interface for ProductDB
-        order_management_system: Any, # Should be Protocol/Interface for OrderSystem
+        product_database: Any,  # Should be Protocol/Interface for ProductDB
+        order_management_system: Any,  # Should be Protocol/Interface for OrderSystem
         # customer_database: Any, # Not directly used in context fetching per intent
-        policy_guidelines: Dict[str, Any]
+        policy_guidelines: dict[str, Any],
     ):
         """
         Initializes the context retriever with necessary system connectors.
@@ -41,7 +56,7 @@ class LLMContextRetriever:
         self.policies = policy_guidelines
         logger.info("LLMContextRetriever initialized.")
 
-    async def get_context(self, intent: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_context(self, intent: str, entities: dict[str, Any]) -> dict[str, Any]:
         """
         Fetches and returns context data relevant to the intent and entities.
 
@@ -52,7 +67,7 @@ class LLMContextRetriever:
         Returns:
             A dictionary containing the fetched context data.
         """
-        context_data: Dict[str, Any] = {}
+        context_data: dict[str, Any] = {}
         logger.debug(f"Getting context for intent: '{intent}', entities: {entities}")
 
         try:
@@ -69,10 +84,10 @@ class LLMContextRetriever:
                     logger.warning("No order_id entity found for order_status intent.")
 
             elif intent == "product_question":
-                product_identifier = entities.get("product_identifier") # Name or SKU
-                product_id = entities.get("product_id") # Specific ID if resolved
+                product_identifier = entities.get("product_identifier")  # Name or SKU
+                product_id = entities.get("product_id")  # Specific ID if resolved
 
-                resolved_id = product_id # Prefer specific ID if already resolved
+                resolved_id = product_id  # Prefer specific ID if already resolved
                 if not resolved_id and product_identifier:
                     logger.debug(f"Attempting to resolve product identifier: {product_identifier}")
                     resolved_id = await self.product_db.resolve_product_id(product_identifier)
@@ -84,14 +99,14 @@ class LLMContextRetriever:
                         context_data["product_details"] = details
                         logger.debug(f"Retrieved product details for {resolved_id}.")
                     else:
-                         logger.warning(f"Failed to retrieve details for resolved product ID {resolved_id}.")
+                        logger.warning(f"Failed to retrieve details for resolved product ID {resolved_id}.")
                     if inventory:
-                         context_data["inventory"] = inventory
-                         logger.debug(f"Retrieved inventory for {resolved_id}.")
+                        context_data["inventory"] = inventory
+                        logger.debug(f"Retrieved inventory for {resolved_id}.")
                     else:
-                         logger.warning(f"Failed to retrieve inventory for resolved product ID {resolved_id}.")
+                        logger.warning(f"Failed to retrieve inventory for resolved product ID {resolved_id}.")
                 elif product_identifier:
-                     logger.warning(f"Could not resolve product identifier '{product_identifier}' to an ID.")
+                    logger.warning(f"Could not resolve product identifier '{product_identifier}' to an ID.")
                 else:
                     logger.warning("No product_identifier or product_id entity found for product_question intent.")
 
@@ -112,7 +127,7 @@ class LLMContextRetriever:
                         context_data["return_eligibility"] = eligibility
                         logger.debug(f"Retrieved return eligibility for {order_id}.")
                     else:
-                         logger.warning(f"Failed to retrieve return eligibility for order ID {order_id}.")
+                        logger.warning(f"Failed to retrieve return eligibility for order ID {order_id}.")
 
                     context_data["return_policy"] = policy
                     logger.debug("Added return policy to context.")
@@ -131,4 +146,4 @@ class LLMContextRetriever:
             # Return partially gathered context or empty dict depending on desired error handling
 
         logger.debug(f"Returning context data: {list(context_data.keys())}")
-        return context_data 
+        return context_data

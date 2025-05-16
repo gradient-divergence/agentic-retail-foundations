@@ -3,10 +3,12 @@ MDP environment for dynamic pricing of a seasonal product.
 Refactored for modular use in agentic-retail-foundations.
 """
 
+import pickle
+
 import numpy as np
+
 from config.config import DynamicPricingMDPConfig
 from utils.logger import get_logger
-import pickle
 
 
 class DynamicPricingMDP:
@@ -62,9 +64,7 @@ class DynamicPricingMDP:
 
     def step(self, action_idx: int) -> tuple[tuple[int, int, int], float, bool, dict]:
         if not (0 <= action_idx < len(self.available_discounts)):
-            self.logger.error(
-                f"Invalid action index: {action_idx}. Available: {list(range(len(self.available_discounts)))}"
-            )
+            self.logger.error(f"Invalid action index: {action_idx}. Available: {list(range(len(self.available_discounts)))}")
             raise ValueError(f"Invalid action index: {action_idx}")
         new_discount = self.available_discounts[action_idx]
         discounted_price = self.base_price * (1 - new_discount)
@@ -75,9 +75,7 @@ class DynamicPricingMDP:
             expected_demand = self.base_demand * (price_ratio**self.price_elasticity)
         demand_std_dev = 0.15 * expected_demand
         actual_demand = max(0, np.random.normal(expected_demand, demand_std_dev))
-        week_effect = 1.0 + 0.2 * np.sin(
-            np.pi * self.current_week / self.season_length_weeks
-        )
+        week_effect = 1.0 + 0.2 * np.sin(np.pi * self.current_week / self.season_length_weeks)
         actual_demand *= week_effect
         actual_demand = int(round(actual_demand))
         sales = min(self.current_inventory, actual_demand)
@@ -92,9 +90,7 @@ class DynamicPricingMDP:
         if done and self.current_inventory > 0:
             salvage_revenue = self.current_inventory * self.end_season_salvage_value
             reward += salvage_revenue
-            self.logger.debug(
-                f"End of season. Salvage value added: {salvage_revenue:.2f} for {self.current_inventory} units."
-            )
+            self.logger.debug(f"End of season. Salvage value added: {salvage_revenue:.2f} for {self.current_inventory} units.")
         next_state = self._get_state()
         self._episode_rewards.append(reward)
         self._episode_states.append(next_state)

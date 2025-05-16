@@ -3,6 +3,7 @@ Data models for representing system state, e.g., inventory.
 """
 
 from datetime import datetime
+
 from pydantic import BaseModel, Field  # Use Pydantic as in notebook
 
 # Import relevant Enums

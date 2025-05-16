@@ -1,14 +1,19 @@
 """Functions for estimating Average Treatment Effects (ATE) using various methods."""
 
-import pandas as pd
+import traceback
+from typing import Any
+
 import numpy as np
+import pandas as pd
 import statsmodels.api as sm
-from sklearn.linear_model import LogisticRegression, LassoCV, LogisticRegressionCV
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor
+from sklearn.ensemble import (
+    GradientBoostingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
+from sklearn.linear_model import LassoCV, LogisticRegression, LogisticRegressionCV
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
-from typing import Any, Dict, Optional, List, Tuple
-import traceback
 
 # Optional dependency handling
 try:
@@ -33,12 +38,13 @@ except ImportError:
 
 # --- Helper Function for Data Validation ---
 
+
 def _validate_input_data(
     data: pd.DataFrame,
     treatment: str,
     outcome: str,
-    common_causes: List[str],
-    required_cols: Optional[List[str]] = None
+    common_causes: list[str],
+    required_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Validates presence of necessary columns and handles potential NaNs."""
     if required_cols is None:
@@ -58,9 +64,11 @@ def _validate_input_data(
 
     return data_subset
 
+
 # --- Naive Estimation ---
 
-def estimate_naive_ate(data: pd.DataFrame, treatment: str, outcome: str) -> Dict[str, float]:
+
+def estimate_naive_ate(data: pd.DataFrame, treatment: str, outcome: str) -> dict[str, float]:
     """
     Calculates the naive difference in means between treated and control groups.
 
@@ -89,11 +97,11 @@ def estimate_naive_ate(data: pd.DataFrame, treatment: str, outcome: str) -> Dict
         "naive_ate": naive_ate,
     }
 
+
 # --- Regression Adjustment ---
 
-def estimate_regression_ate(
-    data: pd.DataFrame, treatment: str, outcome: str, common_causes: List[str]
-) -> Dict[str, Any]:
+
+def estimate_regression_ate(data: pd.DataFrame, treatment: str, outcome: str, common_causes: list[str]) -> dict[str, Any]:
     """
     Estimates ATE using linear regression adjustment.
 
@@ -111,7 +119,7 @@ def estimate_regression_ate(
     # Prepare data for statsmodels
     Y = validated_data[outcome]
     X = validated_data[[treatment] + common_causes]
-    X = sm.add_constant(X) # Add intercept
+    X = sm.add_constant(X)  # Add intercept
 
     # Fit OLS model
     try:
@@ -129,27 +137,29 @@ def estimate_regression_ate(
         print(f"95% Confidence Interval: [{conf_int[0]:.4f}, {conf_int[1]:.4f}]")
 
         return {
-            "summary": results.summary().as_text(), # Or return the results object itself
+            "summary": results.summary().as_text(),  # Or return the results object itself
             "ate": ate_estimate,
             "p_value": ate_pvalue,
             "conf_int": conf_int,
-            "model_results": results # Optional: return full results
+            "model_results": results,  # Optional: return full results
         }
     except Exception as e:
         print(f"Error during Regression Adjustment: {e}")
         traceback.print_exc()
         return {"error": str(e)}
 
+
 # --- Propensity Score Matching ---
+
 
 def estimate_matching_ate(
     data: pd.DataFrame,
     treatment: str,
     outcome: str,
-    common_causes: List[str],
+    common_causes: list[str],
     caliper: float = 0.05,
     ratio: int = 1,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Estimates ATE using Propensity Score Matching (Nearest Neighbors).
 
@@ -192,7 +202,9 @@ def estimate_matching_ate(
 
         # Use NearestNeighbors on the logit propensity score
         nn = NearestNeighbors(
-            n_neighbors=ratio, radius=caliper * np.std(logit_propensity), metric="minkowski"
+            n_neighbors=ratio,
+            radius=caliper * np.std(logit_propensity),
+            metric="minkowski",
         )
         nn.fit(control_units[["logit_propensity"]])
         distances, indices = nn.kneighbors(treated_units[["logit_propensity"]])
@@ -229,6 +241,7 @@ def estimate_matching_ate(
 
         # Optional: Add statistical significance test (e.g., paired t-test on differences)
         from scipy import stats
+
         if len(matched_treated_outcomes) > 1:
             diff = np.array(matched_treated_outcomes) - np.array(matched_control_outcomes)
             t_stat, p_val = stats.ttest_1samp(diff, 0)
@@ -243,7 +256,7 @@ def estimate_matching_ate(
             "num_matched_treated": len(matched_treated_outcomes),
             "num_unmatched_treated": unmatched_treated_count,
             "t_stat": t_stat,
-            "p_value": p_val
+            "p_value": p_val,
         }
 
     except Exception as e:
@@ -251,16 +264,18 @@ def estimate_matching_ate(
         traceback.print_exc()
         return {"error": str(e)}
 
+
 # --- DoWhy Integration ---
+
 
 def estimate_dowhy_ate(
     data: pd.DataFrame,
     treatment: str,
     outcome: str,
-    common_causes: List[str],
+    common_causes: list[str],
     graph_str: str,
     method_name: str = "backdoor.linear_regression",
-) -> Optional[float]:
+) -> float | None:
     """
     Estimates the Average Treatment Effect (ATE) using DoWhy library.
 
@@ -305,13 +320,11 @@ def estimate_dowhy_ate(
             treatment=treatment,
             outcome=outcome,
             graph=graph_str,
-            common_causes=numeric_common_causes, # Use only valid numeric ones
+            common_causes=numeric_common_causes,  # Use only valid numeric ones
         )
 
         identified_estimand = model.identify_effect(proceed_when_unidentified=True)
-        estimate = model.estimate_effect(
-            identified_estimand, method_name=method_name, test_significance=True
-        )
+        estimate = model.estimate_effect(identified_estimand, method_name=method_name, test_significance=True)
 
         ate = estimate.value
         print(f"\nDoWhy Estimation ({method_name}):")
@@ -324,16 +337,18 @@ def estimate_dowhy_ate(
         traceback.print_exc()
         return None
 
+
 # --- EconML Causal Forest ---
+
 
 def estimate_causalforest_ate(
     data: pd.DataFrame,
     treatment: str,
     outcome: str,
-    common_causes: List[str],
+    common_causes: list[str],
     n_estimators: int = 100,
     min_samples_leaf: int = 10,
-) -> Optional[float]:
+) -> float | None:
     """
     Estimates ATE using Causal Forest DML from EconML.
 
@@ -366,8 +381,8 @@ def estimate_causalforest_ate(
             X = X.fillna(X.median())
 
         if X.empty or X.shape[1] == 0:
-             print("Error: No valid numeric common causes (features X) found for CausalForest.")
-             return None
+            print("Error: No valid numeric common causes (features X) found for CausalForest.")
+            return None
 
         # Define outcome and treatment models (nuisance functions)
         model_y = GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123)
@@ -377,7 +392,7 @@ def estimate_causalforest_ate(
         est = CausalForestDML(
             model_y=model_y,
             model_t=model_t,
-            discrete_treatment=True, # Crucial for binary/categorical treatment
+            discrete_treatment=True,  # Crucial for binary/categorical treatment
             n_estimators=n_estimators,
             min_samples_leaf=min_samples_leaf,
             random_state=123,
@@ -391,7 +406,7 @@ def estimate_causalforest_ate(
 
         # Optional: Confidence intervals
         try:
-            ate_interval = est.ate_interval(X=X, alpha=0.05) # 95% CI
+            ate_interval = est.ate_interval(X=X, alpha=0.05)  # 95% CI
             print(f"95% CI for ATE: [{ate_interval[0]:.4f}, {ate_interval[1]:.4f}]")
         except Exception as ci_err:
             print(f"Could not compute confidence intervals: {ci_err}")
@@ -403,15 +418,17 @@ def estimate_causalforest_ate(
         traceback.print_exc()
         return None
 
+
 # --- DoubleML IRM ---
+
 
 def estimate_doubleml_irm_ate(
     data: pd.DataFrame,
     treatment: str,
     outcome: str,
-    common_causes: List[str],
+    common_causes: list[str],
     ml_learner_name: str = "RandomForest",
-) -> Optional[float]:
+) -> float | None:
     """
     Estimates ATE using DoubleML's Interactive Regression Model (IRM).
 
@@ -432,8 +449,8 @@ def estimate_doubleml_irm_ate(
     try:
         # Prepare data for DoubleMLData object
         y_col = outcome
-        d_cols = treatment # Treatment variable
-        x_cols = common_causes # Confounders
+        d_cols = treatment  # Treatment variable
+        x_cols = common_causes  # Confounders
 
         # Ensure confounders are numeric
         numeric_confounders = data[x_cols].select_dtypes(include=np.number).columns.tolist()
@@ -489,14 +506,23 @@ def estimate_doubleml_irm_ate(
 # These functions were present in the original class but largely wrapped the core estimators.
 # They can be simplified or removed if the main orchestrator class handles calling the core estimators directly.
 
-def run_dowhy_analysis(data: pd.DataFrame, treatment: str, outcome: str, common_causes: List[str], graph_str: str, method_name: str = "backdoor.linear_regression") -> Dict[str, Any]:
+
+def run_dowhy_analysis(
+    data: pd.DataFrame,
+    treatment: str,
+    outcome: str,
+    common_causes: list[str],
+    graph_str: str,
+    method_name: str = "backdoor.linear_regression",
+) -> dict[str, Any]:
     """Simplified wrapper to call DoWhy estimation."""
     ate = estimate_dowhy_ate(data, treatment, outcome, common_causes, graph_str, method_name)
     return {f"dowhy_{method_name.split('.')[-1]}_ate": ate}
 
-def run_double_ml_forest(data: pd.DataFrame, treatment: str, outcome: str, common_causes: List[str], **kwargs) -> Dict[str, Any]:
+
+def run_double_ml_forest(data: pd.DataFrame, treatment: str, outcome: str, common_causes: list[str], **kwargs) -> dict[str, Any]:
     """Simplified wrapper to call Causal Forest estimation."""
     # Note: Original class had double_ml_forest call estimate_ate_causalforest.
     # Keeping similar logic here, but name is potentially confusing.
     ate = estimate_causalforest_ate(data, treatment, outcome, common_causes, **kwargs)
-    return {"causal_forest_ate": ate} 
+    return {"causal_forest_ate": ate}

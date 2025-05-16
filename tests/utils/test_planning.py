@@ -1,41 +1,54 @@
-import pytest
+import logging  # Added for caplog
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch
+
+import matplotlib.figure
+import matplotlib.pyplot as plt
 import numpy as np
-import logging # Added for caplog
+import pytest
+
+from models.enums import OrderStatus
+from models.fulfillment import Associate, Order, OrderLineItem
 
 # Function to test
-from utils.planning import calculate_remediation_timeline
+from utils.planning import (
+    FulfillmentPlanner,
+    StoreLayout,
+    calculate_remediation_timeline,
+)
 
 # Define a fixed point in time for consistent testing
 FIXED_NOW = datetime(2024, 1, 1, 12, 0, 0)
 
+
 # Remove patches, pass FIXED_NOW directly
 # @patch('utils.planning.datetime.now')
-def test_calculate_timeline_basic():#mock_now):
+def test_calculate_timeline_basic():  # mock_now):
     """Test basic timeline calculation with future dates."""
     # mock_now.return_value = FIXED_NOW
 
     steps = {
         "DomainA": {"estimated_completion": FIXED_NOW + timedelta(days=10)},
         "DomainB": {"estimated_completion": FIXED_NOW + timedelta(days=5)},
-        "DomainC": {"estimated_completion": FIXED_NOW + timedelta(days=15)}, # Longest
+        "DomainC": {"estimated_completion": FIXED_NOW + timedelta(days=15)},  # Longest
     }
 
     result = calculate_remediation_timeline(steps, now_dt=FIXED_NOW)
 
-    assert result["critical_path"] == ["DomainC", "DomainA"] # Top 2 longest
+    assert result["critical_path"] == ["DomainC", "DomainA"]  # Top 2 longest
     assert result["completion_date"] == FIXED_NOW + timedelta(days=15)
     assert result["suggested_launch_date"] == FIXED_NOW + timedelta(days=15 + 7)
 
+
 # @patch('utils.planning.datetime.now')
-def test_calculate_timeline_with_past_dates():#mock_now):
-    """Test timeline calculation handles past dates correctly (duration clamped to 0)."""
+def test_calculate_timeline_with_past_dates():  # mock_now):
+    """Test timeline calculation handles past dates correctly (duration clamped
+    to 0)."""
     # mock_now.return_value = FIXED_NOW
 
     steps = {
-        "DomainA": {"estimated_completion": FIXED_NOW + timedelta(days=10)}, # Longest positive
-        "DomainB": {"estimated_completion": FIXED_NOW - timedelta(days=5)}, # Past date
+        "DomainA": {"estimated_completion": FIXED_NOW + timedelta(days=10)},  # Longest positive
+        "DomainB": {"estimated_completion": FIXED_NOW - timedelta(days=5)},  # Past date
     }
 
     result = calculate_remediation_timeline(steps, now_dt=FIXED_NOW)
@@ -45,8 +58,9 @@ def test_calculate_timeline_with_past_dates():#mock_now):
     assert result["completion_date"] == FIXED_NOW + timedelta(days=10)
     assert result["suggested_launch_date"] == FIXED_NOW + timedelta(days=10 + 7)
 
+
 # @patch('utils.planning.datetime.now')
-def test_calculate_timeline_empty_input():#mock_now):
+def test_calculate_timeline_empty_input():  # mock_now):
     """Test timeline calculation with an empty input dictionary."""
     # mock_now.return_value = FIXED_NOW
 
@@ -55,17 +69,18 @@ def test_calculate_timeline_empty_input():#mock_now):
 
     assert result["critical_path"] == []
     assert result["completion_date"] == FIXED_NOW
-    assert result["suggested_launch_date"] == FIXED_NOW + timedelta(days=7) # Default buffer
+    assert result["suggested_launch_date"] == FIXED_NOW + timedelta(days=7)  # Default buffer
+
 
 # @patch('utils.planning.datetime.now')
-def test_calculate_timeline_invalid_date_types():#mock_now):
+def test_calculate_timeline_invalid_date_types():  # mock_now):
     """Test timeline calculation skips steps with invalid completion date types."""
     # mock_now.return_value = FIXED_NOW
 
     steps = {
-        "DomainA": {"estimated_completion": FIXED_NOW + timedelta(days=10)}, # Valid
-        "DomainB": {"estimated_completion": "Not a date"}, # Invalid type
-        "DomainC": {"estimated_completion": None}, # Invalid type
+        "DomainA": {"estimated_completion": FIXED_NOW + timedelta(days=10)},  # Valid
+        "DomainB": {"estimated_completion": "Not a date"},  # Invalid type
+        "DomainC": {"estimated_completion": None},  # Invalid type
     }
 
     result = calculate_remediation_timeline(steps, now_dt=FIXED_NOW)
@@ -75,8 +90,9 @@ def test_calculate_timeline_invalid_date_types():#mock_now):
     assert result["completion_date"] == FIXED_NOW + timedelta(days=10)
     assert result["suggested_launch_date"] == FIXED_NOW + timedelta(days=10 + 7)
 
+
 # @patch('utils.planning.datetime.now')
-def test_calculate_timeline_all_past_dates():#mock_now):
+def test_calculate_timeline_all_past_dates():  # mock_now):
     """Test timeline when all completion dates are in the past."""
     # mock_now.return_value = FIXED_NOW
 
@@ -92,9 +108,9 @@ def test_calculate_timeline_all_past_dates():#mock_now):
     assert result["completion_date"] == FIXED_NOW + timedelta(days=0)
     assert result["suggested_launch_date"] == FIXED_NOW + timedelta(days=0 + 7)
 
+
 # --- Tests for StoreLayout --- #
 
-from utils.planning import StoreLayout
 
 # Fixture for a simple StoreLayout instance
 @pytest.fixture
@@ -106,6 +122,7 @@ def simple_layout() -> StoreLayout:
     layout.add_obstacle(3, 1)
     return layout
 
+
 def test_store_layout_initialization():
     """Test StoreLayout initialization."""
     width, height = 10, 8
@@ -113,19 +130,20 @@ def test_store_layout_initialization():
     assert layout.width == width
     assert layout.height == height
     assert layout.grid.shape == (height, width)
-    assert np.all(layout.grid == 0) # Ensure grid is initialized to zeros (no obstacles)
+    assert np.all(layout.grid == 0)  # Ensure grid is initialized to zeros (no obstacles)
     assert layout.obstacles == set()
     assert layout.section_map == {}
 
+
 def test_store_layout_add_obstacle(simple_layout):
     """Test adding obstacles and checking validity."""
-    layout = simple_layout # Uses the 5x4 layout with obstacles at (1,1), (2,1), (3,1)
+    layout = simple_layout  # Uses the 5x4 layout with obstacles at (1,1), (2,1), (3,1)
 
     # Check initial obstacles
     assert (1, 1) in layout.obstacles
     assert (2, 1) in layout.obstacles
     assert (3, 1) in layout.obstacles
-    assert layout.grid[1, 1] == 1 # Grid uses (y, x)
+    assert layout.grid[1, 1] == 1  # Grid uses (y, x)
     assert layout.grid[1, 2] == 1
     assert layout.grid[1, 3] == 1
 
@@ -151,13 +169,14 @@ def test_store_layout_add_obstacle(simple_layout):
     layout.add_obstacle(10, 10)
     assert (10, 10) not in layout.obstacles
 
+
 def test_store_layout_get_neighbors(simple_layout):
     """Test getting valid neighbors for different locations."""
-    layout = simple_layout # 5x4 grid, obstacles at (1,1), (2,1), (3,1)
+    layout = simple_layout  # 5x4 grid, obstacles at (1,1), (2,1), (3,1)
 
     # Center point (away from obstacles)
     neighbors_center = layout.get_neighbors((2, 2))
-    assert set(neighbors_center) == {(1, 2), (3, 2), (2, 3)} # (2,1) is obstacle
+    assert set(neighbors_center) == {(1, 2), (3, 2), (2, 3)}  # (2,1) is obstacle
 
     # Corner point
     neighbors_corner = layout.get_neighbors((0, 0))
@@ -169,24 +188,26 @@ def test_store_layout_get_neighbors(simple_layout):
 
     # Point next to obstacles
     neighbors_near_obstacle = layout.get_neighbors((1, 0))
-    assert set(neighbors_near_obstacle) == {(0, 0), (2, 0)} # (1,1) is obstacle
+    assert set(neighbors_near_obstacle) == {(0, 0), (2, 0)}  # (1,1) is obstacle
 
     # Point completely surrounded by obstacles/boundaries (not possible in this fixture)
     # layout.add_obstacle(1, 0)
     # layout.add_obstacle(0, 1)
     # assert layout.get_neighbors((0, 0)) == [] # Example if needed
 
+
 def test_store_layout_distance():
     """Test Manhattan distance calculation."""
     # No need for layout instance, distance is static calculation based on coords
-    layout = StoreLayout(10, 10) # Dummy instance
+    layout = StoreLayout(10, 10)  # Dummy instance
 
     assert layout.distance((0, 0), (0, 0)) == 0
     assert layout.distance((0, 0), (3, 4)) == 7
     assert layout.distance((3, 4), (0, 0)) == 7
     assert layout.distance((1, 1), (1, 5)) == 4
     assert layout.distance((1, 1), (5, 1)) == 4
-    assert layout.distance((2, 3), (5, 7)) == 3 + 4 # 7
+    assert layout.distance((2, 3), (5, 7)) == 3 + 4  # 7
+
 
 def test_store_layout_shortest_path_simple():
     """Test shortest_path in an open layout."""
@@ -206,9 +227,10 @@ def test_store_layout_shortest_path_simple():
     # Example: (0,0)->(0,1)->(0,2)->(0,3)->(1,3)->(2,3)->(3,3)
     # Just check start, end, and length for simplicity unless specific path is required
 
+
 def test_store_layout_shortest_path_with_obstacles(simple_layout):
     """Test shortest_path navigating around obstacles."""
-    layout = simple_layout # 5x4 grid, obstacles at (1,1), (2,1), (3,1)
+    layout = simple_layout  # 5x4 grid, obstacles at (1,1), (2,1), (3,1)
     start = (0, 0)
     end = (4, 0)
 
@@ -230,6 +252,7 @@ def test_store_layout_shortest_path_with_obstacles(simple_layout):
     assert path_around[0] == start_below
     assert path_around[-1] == end_above
 
+
 def test_store_layout_shortest_path_start_equals_end(simple_layout):
     """Test shortest_path when start and end are the same."""
     layout = simple_layout
@@ -237,7 +260,8 @@ def test_store_layout_shortest_path_start_equals_end(simple_layout):
     path = layout.shortest_path(start, start)
     assert path == [start]
 
-def test_store_layout_shortest_path_no_path():#simple_layout):
+
+def test_store_layout_shortest_path_no_path():  # simple_layout):
     """Test shortest_path when the target is unreachable."""
     # Use a fresh layout for clarity
     layout = StoreLayout(width=3, height=3)
@@ -248,43 +272,41 @@ def test_store_layout_shortest_path_no_path():#simple_layout):
     layout.add_obstacle(1, 2)
 
     start = (0, 0)
-    end = (1, 1) # Target is surrounded
+    end = (1, 1)  # Target is surrounded
     path = layout.shortest_path(start, end)
     assert path is None
 
     # Test target outside grid
-    start = (0,0)
+    start = (0, 0)
     end_out = (5, 5)
     path_out = layout.shortest_path(start, end_out)
     assert path_out is None
 
+
 # Placeholder for StoreLayout add_section tests if needed
-# def test_store_layout_add_section(): ... 
+# def test_store_layout_add_section(): ...
 
 # --- Tests for FulfillmentPlanner --- #
 
-# Import necessary models
-from models.fulfillment import Order, Associate, OrderLineItem
-from models.enums import OrderStatus, AgentType, FulfillmentMethod
-from utils.planning import FulfillmentPlanner, get_mock_item_details
-
 # Fixtures for Planner tests
+
 
 @pytest.fixture
 def planner_layout() -> StoreLayout:
     """A more structured layout for planner tests."""
     layout = StoreLayout(width=10, height=10)
     # Add some obstacles representing shelves/aisles
-    for y in range(1, 9, 2): # Horizontal aisles clear
+    for y in range(1, 9, 2):  # Horizontal aisles clear
         for x in range(1, 9):
             layout.add_obstacle(x, y)
     # Add some vertical connection points clear
     for x in range(2, 8, 3):
-        layout.grid[1:9, x] = 0 # Clear vertical path at x=2, 5, 8
+        layout.grid[1:9, x] = 0  # Clear vertical path at x=2, 5, 8
         layout.obstacles = {(ox, oy) for (ox, oy) in layout.obstacles if ox != x}
     # Define Packing/Dispatch area
     layout.add_section((8, 8), (9, 9), "Packing")
     return layout
+
 
 @pytest.fixture
 def sample_associates() -> list[Associate]:
@@ -294,58 +316,80 @@ def sample_associates() -> list[Associate]:
             associate_id="assoc_001",
             name="Alice",
             authorized_zones={"ambient", "refrigerated"},
-            current_location=(0, 0), # Start point
-            efficiency=1.0, # Baseline efficiency
-            shift_end_time=None # No time limit initially
+            current_location=(0, 0),  # Start point
+            efficiency=1.0,  # Baseline efficiency
+            shift_end_time=None,  # No time limit initially
         ),
         Associate(
             associate_id="assoc_002",
             name="Bob",
             authorized_zones={"ambient", "frozen"},
             current_location=(0, 0),
-            efficiency=1.2, # More efficient
-            shift_end_time=None
+            efficiency=1.2,  # More efficient
+            shift_end_time=None,
         ),
         Associate(
             associate_id="assoc_003",
             name="Charlie",
-            authorized_zones={"ambient"}, # Only ambient
+            authorized_zones={"ambient"},  # Only ambient
             current_location=(0, 0),
-            efficiency=0.9, # Less efficient
-            shift_end_time=None
+            efficiency=0.9,  # Less efficient
+            shift_end_time=None,
         ),
     ]
+
 
 @pytest.fixture
 def sample_orders() -> list[Order]:
     """Provides a list of sample orders.
-       Ensures product IDs match keys or logic in MOCK_PRODUCT_DB from planning.py
-       G0: ambient, P5: refrigerated, D2: refrigerated, F3: frozen, E1: ambient, A7: ambient
+    Ensures product IDs match keys or logic in MOCK_PRODUCT_DB from planning.py
+    G0: ambient, P5: refrigerated, D2: refrigerated, F3: frozen, E1: ambient,
+    A7: ambient
     """
     # Use OrderLineItem instead of Item, add dummy price
-    order1_items = [OrderLineItem(product_id="G0-1", quantity=1, price=10.0), OrderLineItem(product_id="E1-1", quantity=2, price=15.0)] # Ambient only
-    order2_items = [OrderLineItem(product_id="P5-1", quantity=1, price=20.0)] # Refrigerated
-    order3_items = [OrderLineItem(product_id="F3-1", quantity=1, price=25.0)] # Frozen
-    order4_items = [OrderLineItem(product_id="A7-1", quantity=1, price=12.0), OrderLineItem(product_id="D2-1", quantity=1, price=18.0)] # Ambient + Refrigerated
+    order1_items = [
+        OrderLineItem(product_id="G0-1", quantity=1, price=10.0),
+        OrderLineItem(product_id="E1-1", quantity=2, price=15.0),
+    ]  # Ambient only
+    order2_items = [OrderLineItem(product_id="P5-1", quantity=1, price=20.0)]  # Refrigerated
+    order3_items = [OrderLineItem(product_id="F3-1", quantity=1, price=25.0)]  # Frozen
+    order4_items = [
+        OrderLineItem(product_id="A7-1", quantity=1, price=12.0),
+        OrderLineItem(product_id="D2-1", quantity=1, price=18.0),
+    ]  # Ambient + Refrigerated
 
     # Using datetime directly here for simplicity, could use FIXED_NOW if needed
-    now = datetime.now()
+    _now = datetime.now()
     return [
         Order(
-            order_id="order_A", items=order1_items, customer_id="C1_A", status=OrderStatus.CREATED,
+            order_id="order_A",
+            items=order1_items,
+            customer_id="C1_A",
+            status=OrderStatus.CREATED,
         ),
         Order(
-            order_id="order_B", items=order2_items, customer_id="C1_B", status=OrderStatus.CREATED,
+            order_id="order_B",
+            items=order2_items,
+            customer_id="C1_B",
+            status=OrderStatus.CREATED,
         ),
         Order(
-            order_id="order_C", items=order3_items, customer_id="C1_C", status=OrderStatus.CREATED,
+            order_id="order_C",
+            items=order3_items,
+            customer_id="C1_C",
+            status=OrderStatus.CREATED,
         ),
         Order(
-            order_id="order_D", items=order4_items, customer_id="C1_D", status=OrderStatus.CREATED,
+            order_id="order_D",
+            items=order4_items,
+            customer_id="C1_D",
+            status=OrderStatus.CREATED,
         ),
     ]
 
+
 # --- Start testing FulfillmentPlanner methods --- #
+
 
 def test_fulfillment_planner_initialization(planner_layout):
     """Test FulfillmentPlanner initialization."""
@@ -356,6 +400,7 @@ def test_fulfillment_planner_initialization(planner_layout):
     assert planner.assignments == {}
     assert planner.picking_paths == {}
     assert planner.estimated_times == {}
+
 
 def test_fulfillment_planner_add_order(planner_layout, sample_orders):
     """Test adding orders to the planner."""
@@ -373,6 +418,7 @@ def test_fulfillment_planner_add_order(planner_layout, sample_orders):
     assert order1 in planner.orders
     assert order2 in planner.orders
 
+
 def test_fulfillment_planner_add_associate(planner_layout, sample_associates):
     """Test adding associates to the planner."""
     planner = FulfillmentPlanner(planner_layout)
@@ -389,31 +435,37 @@ def test_fulfillment_planner_add_associate(planner_layout, sample_associates):
     assert assoc1 in planner.associates
     assert assoc2 in planner.associates
 
+
 def test_fulfillment_planner_estimate_order_time_success(planner_layout):
     """Test calculating the estimated time and path for a single order."""
-    planner = FulfillmentPlanner(planner_layout)
+    _planner = FulfillmentPlanner(planner_layout)
     # Use items known to be in MOCK_PRODUCT_DB and likely reachable
     # Need to use coords within 10x10 layout for this test.
     # Use OrderLineItem
-    items = [OrderLineItem(product_id="Test1", quantity=1, price=10.0), OrderLineItem(product_id="Test2", quantity=1, price=15.0)]
-    order = Order(order_id="test_ord", items=items, customer_id="C_EST")
-    start_location, efficiency = (0, 0), 1.0
+    items = [
+        OrderLineItem(product_id="Test1", quantity=1, price=10.0),
+        OrderLineItem(product_id="Test2", quantity=1, price=15.0),
+    ]
+    _order = Order(order_id="test_ord", items=items, customer_id="C_EST")
+    _start_location, _efficiency = (0, 0), 1.0
     # ... rest of test ...
+
 
 def test_fulfillment_planner_estimate_order_time_unreachable(planner_layout):
     """Test estimating time when an item location is unreachable."""
-    planner = FulfillmentPlanner(planner_layout)
+    _planner = FulfillmentPlanner(planner_layout)
     # Use OrderLineItem
     items = [OrderLineItem(product_id="Unreachable", quantity=1, price=5.0)]
-    order = Order(order_id="unreachable_ord", items=items, customer_id="C_UNR")
-    start_location, efficiency = (0, 0), 1.0
+    _order = Order(order_id="unreachable_ord", items=items, customer_id="C_UNR")
+    _start_location, _efficiency = (0, 0), 1.0
     # ... rest of test ...
+
 
 def test_fulfillment_planner_plan_simple_assignment(planner_layout, sample_associates, sample_orders):
     """Test plan() assigns a simple, valid order to an available associate."""
     planner = FulfillmentPlanner(planner_layout)
-    alice = next(a for a in sample_associates if a.associate_id == "assoc_001") # Ambient/Refrigerated
-    order_a = next(o for o in sample_orders if o.order_id == "order_A") # Ambient only (G0, E1)
+    alice = next(a for a in sample_associates if a.associate_id == "assoc_001")  # Ambient/Refrigerated
+    order_a = next(o for o in sample_orders if o.order_id == "order_A")  # Ambient only (G0, E1)
 
     planner.add_associate(alice)
     planner.add_order(order_a)
@@ -426,10 +478,10 @@ def test_fulfillment_planner_plan_simple_assignment(planner_layout, sample_assoc
     }
 
     def mock_lookup(product_id):
-        key = product_id[:2] # Use original lookup logic
-        return mock_details.get(key, None) # Return None if not in our test mock
+        key = product_id[:2]  # Use original lookup logic
+        return mock_details.get(key, None)  # Return None if not in our test mock
 
-    with patch('utils.planning.get_mock_item_details', side_effect=mock_lookup):
+    with patch("utils.planning.get_mock_item_details", side_effect=mock_lookup):
         planner.plan()
 
     # --- Assertions --- #
@@ -441,12 +493,12 @@ def test_fulfillment_planner_plan_simple_assignment(planner_layout, sample_assoc
     assert alice.associate_id in planner.picking_paths
     path = planner.picking_paths[alice.associate_id]
     assert path is not None
-    assert len(path) > 1 # Should have moved
-    assert path[0] == alice.current_location # Starts at associate location (0,0)
+    assert len(path) > 1  # Should have moved
+    assert path[0] == alice.current_location  # Starts at associate location (0,0)
     # Path should include item locations (order depends on nearest neighbor)
     assert (2, 2) in path
     assert (8, 6) in path
-    assert path[-1] == alice.current_location # Ends back at start
+    assert path[-1] == alice.current_location  # Ends back at start
 
     # Time
     assert alice.associate_id in planner.estimated_times
@@ -454,6 +506,7 @@ def test_fulfillment_planner_plan_simple_assignment(planner_layout, sample_assoc
 
     # Order Status
     assert order_a.status == OrderStatus.ALLOCATED
+
 
 def test_fulfillment_planner_plan_zone_mismatch(planner_layout, sample_associates, sample_orders):
     """Test plan() doesn't assign an order if associate lacks required zone."""
@@ -470,10 +523,11 @@ def test_fulfillment_planner_plan_zone_mismatch(planner_layout, sample_associate
     mock_details = {
         "F3": {"location": (4, 4), "handling_time": 1.3, "temperature_zone": "frozen"},
     }
+
     def mock_lookup(product_id):
         return mock_details.get(product_id[:2], None)
 
-    with patch('utils.planning.get_mock_item_details', side_effect=mock_lookup):
+    with patch("utils.planning.get_mock_item_details", side_effect=mock_lookup):
         planner.plan()
 
     # Assertions
@@ -488,6 +542,7 @@ def test_fulfillment_planner_plan_zone_mismatch(planner_layout, sample_associate
     # Order C should remain in CREATED status
     assert order_c.status == OrderStatus.CREATED
 
+
 def test_fulfillment_planner_plan_insufficient_time(planner_layout, sample_associates, sample_orders):
     """Test plan() doesn't assign order if associate shift ends too soon."""
     planner = FulfillmentPlanner(planner_layout)
@@ -497,7 +552,8 @@ def test_fulfillment_planner_plan_insufficient_time(planner_layout, sample_assoc
     order_a = next(o for o in sample_orders if o.order_id == "order_A")
 
     # Modify Alice's shift end time to be very short
-    # First, estimate the time required for order_A using the same mocks as previous tests
+    # First, estimate the time required for order_A using the same mocks as
+    # previous tests
     mock_details_data = {
         "G0": {"location": (2, 2), "handling_time": 1.0, "temperature_zone": "ambient"},
         "E1": {"location": (8, 6), "handling_time": 1.5, "temperature_zone": "ambient"},
@@ -505,23 +561,22 @@ def test_fulfillment_planner_plan_insufficient_time(planner_layout, sample_assoc
     item_details_a = [
         mock_details_data["G0"],
         mock_details_data["E1"],
-        mock_details_data["E1"], # Account for quantity 2
+        mock_details_data["E1"],  # Account for quantity 2
     ]
-    _, estimated_time_a = planner._estimate_order_time(
-        order_a, item_details_a, alice.current_location, alice.efficiency
-    )
-    assert estimated_time_a > 0 and estimated_time_a != float('inf') # Ensure calculation worked
+    _, estimated_time_a = planner._estimate_order_time(order_a, item_details_a, alice.current_location, alice.efficiency)
+    assert estimated_time_a > 0 and estimated_time_a != float("inf")  # Ensure calculation worked
 
     # Set shift end time to be less than the estimated time
-    alice.shift_end_time = estimated_time_a * 0.5 # Set end time to half the required time
+    alice.shift_end_time = estimated_time_a * 0.5  # Set end time to half the required time
 
     planner.add_associate(alice)
     planner.add_order(order_a)
 
     # Mock the lookup again for the plan method
-    def mock_lookup(product_id): return mock_details_data.get(product_id.split('-')[0])
+    def mock_lookup(product_id):
+        return mock_details_data.get(product_id.split("-")[0])
 
-    with patch('utils.planning.get_mock_item_details', side_effect=mock_lookup):
+    with patch("utils.planning.get_mock_item_details", side_effect=mock_lookup):
         planner.plan()
 
     # Assertions
@@ -536,17 +591,18 @@ def test_fulfillment_planner_plan_insufficient_time(planner_layout, sample_assoc
     # Order A should remain CREATED
     assert order_a.status == OrderStatus.CREATED
 
+
 def test_fulfillment_planner_explain_plan(planner_layout, sample_associates, sample_orders):
     """Test the explain_plan method generates expected output content."""
     planner = FulfillmentPlanner(planner_layout)
     # Use the simple assignment scenario
     alice = next(a for a in sample_associates if a.associate_id == "assoc_001")
     order_a = next(o for o in sample_orders if o.order_id == "order_A")
-    order_c = next(o for o in sample_orders if o.order_id == "order_C") # Unassigned
+    order_c = next(o for o in sample_orders if o.order_id == "order_C")  # Unassigned
 
     planner.add_associate(alice)
     planner.add_order(order_a)
-    planner.add_order(order_c) # Add an order that won't be assigned to Alice
+    planner.add_order(order_c)  # Add an order that won't be assigned to Alice
 
     # Mock item details lookup
     mock_details_data = {
@@ -554,26 +610,30 @@ def test_fulfillment_planner_explain_plan(planner_layout, sample_associates, sam
         "E1": {"location": (8, 6), "handling_time": 1.5, "temperature_zone": "ambient"},
         "F3": {"location": (4, 4), "handling_time": 1.3, "temperature_zone": "frozen"},
     }
-    def mock_lookup(product_id): return mock_details_data.get(product_id.split('-')[0])
 
-    with patch('utils.planning.get_mock_item_details', side_effect=mock_lookup):
+    def mock_lookup(product_id):
+        return mock_details_data.get(product_id.split("-")[0])
+
+    with patch("utils.planning.get_mock_item_details", side_effect=mock_lookup):
         planner.plan()
         explanation = planner.explain_plan()
 
     # Assert key components are in the explanation string
     assert "Fulfillment Plan Summary:" in explanation
     assert f"Total Orders: {len(planner.orders)}" in explanation
-    assert f"Assigned Orders: 1" in explanation
-    assert f"Unassigned Orders: 1" in explanation
+    assert "Assigned Orders: 1" in explanation
+    assert "Unassigned Orders: 1" in explanation
     assert "Assignments Details:" in explanation
     assert f"- {alice.name} ({alice.associate_id})" in explanation
     assert f"Order {order_a.order_id}" in explanation
     assert "Unassigned Orders:" in explanation
     assert f"Order {order_c.order_id}" in explanation
 
+
 # Need to import matplotlib types and potentially mock plt.show
-import matplotlib.figure
-import matplotlib.pyplot as plt
+# import matplotlib.figure # Moved to top
+# import matplotlib.pyplot as plt # Moved to top
+
 
 def test_fulfillment_planner_visualize_plan_success(planner_layout, sample_associates, sample_orders):
     """Test visualize_plan runs and returns a Figure object on success."""
@@ -581,27 +641,31 @@ def test_fulfillment_planner_visualize_plan_success(planner_layout, sample_assoc
     # Use the simple assignment scenario again
     alice = next(a for a in sample_associates if a.associate_id == "assoc_001")
     order_a = next(o for o in sample_orders if o.order_id == "order_A")
-    planner.add_associate(alice); planner.add_order(order_a)
+    planner.add_associate(alice)
+    planner.add_order(order_a)
 
     mock_details_data = {
         "G0": {"location": (2, 2), "handling_time": 1.0, "temperature_zone": "ambient"},
         "E1": {"location": (8, 6), "handling_time": 1.5, "temperature_zone": "ambient"},
     }
-    def mock_lookup(product_id): return mock_details_data.get(product_id.split('-')[0])
 
-    with patch('utils.planning.get_mock_item_details', side_effect=mock_lookup):
+    def mock_lookup(product_id):
+        return mock_details_data.get(product_id.split("-")[0])
+
+    with patch("utils.planning.get_mock_item_details", side_effect=mock_lookup):
         planner.plan()
 
     # Mock plt.show to prevent window popping up during test run
-    with patch('matplotlib.pyplot.show') as mock_show:
+    with patch("matplotlib.pyplot.show") as mock_show:
         figure = planner.visualize_plan()
 
     assert isinstance(figure, matplotlib.figure.Figure)
-    mock_show.assert_not_called() # Visualize shouldn't call show()
+    mock_show.assert_not_called()  # Visualize shouldn't call show()
 
     # Close the figure to prevent resource warnings
     if figure:
         plt.close(figure)
+
 
 def test_fulfillment_planner_visualize_plan_error(planner_layout, sample_associates, sample_orders, caplog):
     """Test visualize_plan returns None and logs error when plotting fails."""
@@ -609,22 +673,30 @@ def test_fulfillment_planner_visualize_plan_error(planner_layout, sample_associa
     # Setup a simple plan that would normally visualize
     alice = next(a for a in sample_associates if a.associate_id == "assoc_001")
     order_a = next(o for o in sample_orders if o.order_id == "order_A")
-    planner.add_associate(alice); planner.add_order(order_a)
+    planner.add_associate(alice)
+    planner.add_order(order_a)
     # Add missing temperature_zone to mock data
     mock_details_data = {
         "G0": {"location": (2, 2), "handling_time": 1.0, "temperature_zone": "ambient"},
-        "E1": {"location": (8, 6), "handling_time": 1.5, "temperature_zone": "ambient"}
+        "E1": {"location": (8, 6), "handling_time": 1.5, "temperature_zone": "ambient"},
     }
-    def mock_lookup(product_id): return mock_details_data.get(product_id.split('-')[0])
-    with patch('utils.planning.get_mock_item_details', side_effect=mock_lookup): planner.plan()
+
+    def mock_lookup(product_id):
+        return mock_details_data.get(product_id.split("-")[0])
+
+    with patch("utils.planning.get_mock_item_details", side_effect=mock_lookup):
+        planner.plan()
 
     # Mock the plot function to raise an error
-    with patch('matplotlib.axes.Axes.plot', side_effect=ValueError("Plotting failed!")), \
-         caplog.at_level(logging.WARNING): # planning.py uses print, not logger here, might need adjustment
+    with (
+        patch("matplotlib.axes.Axes.plot", side_effect=ValueError("Plotting failed!")),
+        caplog.at_level(logging.WARNING),
+    ):  # planning.py uses print, not logger here, might need adjustment
         figure = planner.visualize_plan()
 
     assert figure is None
-    # assert "Error during visualization: Plotting failed!" in caplog.text # Fails as print is used
+    # assert "Error during visualization: Plotting failed!" in caplog.text
+    # Fails as print is used
 
     # Manually close any figures that might have been created partially
-    plt.close('all')
+    plt.close("all")

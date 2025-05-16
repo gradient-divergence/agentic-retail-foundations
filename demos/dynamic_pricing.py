@@ -3,9 +3,10 @@ Demonstration and training logic for dynamic pricing MDP and Q-learning agent.
 """
 
 import numpy as np
-from environments.mdp import DynamicPricingMDP
+
 from agents.qlearning import QLearningAgent
 from config.config import DynamicPricingMDPConfig, QLearningAgentConfig
+from environments.mdp import DynamicPricingMDP
 from utils.logger import get_logger
 
 logger = get_logger("demos.dynamic_pricing")
@@ -75,14 +76,10 @@ def demonstrate_mdp_dynamic_pricing(
     """
     logger.info("--- Starting MDP Dynamic Pricing Demonstration ---")
     if agent_config is None:
-        agent_config = QLearningAgentConfig(
-            action_space_size=len(env_config.available_discounts)
-        )
+        agent_config = QLearningAgentConfig(action_space_size=len(env_config.available_discounts))
     env = DynamicPricingMDP(env_config)
     agent = QLearningAgent(agent_config)
-    episode_returns, policy = train_agent(
-        env, agent, num_episodes=num_training_episodes, verbose=verbose
-    )
+    episode_returns, policy = train_agent(env, agent, num_episodes=num_training_episodes, verbose=verbose)
     # Learning curve data
     results = {
         "episode_returns": episode_returns,

@@ -1,6 +1,7 @@
-import pytest
 import logging
-from unittest.mock import AsyncMock, MagicMock, patch, ANY
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Models and utils needed
 from agents.base import BaseAgent
@@ -11,21 +12,25 @@ from utils.event_bus import EventBus
 
 # --- Test Fixtures --- #
 
+
 @pytest.fixture
 def mock_event_bus() -> AsyncMock:
     """Provides a mocked EventBus."""
     return AsyncMock(spec=EventBus)
+
 
 @pytest.fixture
 def base_agent(mock_event_bus: AsyncMock) -> BaseAgent:
     """Provides a BaseAgent instance with a mocked event bus."""
     return BaseAgent(
         agent_id="base_test_agent_001",
-        agent_type=AgentType.ORDER_MANAGER, # Example type
-        event_bus=mock_event_bus
+        agent_type=AgentType.ORDER_MANAGER,  # Example type
+        event_bus=mock_event_bus,
     )
 
+
 # --- Test Initialization --- #
+
 
 def test_base_agent_initialization(base_agent: BaseAgent, mock_event_bus: AsyncMock):
     """Test BaseAgent initialization."""
@@ -33,7 +38,9 @@ def test_base_agent_initialization(base_agent: BaseAgent, mock_event_bus: AsyncM
     assert base_agent.agent_type == AgentType.ORDER_MANAGER
     assert base_agent.event_bus is mock_event_bus
 
+
 # --- Test publish_event --- #
+
 
 @pytest.mark.asyncio
 async def test_publish_event_success(base_agent: BaseAgent, mock_event_bus: AsyncMock):
@@ -55,10 +62,11 @@ async def test_publish_event_success(base_agent: BaseAgent, mock_event_bus: Asyn
     assert published_event.payload == payload
     assert published_event.source == base_agent.agent_type
 
+
 @pytest.mark.asyncio
 async def test_publish_event_no_bus(base_agent: BaseAgent, mock_event_bus: AsyncMock, caplog):
     """Test publishing when event_bus is None."""
-    base_agent.event_bus = None # Manually remove event bus
+    base_agent.event_bus = None  # Manually remove event bus
     event_type = "test.event"
     payload = {"data": "value"}
 
@@ -70,7 +78,9 @@ async def test_publish_event_no_bus(base_agent: BaseAgent, mock_event_bus: Async
     # Assert error was logged
     assert f"Agent {base_agent.agent_id} has no event bus" in caplog.text
 
+
 # --- Test handle_exception --- #
+
 
 # Mock the Order class methods needed
 @pytest.fixture
@@ -82,8 +92,9 @@ def mock_order() -> MagicMock:
     order.update_status = MagicMock()
     return order
 
+
 @pytest.mark.asyncio
-@patch.object(BaseAgent, 'publish_event', new_callable=AsyncMock)
+@patch.object(BaseAgent, "publish_event", new_callable=AsyncMock)
 async def test_handle_exception_no_order(mock_publish, base_agent: BaseAgent, caplog):
     """Test handle_exception without an order object."""
     exception = ValueError("Something went wrong")
@@ -110,11 +121,10 @@ async def test_handle_exception_no_order(mock_publish, base_agent: BaseAgent, ca
     assert error_details["agent_id"] == base_agent.agent_id
     assert "order_id" not in error_details
 
+
 @pytest.mark.asyncio
-@patch.object(BaseAgent, 'publish_event', new_callable=AsyncMock)
-async def test_handle_exception_with_order_success(
-    mock_publish, base_agent: BaseAgent, mock_order: MagicMock, caplog
-):
+@patch.object(BaseAgent, "publish_event", new_callable=AsyncMock)
+async def test_handle_exception_with_order_success(mock_publish, base_agent: BaseAgent, mock_order: MagicMock, caplog):
     """Test handle_exception with an order, where status update succeeds."""
     exception = TypeError("Bad type")
     context = {"data": {"key": "value"}}
@@ -144,14 +154,13 @@ async def test_handle_exception_with_order_success(
 
     assert event_type == "system.exception"
     assert error_details["error_type"] == "TypeError"
-    assert error_details["order_id"] == mock_order.order_id # Check order_id is present
+    assert error_details["order_id"] == mock_order.order_id  # Check order_id is present
     assert error_details["context"] == context
 
+
 @pytest.mark.asyncio
-@patch.object(BaseAgent, 'publish_event', new_callable=AsyncMock)
-async def test_handle_exception_with_order_update_fails(
-    mock_publish, base_agent: BaseAgent, mock_order: MagicMock, caplog
-):
+@patch.object(BaseAgent, "publish_event", new_callable=AsyncMock)
+async def test_handle_exception_with_order_update_fails(mock_publish, base_agent: BaseAgent, mock_order: MagicMock, caplog):
     """Test handle_exception when the order.update_status call itself fails."""
     exception = KeyError("Missing key")
     context = {"file": "input.txt"}
@@ -186,4 +195,4 @@ async def test_handle_exception_with_order_update_fails(
     # order_id might or might not be present depending on exact execution flow before exception
     # Let's just check it doesn't contain the update_error details
     assert error_details["context"] == context
-    assert "DB connection failed" not in error_details.get("error_message", "") 
+    assert "DB connection failed" not in error_details.get("error_message", "")

@@ -5,32 +5,29 @@ Contains the RetailCustomerServiceAgent class for LLM-powered customer service i
 Orchestrates calls to specific components for context retrieval, LLM subtasks, and conversation management.
 """
 
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 import logging
-import asyncio
 import os
+from datetime import datetime
+from typing import Any
 
 from openai import AsyncOpenAI
-from utils.openai_utils import safe_chat_completion
 
 # NLP utilities
 from utils import nlp
 
 # Agent components
 from .conversation_manager import ConversationManager
-from .llm_context_retriever import LLMContextRetriever
+
 # Import from the new components module (replace response_builder)
 from .llm_components import (
     build_response_prompt,
     extract_actions,
-    generate_agent_response
+    generate_agent_response,
 )
+from .llm_context_retriever import LLMContextRetriever
 
 # Dummy Interfaces (replace with actual imports or protocols if available)
-from .llm_context_retriever import (
-    DummyProductDB, DummyOrderSystem, DummyCustomerDB
-)
+
 
 class RetailCustomerServiceAgent:
     """
@@ -42,10 +39,10 @@ class RetailCustomerServiceAgent:
     def __init__(
         self,
         # Dependencies for context/data systems
-        product_database: Any, # e.g., DummyProductDB()
-        order_management_system: Any, # e.g., DummyOrderSystem()
-        customer_database: Any, # e.g., DummyCustomerDB()
-        policy_guidelines: Dict[str, Any],
+        product_database: Any,  # e.g., DummyProductDB()
+        order_management_system: Any,  # e.g., DummyOrderSystem()
+        customer_database: Any,  # e.g., DummyCustomerDB()
+        policy_guidelines: dict[str, Any],
         # LLM Configuration
         api_key: str | None = None,
         response_model: str = "gpt-4o",
@@ -75,9 +72,7 @@ class RetailCustomerServiceAgent:
                 self.logger.error(f"Failed to initialize OpenAI client: {e}")
         else:
             self.client = None
-            self.logger.warning(
-                "OpenAI API key missing or placeholder. LLM features will be disabled."
-            )
+            self.logger.warning("OpenAI API key missing or placeholder. LLM features will be disabled.")
 
         # Initialize dependency components
         self.customer_db = customer_database
@@ -86,14 +81,12 @@ class RetailCustomerServiceAgent:
             product_database=product_database,
             order_management_system=order_management_system,
             # customer_database=customer_database, # Not needed by retriever directly
-            policy_guidelines=policy_guidelines
+            policy_guidelines=policy_guidelines,
         )
 
         self.logger.info("RetailCustomerServiceAgent initialized.")
 
-    async def process_customer_inquiry(
-        self, customer_id: str, message: str
-    ) -> Dict[str, Any]:
+    async def process_customer_inquiry(self, customer_id: str, message: str) -> dict[str, Any]:
         """
         Process a customer inquiry by orchestrating sub-components.
 
@@ -114,9 +107,7 @@ class RetailCustomerServiceAgent:
                 "error": "LLM client not available",
             }
 
-        self.logger.info(
-            f"Processing inquiry for customer {customer_id}: '{message[:50]}...'"
-        )
+        self.logger.info(f"Processing inquiry for customer {customer_id}: '{message[:50]}...'")
 
         # Use context manager for lock
         async with self.conversation_manager.get_lock(customer_id):
@@ -124,7 +115,7 @@ class RetailCustomerServiceAgent:
             self.conversation_manager.add_message(customer_id, "customer", message)
 
             # 2. Basic context retrieval (customer info)
-            customer_info: Dict[str, Any] = {}
+            customer_info: dict[str, Any] = {}
             try:
                 cust_info = await self.customer_db.get_customer(customer_id)
                 customer_info = cust_info if cust_info else {}
@@ -137,7 +128,7 @@ class RetailCustomerServiceAgent:
             self.logger.debug(f"Classified intent: {intent}")
 
             # 4. Extract Entities (can be combined or specific)
-            entities: Dict[str, Any] = {}
+            entities: dict[str, Any] = {}
             try:
                 # Example: Extract order ID (needs recent orders)
                 # Note: Getting recent orders here might be slightly inefficient if not always needed
@@ -148,7 +139,7 @@ class RetailCustomerServiceAgent:
                     message=message,
                     recent_order_ids=[o["order_id"] for o in recent_orders if "order_id" in o],
                     model=self.utility_model,
-                    logger=self.logger, # Pass agent logger
+                    logger=self.logger,  # Pass agent logger
                     retry_attempts=self.retry_attempts,
                     retry_backoff=self.retry_backoff,
                 )
@@ -158,7 +149,7 @@ class RetailCustomerServiceAgent:
 
                 # Example: Extract product identifier
                 if intent == "product_question":
-                     extracted_product_id = await nlp.extract_product_id(
+                    extracted_product_id = await nlp.extract_product_id(
                         client=self.client,
                         message=message,
                         model=self.utility_model,
@@ -166,7 +157,7 @@ class RetailCustomerServiceAgent:
                         retry_attempts=self.retry_attempts,
                         retry_backoff=self.retry_backoff,
                     )
-                     if extracted_product_id:
+                    if extracted_product_id:
                         entities["product_identifier"] = extracted_product_id
                         self.logger.debug(f"Extracted entity product_identifier: {extracted_product_id}")
                 # Add more entity extractions as needed...
@@ -201,7 +192,7 @@ class RetailCustomerServiceAgent:
                 # max_tokens, temperature can be passed if needed
             )
 
-            final_response: Dict[str, Any] = {
+            final_response: dict[str, Any] = {
                 "message": "I apologize, I encountered an issue generating a response.",
                 "intent": intent,
                 "actions": [],
@@ -225,8 +216,8 @@ class RetailCustomerServiceAgent:
                 # 10. Add Agent message to history
                 self.conversation_manager.add_message(customer_id, "agent", generated_message)
             else:
-                 # Handle case where response generation failed
-                 final_response["error"] = "LLM response generation failed."
+                # Handle case where response generation failed
+                final_response["error"] = "LLM response generation failed."
 
             # 11. Analyze Sentiment (optional, could be done earlier)
             customer_sentiment = await nlp.sentiment_analysis(
@@ -265,9 +256,7 @@ class RetailCustomerServiceAgent:
     # _generate_response -> llm_components.generate_agent_response
     # _analyze_sentiment -> nlp.sentiment_analysis
 
-    async def _log_interaction(
-        self, customer_id: str, intent: str, message: str, response: dict
-    ):
+    async def _log_interaction(self, customer_id: str, intent: str, message: str, response: dict):
         """Log the interaction details (placeholder for actual logging)."""
         log_entry = {
             "timestamp": datetime.now().isoformat(),
@@ -284,6 +273,7 @@ class RetailCustomerServiceAgent:
         )
         # In a real system, persist this log_entry to a database, file, or monitoring service.
         pass
+
 
 # Example Usage (Illustrative - requires setting up dummy dependencies)
 # async def main():

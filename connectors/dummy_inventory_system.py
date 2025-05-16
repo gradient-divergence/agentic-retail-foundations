@@ -4,8 +4,8 @@ Module: connectors.dummy_inventory_system
 Provides a dummy in-memory inventory system for testing shelf monitoring agents.
 """
 
-from typing import Any
 import asyncio
+from typing import Any
 
 
 class DummyInventorySystem:

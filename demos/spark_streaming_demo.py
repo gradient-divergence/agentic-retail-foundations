@@ -11,13 +11,13 @@ import logging
 # Attempt to import PySpark modules - will fail if Spark is not installed
 try:
     from pyspark.sql import SparkSession
-    from pyspark.sql.functions import from_json, col, window, avg, sum, count
+    from pyspark.sql.functions import avg, col, count, from_json, sum, window
     from pyspark.sql.types import (
-        StructType,
-        StructField,
-        StringType,
-        TimestampType,
         DoubleType,
+        StringType,
+        StructField,
+        StructType,
+        TimestampType,
     )
 
     SPARK_AVAILABLE = True
@@ -68,21 +68,15 @@ except ImportError:
     DoubleType = lambda: None
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("spark-streaming-demo")
 
 
 def run_spark_streaming_job():
     """Runs the Spark Streaming job for sales velocity calculation."""
     if not SPARK_AVAILABLE:
-        logger.error(
-            "PySpark is not installed or available. Cannot run Spark Streaming job."
-        )
-        print(
-            "Error: PySpark not found. Please install pyspark and ensure Spark environment is configured."
-        )
+        logger.error("PySpark is not installed or available. Cannot run Spark Streaming job.")
+        print("Error: PySpark not found. Please install pyspark and ensure Spark environment is configured.")
         return
 
     logger.info("Initializing Spark Session...")

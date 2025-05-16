@@ -7,31 +7,26 @@ app = marimo.App(width="full")
 @app.cell
 def _():
     # Imports for types and standard libraries
+    import asyncio
+    import json
+
+    # Configure logging
+    import logging
+    import pathlib
+    import random
+    import time
+    import uuid
     from collections import defaultdict
+    from collections.abc import Awaitable, Callable
     from datetime import datetime, timedelta
     from enum import Enum
     from typing import Any, Optional
-    from collections.abc import Callable, Awaitable
-    import asyncio
-    import json
-    import random
-    import uuid
-    import marimo as mo
-    import pathlib
-    import pandas as pd
-    import numpy as np
-    import time
 
-    # Import refactored components from project modules
-    from models.messaging import AgentMessage, Performative
-    from agents.messaging import MessageBroker
-    from models.task import Task, TaskStatus, TaskType, Bid
-    from agents.store import StoreAgent
-    from agents.protocols.contract_net import RetailCoordinator
-    from models.supplier import Supplier, SupplierRating
-    from agents.protocols.auction import ProcurementAuction
-    from models.store import Store
-    from agents.protocols.inventory_sharing import InventoryCollaborationNetwork
+    import marimo as mo
+    import numpy as np
+    import pandas as pd
+
+    from agents.coordinators.product_launch import ProductLaunchCoordinator
     from agents.cross_functional import (
         CustomerServiceAgent,
         MarketingAgent,
@@ -39,15 +34,20 @@ def _():
         StoreOpsAgent,
         SupplyChainAgent,
     )
-    from agents.coordinators.product_launch import ProductLaunchCoordinator
+    from agents.messaging import MessageBroker
+    from agents.protocols.auction import ProcurementAuction
+    from agents.protocols.contract_net import RetailCoordinator
+    from agents.protocols.inventory_sharing import InventoryCollaborationNetwork
+    from agents.store import StoreAgent
+
+    # Import refactored components from project modules
+    from models.messaging import AgentMessage, Performative
+    from models.store import Store
+    from models.supplier import Supplier, SupplierRating
+    from models.task import Bid, Task, TaskStatus, TaskType
     from utils.planning import calculate_remediation_timeline
 
-    # Configure logging
-    import logging
-
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     logger = logging.getLogger(__name__)
 
     # Return all imported names needed by subsequent cells
@@ -154,13 +154,9 @@ def _(asyncio, communication_logs, mo, run_comm_button):
         # For now, we just run it.
         await demo_retail_agent_communication()
         # Update state after completion (maybe with a success message)
-        communication_logs.set_value(
-            ["Communication Demo Completed (check console for logs)."]
-        )
+        communication_logs.set_value(["Communication Demo Completed (check console for logs)."])
 
-    _ = run_comm_button._on_click(
-        lambda: asyncio.create_task(run_and_log_communication())
-    )
+    _ = run_comm_button._on_click(lambda: asyncio.create_task(run_and_log_communication()))
 
     mo.md(
         f"""
@@ -302,9 +298,7 @@ def _(asyncio, mo, run_sharing_button, sharing_logs):
     async def run_and_log_sharing():
         """Runs the Inventory Sharing demo."""
         await demo_collaborative_inventory_sharing()
-        sharing_logs.set_value(
-            ["Inventory Sharing Demo Completed (check console for logs)."]
-        )
+        sharing_logs.set_value(["Inventory Sharing Demo Completed (check console for logs)."])
 
     _ = run_sharing_button._on_click(lambda: asyncio.create_task(run_and_log_sharing()))
 
@@ -352,9 +346,7 @@ def _(asyncio, launch_logs, mo, run_launch_button):
     async def run_and_log_launch():
         """Runs the Product Launch demo."""
         await demo_product_launch()
-        launch_logs.set_value(
-            ["Product Launch Demo Completed (check console for logs)."]
-        )
+        launch_logs.set_value(["Product Launch Demo Completed (check console for logs)."])
 
     _ = run_launch_button._on_click(lambda: asyncio.create_task(run_and_log_launch()))
 

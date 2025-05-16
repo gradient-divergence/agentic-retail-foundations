@@ -1,14 +1,17 @@
 """Functions for performing counterfactual analysis based on causal models."""
 
-import pandas as pd
-import numpy as np
-from typing import Any, Dict, Optional, List
 import traceback
+from typing import Any
+
+import numpy as np
+import pandas as pd
 
 # Optional dependency handling - needed for CausalForest
 try:
     from econml.dml import CausalForestDML
-    from sklearn.ensemble import GradientBoostingRegressor # Default model used in original class
+    from sklearn.ensemble import (
+        GradientBoostingRegressor,
+    )  # Default model used in original class
 except ImportError:
     CausalForestDML = None
     GradientBoostingRegressor = None
@@ -16,13 +19,14 @@ except ImportError:
 
 # --- Counterfactual Simulation --- (Focusing on Causal Forest as example)
 
+
 def fit_causal_forest_for_counterfactuals(
     data: pd.DataFrame,
     treatment: str,
     outcome: str,
-    common_causes: List[str],
-    **kwargs: Any
-) -> Optional[CausalForestDML]:
+    common_causes: list[str],
+    **kwargs: Any,
+) -> CausalForestDML | None:
     """
     Fits a Causal Forest model, intended for later use in counterfactual predictions.
 
@@ -65,26 +69,34 @@ def fit_causal_forest_for_counterfactuals(
             X = X.fillna(X.median())
 
         if X.empty or X.shape[1] == 0:
-             print("Error: No valid numeric common causes (features X) found.")
-             return None
+            print("Error: No valid numeric common causes (features X) found.")
+            return None
 
         # Define default models if not provided in kwargs
-        model_y = kwargs.get('model_y', GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123))
-        model_t = kwargs.get('model_t', GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123))
+        model_y = kwargs.get(
+            "model_y",
+            GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123),
+        )
+        model_t = kwargs.get(
+            "model_t",
+            GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123),
+        )
 
         # Filter CausalForestDML specific args from kwargs
         cf_kwargs = {
-            k: v for k, v in kwargs.items()
-            if k in ['n_estimators', 'min_samples_leaf', 'max_depth', 'random_state'] # Add other valid params
+            k: v
+            for k, v in kwargs.items()
+            if k
+            in [
+                "n_estimators",
+                "min_samples_leaf",
+                "max_depth",
+                "random_state",
+            ]  # Add other valid params
         }
-        cf_kwargs.setdefault('random_state', 123)
+        cf_kwargs.setdefault("random_state", 123)
 
-        est = CausalForestDML(
-            model_y=model_y,
-            model_t=model_t,
-            discrete_treatment=True,
-            **cf_kwargs
-        )
+        est = CausalForestDML(model_y=model_y, model_t=model_t, discrete_treatment=True, **cf_kwargs)
         print(f"Fitting CausalForestDML with parameters: {cf_kwargs}")
         est.fit(Y, T, X=X)
         print("Causal Forest model fitted successfully.")
@@ -95,13 +107,14 @@ def fit_causal_forest_for_counterfactuals(
         traceback.print_exc()
         return None
 
+
 def simulate_counterfactuals(
-    model: Any, # Should ideally be a specific type, e.g., CausalForestDML
+    model: Any,  # Should ideally be a specific type, e.g., CausalForestDML
     data: pd.DataFrame,
     treatment: str,
-    common_causes: List[str],
-    scenario: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    common_causes: list[str],
+    scenario: dict[str, Any],
+) -> dict[str, Any] | None:
     """
     Simulates counterfactual outcomes based on a fitted model and a scenario.
 
@@ -139,8 +152,8 @@ def simulate_counterfactuals(
             X = X.fillna(X.median())
 
         if X.empty or X.shape[1] == 0:
-             print("Error: No valid numeric features (X) found for counterfactual prediction.")
-             return None
+            print("Error: No valid numeric features (X) found for counterfactual prediction.")
+            return None
 
         # Get factual predictions (predicted outcome with actual treatment)
         # Note: CausalForestDML's primary output is CATE (effect), not direct outcome prediction.
@@ -163,12 +176,12 @@ def simulate_counterfactuals(
         # More correctly: Use predict methods if available, or potentially refit an outcome model.
         # Simpler approach from original code: Use `const_marginal_effect`
 
-        counterfactual_treatment_value = scenario.get('set_treatment')
+        counterfactual_treatment_value = scenario.get("set_treatment")
         if counterfactual_treatment_value is not None:
             if counterfactual_treatment_value not in [0, 1]:
                 print(f"Warning: set_treatment scenario only supports 0 or 1, got {counterfactual_treatment_value}")
                 # Defaulting to predicting effect, not outcome under fixed T
-                counterfactual_avg_effect = factual_avg_effect # Or raise error?
+                counterfactual_avg_effect = factual_avg_effect  # Or raise error?
             else:
                 # Predict outcome under T=0 and T=1
                 # Note: est.predict(X, T=0) might not be directly available or represent E[Y|T=0,X] in all DML variants.
@@ -191,7 +204,7 @@ def simulate_counterfactuals(
 
         # Handling 'adjust_feature' scenario is more complex:
         # It requires modifying X and re-predicting, potentially across both T=0 and T=1.
-        elif 'adjust_feature' in scenario:
+        elif "adjust_feature" in scenario:
             print("Warning: 'adjust_feature' scenario is not fully implemented in this refactoring.")
             # Placeholder logic:
             # feat_name = scenario['adjust_feature']['feature_name']
@@ -200,10 +213,10 @@ def simulate_counterfactuals(
             # X_cf[feat_name] = feat_value
             # cf_effect = model.const_marginal_effect(X_cf)
             # counterfactual_avg_effect = np.mean(cf_effect)
-            counterfactual_avg_effect = factual_avg_effect # Placeholder
+            counterfactual_avg_effect = factual_avg_effect  # Placeholder
         else:
             print(f"Warning: Unsupported counterfactual scenario: {scenario}")
-            counterfactual_avg_effect = factual_avg_effect # Default to factual
+            counterfactual_avg_effect = factual_avg_effect  # Default to factual
 
         print("\nCounterfactual Simulation Results (Average Effects):")
         print(f"  Scenario: {scenario}")
@@ -219,22 +232,23 @@ def simulate_counterfactuals(
         }
 
     except AttributeError as ae:
-         print(f"Error during counterfactual simulation: Model might lack required method (e.g., 'effect'). {ae}")
-         traceback.print_exc()
-         return None
+        print(f"Error during counterfactual simulation: Model might lack required method (e.g., 'effect'). {ae}")
+        traceback.print_exc()
+        return None
     except Exception as e:
         print(f"Error during counterfactual simulation: {e}")
         traceback.print_exc()
         return None
+
 
 # --- Wrapper/Simplified Function (from original class) ---
 def perform_counterfactual_analysis(
     model: Any,
     data: pd.DataFrame,
     treatment: str,
-    common_causes: List[str],
-    scenario: Dict[str, Any]
-) -> Optional[Dict[str, Any]]:
+    common_causes: list[str],
+    scenario: dict[str, Any],
+) -> dict[str, Any] | None:
     """Simplified wrapper to call counterfactual simulation."""
     # Currently assumes the model is already fitted (e.g., by fit_causal_forest_for_counterfactuals)
     return simulate_counterfactuals(
@@ -242,5 +256,5 @@ def perform_counterfactual_analysis(
         data=data,
         treatment=treatment,
         common_causes=common_causes,
-        scenario=scenario
-    ) 
+        scenario=scenario,
+    )

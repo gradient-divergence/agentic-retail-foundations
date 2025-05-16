@@ -35,9 +35,7 @@ class BaseAgent:
             logger_base.error(f"Agent {self.agent_id} has no event bus to publish to.")
             return
 
-        event = RetailEvent(
-            event_type=event_type, payload=payload, source=self.agent_type
-        )
+        event = RetailEvent(event_type=event_type, payload=payload, source=self.agent_type)
         await self.event_bus.publish(event)
 
     # Generic exception handler - can be overridden by subclasses
@@ -60,15 +58,9 @@ class BaseAgent:
         )
 
         # Update order status if an order object is provided
-        if (
-            order is not None
-            and hasattr(order, "update_status")
-            and hasattr(order, "order_id")
-        ):
+        if order is not None and hasattr(order, "update_status") and hasattr(order, "order_id"):
             try:
-                order.update_status(
-                    OrderStatus.EXCEPTION, self.agent_type, error_details
-                )
+                order.update_status(OrderStatus.EXCEPTION, self.agent_type, error_details)
                 error_details["order_id"] = order.order_id  # Add order_id if updated
             except Exception as update_err:
                 logger_base.error(

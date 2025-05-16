@@ -2,10 +2,10 @@
 StoreOpsAgent for preparing stores for launch and store ops remediation in retail MAS.
 """
 
-from datetime import datetime, timedelta
-from typing import Any
 import asyncio
 import random
+from datetime import datetime, timedelta
+from typing import Any
 
 
 class StoreOpsAgent:
@@ -29,10 +29,7 @@ class StoreOpsAgent:
         """
         print(f"Store Ops: Preparing for launch of {product_id}")
         await asyncio.sleep(0.4)
-        training_ready = (
-            "product_overview" in staff_training
-            and "sales_techniques" in staff_training
-        )
+        training_ready = "product_overview" in staff_training and "sales_techniques" in staff_training
         return {
             "status": "ready" if training_ready else "delayed",
             "summary": f"Store ops preparation {'complete' if training_ready else 'incomplete - training needed'}",
@@ -41,9 +38,7 @@ class StoreOpsAgent:
             "displays_ready": "standard_display" in display_requirements,
         }
 
-    async def suggest_remediation(
-        self, product_id: str, current_status: str
-    ) -> dict[str, Any]:
+    async def suggest_remediation(self, product_id: str, current_status: str) -> dict[str, Any]:
         """
         Suggest remediation steps for store operations issues.
         """
@@ -68,9 +63,7 @@ class StoreOpsAgent:
         """Simulate checking if stores are ready (layout, staff trained)."""
         agent_name = self.__class__.__name__
         product_id = product_data.get("id", "Unknown Product")
-        planned_launch_date = product_data.get(
-            "planned_launch_date", datetime.now() + timedelta(days=30)
-        )
+        planned_launch_date = product_data.get("planned_launch_date", datetime.now() + timedelta(days=30))
         print(f"StoreOps: Checking readiness for {product_id}")
         await asyncio.sleep(random.uniform(0.15, 0.35))
 
@@ -88,9 +81,7 @@ class StoreOpsAgent:
         readiness_date = None
 
         if missing_data:
-            details = (
-                f"Blocked: Missing required launch data - {', '.join(missing_data)}."
-            )
+            details = f"Blocked: Missing required launch data - {', '.join(missing_data)}."
             readiness_date = None  # Cannot proceed
         else:
             # Simulate potential delays in training rollout or display setup
@@ -98,21 +89,15 @@ class StoreOpsAgent:
             if delay_chance < 0.7:  # 70% chance ready
                 status = "ready"
                 details = "Stores ready: Layout updated, staff training scheduled, displays prepared."
-                readiness_date = planned_launch_date - timedelta(
-                    days=random.randint(2, 5)
-                )  # Ready a few days before
+                readiness_date = planned_launch_date - timedelta(days=random.randint(2, 5))  # Ready a few days before
             elif delay_chance < 0.9:  # 20% minor delay
                 status = "blocked"
                 details = "Minor delay: Staff training sessions behind schedule in some regions."
-                readiness_date = planned_launch_date + timedelta(
-                    days=random.randint(1, 3)
-                )
+                readiness_date = planned_launch_date + timedelta(days=random.randint(1, 3))
             else:  # 10% major delay
                 status = "blocked"
                 details = "Major delay: Delivery of new display units postponed."
-                readiness_date = planned_launch_date + timedelta(
-                    days=random.randint(5, 10)
-                )
+                readiness_date = planned_launch_date + timedelta(days=random.randint(5, 10))
 
         print(
             f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}"

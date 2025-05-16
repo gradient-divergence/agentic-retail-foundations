@@ -3,8 +3,8 @@ Inventory collaboration network protocol agent/logic.
 Coordinates inventory transfers between stores.
 """
 
-from datetime import datetime
 import random
+from datetime import datetime
 from typing import TypedDict
 
 from models.store import Store
@@ -34,11 +34,7 @@ class InventoryCollaborationNetwork:
         self.stores[store.store_id] = store
         for eid, estore in self.stores.items():
             if eid != store.store_id:
-                cost = (
-                    store.transfer_cost_factor
-                    * estore.transfer_cost_factor
-                    * random.uniform(0.5, 2.0)
-                )
+                cost = store.transfer_cost_factor * estore.transfer_cost_factor * random.uniform(0.5, 2.0)
                 self.transfer_costs[(store.store_id, eid)] = cost
                 self.transfer_costs[(eid, store.store_id)] = cost
 
@@ -73,21 +69,13 @@ class InventoryCollaborationNetwork:
                         continue
                     if product_id in excess and excess[product_id] > 0:
                         sending_store = self.stores[sending_id]
-                        transfer_cost = self.transfer_costs.get(
-                            (sending_id, needing_id), float("inf")
-                        )
+                        transfer_cost = self.transfer_costs.get((sending_id, needing_id), float("inf"))
                         if transfer_cost > self.max_transfer_distance:
                             continue
                         available = min(excess[product_id], qty_needed)
-                        sender_val = sending_store.calculate_transfer_value(
-                            product_id, available, True
-                        )
-                        receiver_val = needing_store.calculate_transfer_value(
-                            product_id, available, False
-                        )
-                        net_val = (
-                            sender_val + receiver_val - (transfer_cost * available)
-                        )
+                        sender_val = sending_store.calculate_transfer_value(product_id, available, True)
+                        receiver_val = needing_store.calculate_transfer_value(product_id, available, False)
+                        net_val = sender_val + receiver_val - (transfer_cost * available)
                         if net_val > 0 and available > 0:
                             sender_info: PotentialSenderInfo = {
                                 "sender_id": sending_id,

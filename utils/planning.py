@@ -1,14 +1,17 @@
-from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
 import heapq
-from typing import Any
-import numpy as np
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
+
+import matplotlib.pyplot as plt
+import numpy as np
+
 from models.enums import OrderStatus
 
 # Import models needed by these classes
-from models.fulfillment import Order, Associate, Item
+from models.fulfillment import Associate, Order
 
 # --- Mock Product Data/Lookup (for planner demo) ---
 # In a real system, planner would access a product database
@@ -29,6 +32,8 @@ MOCK_PRODUCT_DB = {
     "A7": {"location": (40, 25), "handling_time": 1.4, "temperature_zone": "ambient"},
 }
 
+logger_planning = logging.getLogger(__name__)
+
 
 def get_mock_item_details(product_id: str) -> dict[str, Any]:
     # Simplified lookup, returning defaults if not found
@@ -47,14 +52,16 @@ def calculate_remediation_timeline(steps_by_domain: dict, now_dt: datetime | Non
     Args:
         steps_by_domain: Dictionary mapping domain names to step details including
                          an 'estimated_completion' datetime object.
-        now_dt: Optional datetime object representing the current time. Defaults to datetime.now().
+        now_dt: Optional datetime object representing the current time.
+                Defaults to datetime.now().
 
     Returns:
-        Dictionary containing 'critical_path', 'completion_date', 'suggested_launch_date'.
+        Dictionary containing 'critical_path', 'completion_date',
+        'suggested_launch_date'.
     """
     all_durations = []
     critical_path = []
-    now = now_dt or datetime.now() # Use passed-in time or get current time
+    now = now_dt or datetime.now()  # Use passed-in time or get current time
 
     for domain, step in steps_by_domain.items():
         # Ensure estimated_completion is a datetime object
@@ -67,9 +74,7 @@ def calculate_remediation_timeline(steps_by_domain: dict, now_dt: datetime | Non
 
         # Calculate remaining days, ensuring non-negative duration
         duration_delta = estimated_completion - now
-        duration_days = max(
-            0, duration_delta.days
-        )  # Use max(0, ...) to handle past dates
+        duration_days = max(0, duration_delta.days)  # Use max(0, ...) to handle past dates
 
         all_durations.append((domain, duration_days))
 
@@ -85,7 +90,7 @@ def calculate_remediation_timeline(steps_by_domain: dict, now_dt: datetime | Non
 
     # Determine critical path (e.g., top 2 longest *positive* durations)
     positive_durations = [d for d in all_durations if d[1] > 0]
-    critical_path = [d[0] for d in positive_durations[:2]] # Take top 2 positive
+    critical_path = [d[0] for d in positive_durations[:2]]  # Take top 2 positive
 
     # Max duration determines the completion date (use original list for this)
     max_duration = all_durations[0][1] if all_durations else 0
@@ -117,9 +122,7 @@ class StoreLayout:
             self.grid[y, x] = 1  # Mark as obstacle
             self.obstacles.add((x, y))
 
-    def add_section(
-        self, top_left: tuple[int, int], bottom_right: tuple[int, int], name: str
-    ):
+    def add_section(self, top_left: tuple[int, int], bottom_right: tuple[int, int], name: str):
         """Define a named section within the store."""
         x1, y1 = top_left
         x2, y2 = bottom_right
@@ -149,9 +152,7 @@ class StoreLayout:
         x2, y2 = loc2
         return abs(x1 - x2) + abs(y1 - y2)
 
-    def shortest_path(
-        self, start: tuple[int, int], end: tuple[int, int]
-    ) -> list[tuple[int, int]] | None:
+    def shortest_path(self, start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]] | None:
         """Find the shortest path using A* algorithm."""
         if start == end:
             return [start]
@@ -195,12 +196,8 @@ class FulfillmentPlanner:
         self.store_layout = store_layout
         self.orders: list[Order] = []
         self.associates: list[Associate] = []
-        self.assignments: dict[str, list[Order]] = defaultdict(
-            list
-        )  # associate_id -> list of assigned orders
-        self.picking_paths: dict[
-            str, list[tuple[int, int]]
-        ] = {}  # associate_id -> path
+        self.assignments: dict[str, list[Order]] = defaultdict(list)  # associate_id -> list of assigned orders
+        self.picking_paths: dict[str, list[tuple[int, int]]] = {}  # associate_id -> path
         self.estimated_times: dict[str, float] = {}  # associate_id -> total time
 
     def add_order(self, order: Order):
@@ -217,7 +214,7 @@ class FulfillmentPlanner:
         self.orders.sort(key=lambda o: o.created_at)
 
         # 2. Simple Assignment
-        unassigned_orders = self.orders[:] # Copy list
+        unassigned_orders = self.orders[:]  # Copy list
         self.assignments = defaultdict(list)
         self.picking_paths = {}
         self.estimated_times = {}
@@ -231,53 +228,25 @@ class FulfillmentPlanner:
             # Try assigning orders to this associate
             temp_unassigned = unassigned_orders[:]
             for order in temp_unassigned:
-                # Get required zones from item details via lookup
-                required_zones = set()
-                items_details = []
-                valid_order = True
-                for line_item in order.items:
-                    item_detail = get_mock_item_details(line_item.product_id)
-                    if not item_detail:  # Handle if product not found
-                        print(
-                            f"Warning: Details not found for product {line_item.product_id} in order {order.order_id}"
-                        )
-                        valid_order = False
-                        break
-                    required_zones.add(item_detail["temperature_zone"])
-                    items_details.append(item_detail)  # Store for later use
-
-                if not valid_order:
-                    continue  # Skip order if item details missing
-
-                can_handle = all(
-                    zone in associate.authorized_zones for zone in required_zones
-                )
+                # Check zones and item validity using helper
+                can_handle, required_zones, items_details = self._can_associate_handle_order(associate, order)
                 if not can_handle:
                     continue
 
                 # Estimate time for this order using looked-up details
-                order_path, order_time = self._estimate_order_time(
-                    order, items_details, current_location, associate.efficiency
-                )
+                order_path, order_time = self._estimate_order_time(order, items_details, current_location, associate.efficiency)
                 if order_path is None:
                     continue  # Cannot find path
 
                 # Check if associate has time before shift ends
-                if (
-                    associate.shift_end_time is not None
-                    and (current_time + order_time) > associate.shift_end_time
-                ):
+                if associate.shift_end_time is not None and (current_time + order_time) > associate.shift_end_time:
                     continue  # Not enough time
 
                 # Assign order if checks pass
                 assigned_to_associate.append(order)
                 current_time += order_time
-                current_location = order_path[
-                    -1
-                ]  # End location of this order becomes start for next
-                path_for_associate.extend(
-                    order_path[1:]
-                )  # Append path, skip start node
+                current_location = order_path[-1]  # End location of this order becomes start for next
+                path_for_associate.extend(order_path[1:])  # Append path, skip start node
                 unassigned_orders.remove(order)
 
             if assigned_to_associate:
@@ -288,11 +257,32 @@ class FulfillmentPlanner:
 
         # Update status of assigned/unassigned orders
         for order in self.orders:
-            is_assigned = any(
-                order in assigned_list for assigned_list in self.assignments.values()
-            )
+            is_assigned = any(order in assigned_list for assigned_list in self.assignments.values())
             # Use OrderStatus enum correctly
             order.status = OrderStatus.ALLOCATED if is_assigned else OrderStatus.CREATED
+
+    def _can_associate_handle_order(self, associate: Associate, order: Order) -> tuple[bool, set[str], list[dict[str, Any]]]:
+        """Check if an associate can handle an order based on zones and item
+        validity."""
+        required_zones = set()
+        items_details = []
+        valid_order_items = True
+        for line_item in order.items:
+            item_detail = get_mock_item_details(line_item.product_id)
+            if not item_detail:
+                logger_planning.warning(
+                    f"Details not found for product {line_item.product_id} in order {order.order_id}. Skipping order for this associate."
+                )
+                valid_order_items = False
+                break
+            required_zones.add(item_detail["temperature_zone"])
+            items_details.append(item_detail)
+
+        if not valid_order_items:
+            return False, set(), []
+
+        can_handle_zones = all(zone in associate.authorized_zones for zone in required_zones)
+        return can_handle_zones, required_zones, items_details
 
     def _estimate_order_time(
         self,
@@ -315,19 +305,13 @@ class FulfillmentPlanner:
                 remaining_locations,
                 key=lambda loc: self.store_layout.distance(current_location, loc),
             )
-            segment_path = self.store_layout.shortest_path(
-                current_location, nearest_loc
-            )
+            segment_path = self.store_layout.shortest_path(current_location, nearest_loc)
             if segment_path is None:
                 return None, float("inf")  # Cannot reach item
 
             travel_time = (len(segment_path) - 1) * 0.1  # Example: 0.1 min per step
             # Get handling time from the passed item_details matching the location
-            handling_time = sum(
-                detail["handling_time"]
-                for detail in item_details
-                if detail["location"] == nearest_loc
-            )
+            handling_time = sum(detail["handling_time"] for detail in item_details if detail["location"] == nearest_loc)
             total_time += (travel_time + handling_time) / efficiency
             full_path.extend(segment_path[1:])
             current_location = nearest_loc
@@ -356,9 +340,7 @@ class FulfillmentPlanner:
         explanation.append("\nAssignments Details:")
         for associate_id, assigned_orders in self.assignments.items():
             # Add back ignore for persistent assignment error
-            associate = next(  # type: ignore[assignment]
-                (a for a in self.associates if a.associate_id == associate_id), None
-            )
+            associate = next((a for a in self.associates if a.associate_id == associate_id), None)  # type: ignore[assignment]
             if not associate:
                 assoc_name = f"Associate {associate_id}"
             else:
@@ -368,9 +350,7 @@ class FulfillmentPlanner:
             )
             for order in assigned_orders:
                 # Remove priority from explanation
-                explanation.append(
-                    f"  - Order {order.order_id} (Items: {len(order.items)})"
-                )
+                explanation.append(f"  - Order {order.order_id} (Items: {len(order.items)})")
 
         if unassigned_count > 0:
             explanation.append("\nUnassigned Orders:")
@@ -378,9 +358,7 @@ class FulfillmentPlanner:
                 # Check order status enum value
                 if order.status == OrderStatus.CREATED:
                     # Remove priority from explanation
-                    explanation.append(
-                        f"  - Order {order.order_id} (Items: {len(order.items)})"
-                    )
+                    explanation.append(f"  - Order {order.order_id} (Items: {len(order.items)})")
 
         return "\n".join(explanation)
 
@@ -391,19 +369,11 @@ class FulfillmentPlanner:
             # Draw grid
             ax.imshow(self.store_layout.grid, cmap="Greys", origin="lower", alpha=0.3)
             # Draw sections
-            section_colors = plt.cm.get_cmap(
-                "tab20", len(self.store_layout.section_map)
-            )
+            section_colors = plt.cm.get_cmap("tab20", len(self.store_layout.section_map))
             unique_sections = sorted(list(set(self.store_layout.section_map.values())))
-            color_map = {
-                name: section_colors(i) for i, name in enumerate(unique_sections)
-            }
+            color_map = {name: section_colors(i) for i, name in enumerate(unique_sections)}
             for (x, y), name in self.store_layout.section_map.items():
-                ax.add_patch(
-                    plt.Rectangle(
-                        (x - 0.5, y - 0.5), 1, 1, color=color_map[name], alpha=0.2
-                    )
-                )
+                ax.add_patch(plt.Rectangle((x - 0.5, y - 0.5), 1, 1, color=color_map[name], alpha=0.2))
             # Draw obstacles
             for x, y in self.store_layout.obstacles:
                 ax.add_patch(plt.Rectangle((x - 0.5, y - 0.5), 1, 1, color="black"))
@@ -412,7 +382,7 @@ class FulfillmentPlanner:
             for i, (assoc_id, path) in enumerate(self.picking_paths.items()):
                 if not path:
                     continue
-                path_x, path_y = zip(*path)
+                path_x, path_y = zip(*path, strict=False)
                 ax.plot(
                     path_x,
                     path_y,
@@ -422,12 +392,8 @@ class FulfillmentPlanner:
                     color=path_colors(i),
                     linewidth=2,
                 )
-                ax.plot(
-                    path_x[0], path_y[0], "go", markersize=8, label=f"{assoc_id} Start"
-                )  # Start point
-                ax.plot(
-                    path_x[-1], path_y[-1], "ro", markersize=8, label=f"{assoc_id} End"
-                )  # End point
+                ax.plot(path_x[0], path_y[0], "go", markersize=8, label=f"{assoc_id} Start")  # Start point
+                ax.plot(path_x[-1], path_y[-1], "ro", markersize=8, label=f"{assoc_id} End")  # End point
 
             ax.set_xticks(np.arange(-0.5, self.store_layout.width, 5))
             ax.set_yticks(np.arange(-0.5, self.store_layout.height, 5))
@@ -441,5 +407,5 @@ class FulfillmentPlanner:
             plt.tight_layout(rect=(0, 0, 0.85, 1))  # Use tuple for rect
             return fig
         except Exception as e:
-            print(f"Error during visualization: {e}")
+            logger_planning.error(f"Error during visualization: {e}")
             return None

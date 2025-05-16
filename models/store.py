@@ -3,9 +3,9 @@ Data model for retail store entities.
 """
 
 from dataclasses import dataclass, field
-from typing import Any
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from models.inventory import InventoryPosition, InventoryStatus
 
@@ -147,9 +147,7 @@ class Store:
             return False
         return self.inventory[product_id].excess_units() >= quantity
 
-    def execute_transfer(
-        self, product_id: str, quantity: int, partner_id: str, is_sending: bool = True
-    ) -> bool:
+    def execute_transfer(self, product_id: str, quantity: int, partner_id: str, is_sending: bool = True) -> bool:
         """
         Execute a transfer of inventory to or from another store.
 
@@ -191,9 +189,7 @@ class Store:
         )
         return True
 
-    def calculate_transfer_value(
-        self, product_id: str, quantity: int, is_sending: bool
-    ) -> float:
+    def calculate_transfer_value(self, product_id: str, quantity: int, is_sending: bool) -> float:
         """
         Calculate the value/benefit of transferring a product.
         Positive values indicate beneficial transfers, negative values indicate harmful ones.

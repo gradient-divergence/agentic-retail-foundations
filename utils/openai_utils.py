@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from typing import Any
 from collections.abc import Iterable
+from typing import Any
 
 # Use AsyncOpenAI for async operations
 from openai import AsyncOpenAI, OpenAI
@@ -9,10 +9,9 @@ from openai import AsyncOpenAI, OpenAI
 # Import specific message param types
 from openai.types.chat import (
     ChatCompletion,
-    ChatCompletionMessageParam,  # Use the base MessageParam type hint
-    # ChatCompletionSystemMessageParam,
-    # ChatCompletionUserMessageParam,
-)
+    ChatCompletionMessageParam,
+)  # ChatCompletionSystemMessageParam,; ChatCompletionUserMessageParam,  # Use the base MessageParam type hint
+
 # Define a type alias for the expected message structure
 # ChatMessage = Union[ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam]
 
@@ -44,7 +43,8 @@ async def safe_chat_completion(
     retry_attempts:
         How many times to retry on *any* exception.
     retry_backoff:
-        Base back-off (in seconds); the delay grows exponentially (``backoff * 2**(attempt-1)``).
+        Base back-off (in seconds); the delay grows exponentially
+        (``backoff * 2**(attempt-1)``).
     **kwargs:
         Additional keyword arguments forwarded to ``client.chat.completions.create``.
 
@@ -92,9 +92,7 @@ async def safe_chat_completion(
             return completion
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
-            logger.warning(
-                "OpenAI call failed (attempt %s/%s): %s", attempt, retry_attempts, exc
-            )
+            logger.warning("OpenAI call failed (attempt %s/%s): %s", attempt, retry_attempts, exc)
             # Only sleep if there are more retries left
             if attempt < retry_attempts:
                 await asyncio.sleep(retry_backoff * (2 ** (attempt - 1)))

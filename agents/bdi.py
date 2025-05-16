@@ -2,10 +2,11 @@
 BDI (Belief-Desire-Intention) agent for inventory management in agentic-retail-foundations.
 """
 
-from datetime import datetime, timedelta
-import random
 import logging
-from models.inventory import ProductInfo, InventoryItem, SalesData
+import random
+from datetime import datetime, timedelta
+
+from models.inventory import InventoryItem, ProductInfo, SalesData
 
 logger = logging.getLogger("AgentFrameworks")
 
@@ -72,9 +73,7 @@ class InventoryBDIAgent:
 
     def observe(self, product_id: str) -> dict:
         if product_id not in self.products or product_id not in self.inventory:
-            logger.warning(
-                f"Observe: missing product or inventory data for {product_id}."
-            )
+            logger.warning(f"Observe: missing product or inventory data for {product_id}.")
             return {}
         product = self.products[product_id]
         item = self.inventory[product_id]
@@ -100,14 +99,8 @@ class InventoryBDIAgent:
         return observation
 
     def orient(self, product_id: str, observation: dict) -> dict:
-        if (
-            not observation
-            or product_id not in self.products
-            or product_id not in self.inventory
-        ):
-            logger.warning(
-                f"Orient: missing observation or product data for {product_id}."
-            )
+        if not observation or product_id not in self.products or product_id not in self.inventory:
+            logger.warning(f"Orient: missing observation or product data for {product_id}.")
             return {}
         product = self.products[product_id]
         item = self.inventory[product_id]
@@ -134,16 +127,12 @@ class InventoryBDIAgent:
         sales_obj = self.sales_data.get(product_id)
         trend_factor = sales_obj.trend() if sales_obj else 0.0
         projected_daily = max(0, avg_daily_7 * (1 + trend_factor))
-        days_of_supply = (
-            inventory_level / projected_daily if projected_daily > 0 else float("inf")
-        )
+        days_of_supply = inventory_level / projected_daily if projected_daily > 0 else float("inf")
         lead_time = observation.get("lead_time", product.lead_time_days)
         buffer_days = 3
         if inventory_status == "low" and days_of_supply < (lead_time + buffer_days):
             sales_assessment = "risk_of_stockout"
-        elif inventory_status == "high" and projected_daily < max(
-            1, item.reorder_point * 0.1
-        ):
+        elif inventory_status == "high" and projected_daily < max(1, item.reorder_point * 0.1):
             sales_assessment = "slow_moving"
         elif avg_daily_7 <= 0.1 and inventory_level > 0:
             sales_assessment = "stagnant"
@@ -181,15 +170,9 @@ class InventoryBDIAgent:
         return orientation
 
     def deliberate(self) -> list[str]:
-        stockout_utility = (
-            self._evaluate_stockout_prevention() * self.goals["minimize_stockouts"]
-        )
-        excess_utility = (
-            self._evaluate_excess_reduction() * self.goals["minimize_excess_inventory"]
-        )
-        profit_utility = (
-            self._evaluate_profit_maximization() * self.goals["maximize_profit_margin"]
-        )
+        stockout_utility = self._evaluate_stockout_prevention() * self.goals["minimize_stockouts"]
+        excess_utility = self._evaluate_excess_reduction() * self.goals["minimize_excess_inventory"]
+        profit_utility = self._evaluate_profit_maximization() * self.goals["maximize_profit_margin"]
         fresh_utility = self._evaluate_freshness() * self.goals["ensure_fresh_products"]
         utilities = {
             "minimize_stockouts": stockout_utility,
@@ -199,10 +182,7 @@ class InventoryBDIAgent:
         }
         sorted_goals = sorted(utilities.items(), key=lambda x: x[1], reverse=True)
         prioritized_goals = [g for (g, val) in sorted_goals if val > 0.01]
-        logger.info(
-            "Deliberated Goals: "
-            + str([(g, round(utilities[g], 3)) for g in prioritized_goals])
-        )
+        logger.info("Deliberated Goals: " + str([(g, round(utilities[g], 3)) for g in prioritized_goals]))
         return prioritized_goals
 
     def generate_intentions(self, prioritized_goals: list[str]) -> None:
@@ -217,9 +197,7 @@ class InventoryBDIAgent:
                 self._plan_margin_optimization(processed_products)
             elif goal == "ensure_fresh_products":
                 self._plan_freshness_management(processed_products)
-        logger.info(
-            f"Generated {len(self.active_intentions)} intentions from goals: {prioritized_goals}"
-        )
+        logger.info(f"Generated {len(self.active_intentions)} intentions from goals: {prioritized_goals}")
 
     def execute_intentions(self) -> list[dict]:
         executed_actions = []
@@ -248,16 +226,12 @@ class InventoryBDIAgent:
                 elif action_type == "discount_perishable":
                     success = self._execute_perishable_discount(intention)
                 else:
-                    logger.warning(
-                        f"Unknown intention action type: {action_type} for {pid}"
-                    )
+                    logger.warning(f"Unknown intention action type: {action_type} for {pid}")
                 if success:
                     executed_actions.append(intention)
                     processed_products_in_execution.add(pid)
             except Exception as e:
-                logger.error(
-                    f"Error executing intention {intention}: {e}", exc_info=True
-                )
+                logger.error(f"Error executing intention {intention}: {e}", exc_info=True)
         logger.info(f"Executed {len(executed_actions)} intentions.")
         self.active_intentions.clear()
         return executed_actions
@@ -339,11 +313,7 @@ class InventoryBDIAgent:
                 continue
             if pid not in self.products or pid not in self.sales_data:
                 continue
-            if (
-                item.pending_order_quantity > 0
-                and item.expected_delivery_date
-                and item.expected_delivery_date.date() > self.current_date.date()
-            ):
+            if item.pending_order_quantity > 0 and item.expected_delivery_date and item.expected_delivery_date.date() > self.current_date.date():
                 continue
             product = self.products[pid]
             sales_obj = self.sales_data[pid]
@@ -354,9 +324,7 @@ class InventoryBDIAgent:
             lead_time = product.lead_time_days
             buffer_days = 3
             if days_of_supply <= lead_time + buffer_days:
-                needed = item.optimal_stock - (
-                    item.current_stock + item.pending_order_quantity
-                )
+                needed = item.optimal_stock - (item.current_stock + item.pending_order_quantity)
                 order_qty = int(round(max(needed, product.min_order_quantity)))
                 if order_qty > 0:
                     urgency = 1.0 - (days_of_supply / (lead_time + buffer_days))
@@ -371,9 +339,7 @@ class InventoryBDIAgent:
                         }
                     )
                     processed_products.add(pid)
-                    logger.info(
-                        f"INTENTION (Reorder): {order_qty} x {pid} (DoS: {days_of_supply:.1f}, Prio: {priority:.2f})"
-                    )
+                    logger.info(f"INTENTION (Reorder): {order_qty} x {pid} (DoS: {days_of_supply:.1f}, Prio: {priority:.2f})")
 
     def _plan_inventory_reduction(self, processed_products: set[str]) -> None:
         for pid, item in self.inventory.items():
@@ -385,16 +351,9 @@ class InventoryBDIAgent:
                 continue
             product = self.products[pid]
             if item.current_stock > item.optimal_stock * 1.5:
-                excess_ratio = (
-                    (item.current_stock - item.optimal_stock) / item.optimal_stock
-                    if item.optimal_stock > 0
-                    else 2.0
-                )
+                excess_ratio = (item.current_stock - item.optimal_stock) / item.optimal_stock if item.optimal_stock > 0 else 2.0
                 discount_pct = min(max(round(excess_ratio * 10), 5), 30)
-                priority = (
-                    min(1.0, excess_ratio * 0.5)
-                    * self.goals["minimize_excess_inventory"]
-                )
+                priority = min(1.0, excess_ratio * 0.5) * self.goals["minimize_excess_inventory"]
                 self.active_intentions.append(
                     {
                         "action": "discount",
@@ -443,9 +402,7 @@ class InventoryBDIAgent:
         self.inventory[pid].pending_order_quantity += qty
         self.inventory[pid].expected_delivery_date = delivery_date
         self.inventory[pid].last_reorder_date = self.current_date
-        logger.info(
-            f"EXECUTE: Reorder {qty} x {pid}. Delivery expected {delivery_date.date()}."
-        )
+        logger.info(f"EXECUTE: Reorder {qty} x {pid}. Delivery expected {delivery_date.date()}.")
         return True
 
     def _execute_discount(self, intention: dict) -> bool:
@@ -458,9 +415,7 @@ class InventoryBDIAgent:
         old_price = product.current_price
         new_price = round(old_price * (1 - disc_pct / 100), 2)
         product.current_price = new_price
-        logger.info(
-            f"EXECUTE: Discount {disc_pct}% for {pid}. Price {old_price:.2f} -> {new_price:.2f}"
-        )
+        logger.info(f"EXECUTE: Discount {disc_pct}% for {pid}. Price {old_price:.2f} -> {new_price:.2f}")
         return True
 
     def _execute_promotion(self, intention: dict) -> bool:
@@ -477,9 +432,7 @@ class InventoryBDIAgent:
         old_price = product.current_price
         new_price = round(old_price * (1 - disc_pct / 100), 2)
         product.current_price = new_price
-        logger.info(
-            f"EXECUTE: Perishable discount {disc_pct}% for {pid}. Price {old_price:.2f} -> {new_price:.2f}"
-        )
+        logger.info(f"EXECUTE: Perishable discount {disc_pct}% for {pid}. Price {old_price:.2f} -> {new_price:.2f}")
         return True
 
     def run_cycle(self) -> list[dict]:

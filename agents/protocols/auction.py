@@ -4,9 +4,9 @@ Auction protocol implementation for procurement in retail settings.
 This module implements various auction protocols used in procurement and supplier bidding scenarios.
 """
 
-from typing import Any
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from models.procurement import PurchaseOrder, PurchaseOrderStatus, SupplierBid
 from models.supplier import Supplier
@@ -114,21 +114,14 @@ class ProcurementAuction:
             return False
 
         # For reverse auctions, new bids must be lower than the best bid so far
-        if (
-            self.auction_type == AuctionType.REVERSE
-            and self.current_best_bid is not None
-            and bid.price >= self.current_best_bid.price
-        ):
+        if self.auction_type == AuctionType.REVERSE and self.current_best_bid is not None and bid.price >= self.current_best_bid.price:
             return False
 
         # Record the bid
         self.bids[bid.supplier_id].append(bid)
 
         # Update best bid if this is better (lower for reverse auction)
-        if self.current_best_bid is None or (
-            self.auction_type == AuctionType.REVERSE
-            and bid.price < self.current_best_bid.price
-        ):
+        if self.current_best_bid is None or (self.auction_type == AuctionType.REVERSE and bid.price < self.current_best_bid.price):
             self.current_best_bid = bid
 
         # Record the bid in history
@@ -199,9 +192,7 @@ class ProcurementAuction:
             "action": "round_advanced",
             "new_round": self.current_round,
             "max_rounds": self.max_rounds,
-            "current_best_price": (
-                self.current_best_bid.price if self.current_best_bid else None
-            ),
+            "current_best_price": (self.current_best_bid.price if self.current_best_bid else None),
         }
         self.auction_history.append(event)
 
@@ -233,11 +224,7 @@ class ProcurementAuction:
             return None
 
         # Check reserve price for reverse auctions
-        if (
-            self.auction_type == AuctionType.REVERSE
-            and self.reserve_price is not None
-            and winning_bid.price > self.reserve_price
-        ):
+        if self.auction_type == AuctionType.REVERSE and self.reserve_price is not None and winning_bid.price > self.reserve_price:
             self.status = AuctionStatus.FAILED
             self.purchase_order.status = PurchaseOrderStatus.CANCELLED
 

@@ -1,5 +1,7 @@
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
+
 from agents.cross_functional.store_ops import StoreOpsAgent
 
 
@@ -11,9 +13,7 @@ async def test_prepare_for_launch():
     planogram_updates = {"aisle": "A1"}
     staff_training = ["product_overview", "sales_techniques"]
     display_requirements = ["standard_display"]
-    result = await agent.prepare_for_launch(
-        product_id, launch_date, planogram_updates, staff_training, display_requirements
-    )
+    result = await agent.prepare_for_launch(product_id, launch_date, planogram_updates, staff_training, display_requirements)
     assert result["status"] in ("ready", "delayed")
     assert "planogram_updated" in result
     assert "staff_trained" in result

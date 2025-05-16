@@ -66,10 +66,7 @@ def build_product_identifier_prompt(message: str) -> str:
 
 def build_sentiment_prompt(message: str) -> str:
     """Return the user prompt for sentiment classification."""
-    return (
-        'Classify the sentiment: "positive", "neutral", or "negative". Respond with only one word.'
-        f'\nMessage: "{message}"\nSentiment:'
-    )
+    return f'Classify the sentiment: "positive", "neutral", or "negative". Respond with only one word.\nMessage: "{message}"\nSentiment:'
 
 
 def build_action_extraction_prompt(response: str) -> str:

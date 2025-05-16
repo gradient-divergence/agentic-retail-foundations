@@ -5,11 +5,11 @@ Cross-functional agent classes and product launch orchestration logic for retail
 from datetime import datetime, timedelta
 from typing import Any
 
-from agents.cross_functional.supply_chain import SupplyChainAgent
-from agents.cross_functional.pricing import PricingAgent
-from agents.cross_functional.marketing import MarketingAgent
-from agents.cross_functional.store_ops import StoreOpsAgent
 from agents.cross_functional.customer_service import CustomerServiceAgent
+from agents.cross_functional.marketing import MarketingAgent
+from agents.cross_functional.pricing import PricingAgent
+from agents.cross_functional.store_ops import StoreOpsAgent
+from agents.cross_functional.supply_chain import SupplyChainAgent
 
 
 def calculate_remediation_timeline(
@@ -45,9 +45,7 @@ async def coordinate_product_launch(product_data: dict[str, Any]) -> dict[str, A
     }
     product_id = product_data["id"]
     launch_date = product_data["planned_launch_date"]
-    print(
-        f"\nCoordinating launch for product {product_id} planned for {launch_date.strftime('%Y-%m-%d')}\n"
-    )
+    print(f"\nCoordinating launch for product {product_id} planned for {launch_date.strftime('%Y-%m-%d')}\n")
     inventory_plan = await agents["supply_chain"].plan_initial_distribution(
         product_id=product_id,
         target_date=launch_date,
@@ -109,24 +107,16 @@ async def coordinate_product_launch(product_data: dict[str, Any]) -> dict[str, A
         }
     else:
         blockers = [domain for domain, stat in statuses.items() if stat != "ready"]
-        print(
-            f"\n⚠️ Launch DELAYED due to {len(blockers)} departments not ready: {', '.join(blockers)}"
-        )
+        print(f"\n⚠️ Launch DELAYED due to {len(blockers)} departments not ready: {', '.join(blockers)}")
         print("\nGenerating remediation plan...")
         remediation_plan = {}
         for blocker in blockers:
-            remediation_plan[blocker] = await agents[blocker].suggest_remediation(
-                product_id=product_id, current_status=statuses[blocker]
-            )
+            remediation_plan[blocker] = await agents[blocker].suggest_remediation(product_id=product_id, current_status=statuses[blocker])
         timeline = calculate_remediation_timeline(remediation_plan)
         print("\nRemediation Timeline:")
         print(f"- Critical path: {' → '.join(timeline['critical_path'])}")
-        print(
-            f"- Estimated completion: {timeline['completion_date'].strftime('%Y-%m-%d')}"
-        )
-        print(
-            f"- Suggested new launch: {timeline['suggested_launch_date'].strftime('%Y-%m-%d')}"
-        )
+        print(f"- Estimated completion: {timeline['completion_date'].strftime('%Y-%m-%d')}")
+        print(f"- Suggested new launch: {timeline['suggested_launch_date'].strftime('%Y-%m-%d')}")
         return {
             "product_id": product_id,
             "launch_status": "delayed",

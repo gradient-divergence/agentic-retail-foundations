@@ -1,17 +1,18 @@
-import pytest
-import numpy as np
 import logging
-from unittest.mock import patch, MagicMock, ANY, AsyncMock
 from datetime import datetime
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
+
+import numpy as np
+import pytest
 
 # Module to test
 from agents.cv import ShelfMonitoringAgent
-from agents.sensor import SensorDataProcessor
 
 # It's often cleaner to apply patches within the tests that need them
 # rather than using global fixtures, especially for complex libraries.
 
 # --- Fixtures --- #
+
 
 @pytest.fixture
 def mock_planogram_db() -> MagicMock:
@@ -20,6 +21,7 @@ def mock_planogram_db() -> MagicMock:
     db.get_section_planogram = AsyncMock()
     return db
 
+
 @pytest.fixture
 def mock_inventory_system() -> MagicMock:
     inv = MagicMock()
@@ -27,6 +29,7 @@ def mock_inventory_system() -> MagicMock:
     inv.get_current_price = AsyncMock()
     # Add other methods as needed by tests
     return inv
+
 
 @pytest.fixture
 def agent_params(mock_planogram_db, mock_inventory_system) -> dict:
@@ -38,8 +41,9 @@ def agent_params(mock_planogram_db, mock_inventory_system) -> dict:
         "confidence_threshold": 0.7,
     }
 
+
 @pytest.fixture
-@patch('agents.cv.tf.saved_model.load') # Patch model loading for the agent fixture
+@patch("agents.cv.tf.saved_model.load")  # Patch model loading for the agent fixture
 def shelf_monitoring_agent(mock_tf_load, agent_params) -> ShelfMonitoringAgent:
     """Fixture to create a ShelfMonitoringAgent instance with mocked dependencies."""
     # Set up a mock model instance to be returned by the patched load function
@@ -51,19 +55,21 @@ def shelf_monitoring_agent(mock_tf_load, agent_params) -> ShelfMonitoringAgent:
         "detection_classes": [MagicMock(numpy=MagicMock(return_value=np.array([[]])))],
         "detection_scores": [MagicMock(numpy=MagicMock(return_value=np.array([[]])))],
     }
-    mock_model_instance.return_value = mock_detection_result # Mock the call `model(tensor)`
+    mock_model_instance.return_value = mock_detection_result  # Mock the call `model(tensor)`
     mock_tf_load.return_value = mock_model_instance
 
     # Create the agent instance
     agent = ShelfMonitoringAgent(**agent_params)
     # Manually assign the callable mock if needed, depending on the exact model usage pattern
-    agent.detection_model = mock_model_instance # Ensure the instance has the callable mock
+    agent.detection_model = mock_model_instance  # Ensure the instance has the callable mock
     return agent
+
 
 # --- Test Initialization --- #
 
+
 # Patch the specific tf function used in __init__
-@patch('agents.cv.tf.saved_model.load')
+@patch("agents.cv.tf.saved_model.load")
 def test_agent_initialization_model_load_success(mock_tf_load, agent_params):
     """Test initialization when TF model loads successfully."""
     mock_model_instance = MagicMock()
@@ -77,8 +83,9 @@ def test_agent_initialization_model_load_success(mock_tf_load, agent_params):
     assert agent.inventory_system is agent_params["inventory_system"]
     assert agent.confidence_threshold == agent_params["confidence_threshold"]
 
+
 # Patch the specific tf function used in __init__
-@patch('agents.cv.tf.saved_model.load')
+@patch("agents.cv.tf.saved_model.load")
 def test_agent_initialization_model_load_fail(mock_tf_load, agent_params, caplog):
     """Test initialization uses dummy model when TF model load fails."""
     mock_tf_load.side_effect = OSError("Load failed")
@@ -89,15 +96,17 @@ def test_agent_initialization_model_load_fail(mock_tf_load, agent_params, caplog
     mock_tf_load.assert_called_once_with(agent_params["model_path"])
     # Check if the dummy model class is instantiated (check type)
     assert agent.detection_model is not None
-    assert type(agent.detection_model).__name__ == '_DummyModel'
+    assert type(agent.detection_model).__name__ == "_DummyModel"
     assert "Could not load model" in caplog.text
     assert "Falling back to a dummy detection model" in caplog.text
 
+
 # --- Test Helper Methods --- #
 
+
 # Patch cv2 and tf functions directly within the test
-@patch('agents.cv.cv2')
-@patch('agents.cv.tf')
+@patch("agents.cv.cv2")
+@patch("agents.cv.tf")
 def test_preprocess_image(mock_tf, mock_cv2, agent_params):
     """Test image preprocessing steps."""
     # Configure mocks
@@ -114,12 +123,13 @@ def test_preprocess_image(mock_tf, mock_cv2, agent_params):
     mock_tf.expand_dims.assert_called_once()
     assert tensor.shape == (1, 640, 640, 3)
 
-@patch.object(ShelfMonitoringAgent, '_get_class_mapping')
+
+@patch.object(ShelfMonitoringAgent, "_get_class_mapping")
 def test_process_detections(mock_get_mapping, agent_params):
     """Test processing of raw model detections."""
     # Create agent instance *inside* the test to ensure params are set correctly
     agent = ShelfMonitoringAgent(**agent_params)
-    agent.confidence_threshold = 0.6 # Override default if needed for test case
+    agent.confidence_threshold = 0.6  # Override default if needed for test case
 
     mock_get_mapping.return_value = {1: "SKU_A", 2: "SKU_B"}
 
@@ -142,26 +152,46 @@ def test_process_detections(mock_get_mapping, agent_params):
     processed = agent._process_detections(mock_detections, img_w, img_h)
 
     # Assertions
-    assert len(processed) == 1 # Only detection 1 (score 0.8) should pass threshold 0.6
+    assert len(processed) == 1  # Only detection 1 (score 0.8) should pass threshold 0.6
     p1 = processed[0]
     assert p1["product_id"] == "SKU_A"
     assert p1["confidence"] == pytest.approx(0.8)
-    expected_box = [int(0.1*img_h), int(0.1*img_w), int(0.5*img_h), int(0.5*img_w)]
+    expected_box = [
+        int(0.1 * img_h),
+        int(0.1 * img_w),
+        int(0.5 * img_h),
+        int(0.5 * img_w),
+    ]
     assert p1["bounding_box"] == expected_box
     assert p1["shelf_position"]["x"] == pytest.approx((0.1 + 0.5) / 2)
     assert p1["shelf_position"]["y"] == pytest.approx((0.1 + 0.5) / 2)
 
+
 # --- Test Planogram Comparison --- #
+
 
 @pytest.fixture
 def sample_planogram() -> dict:
     return {
         "products": [
-            {"product_id": "SKU_A", "expected_count": 5, "position": {"x": 0.2, "y": 0.3}},
-            {"product_id": "SKU_B", "expected_count": 3, "position": {"x": 0.6, "y": 0.3}},
-            {"product_id": "SKU_C", "expected_count": 4, "position": {"x": 0.4, "y": 0.7}},
+            {
+                "product_id": "SKU_A",
+                "expected_count": 5,
+                "position": {"x": 0.2, "y": 0.3},
+            },
+            {
+                "product_id": "SKU_B",
+                "expected_count": 3,
+                "position": {"x": 0.6, "y": 0.3},
+            },
+            {
+                "product_id": "SKU_C",
+                "expected_count": 4,
+                "position": {"x": 0.4, "y": 0.7},
+            },
         ]
     }
+
 
 @pytest.mark.parametrize(
     "test_id, detected_products, expected_issues_types_pids",
@@ -171,7 +201,10 @@ def sample_planogram() -> dict:
             "perfect_match",
             [
                 # SKU_A (Count=5, Pos=~0.2,0.3)
-                {"product_id": "SKU_A", "shelf_position": {"x": 0.21, "y": 0.31}}, # Pos OK
+                {
+                    "product_id": "SKU_A",
+                    "shelf_position": {"x": 0.21, "y": 0.31},
+                },  # Pos OK
                 {"product_id": "SKU_A", "shelf_position": {"x": 0.19, "y": 0.29}},
                 {"product_id": "SKU_A", "shelf_position": {"x": 0.20, "y": 0.30}},
                 {"product_id": "SKU_A", "shelf_position": {"x": 0.22, "y": 0.32}},
@@ -186,7 +219,7 @@ def sample_planogram() -> dict:
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.40, "y": 0.70}},
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.42, "y": 0.72}},
             ],
-            {} # No issues expected
+            {},  # No issues expected
         ),
         # Case 2: Low stock SKU_A
         (
@@ -205,7 +238,7 @@ def sample_planogram() -> dict:
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.4, "y": 0.7}},
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.4, "y": 0.7}},
             ],
-            {("LOW_STOCK", "SKU_A")} # Expect low stock for SKU_A
+            {("LOW_STOCK", "SKU_A")},  # Expect low stock for SKU_A
         ),
         # Case 3: Out of stock SKU_B
         (
@@ -224,7 +257,7 @@ def sample_planogram() -> dict:
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.4, "y": 0.7}},
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.4, "y": 0.7}},
             ],
-            {("OUT_OF_STOCK", "SKU_B")} # Expect OOS for SKU_B
+            {("OUT_OF_STOCK", "SKU_B")},  # Expect OOS for SKU_B
         ),
         # Case 4: Unexpected product
         (
@@ -246,13 +279,13 @@ def sample_planogram() -> dict:
                 # Unexpected SKU_X
                 {"product_id": "SKU_X", "shelf_position": {"x": 0.5, "y": 0.5}},
             ],
-            {("UNEXPECTED_PRODUCT", "SKU_X")} # Expect unexpected SKU_X
+            {("UNEXPECTED_PRODUCT", "SKU_X")},  # Expect unexpected SKU_X
         ),
         # Case 5: Misplaced product
         (
             "misplaced_product",
             [
-                 # SKU_A OK
+                # SKU_A OK
                 {"product_id": "SKU_A", "shelf_position": {"x": 0.2, "y": 0.3}},
                 {"product_id": "SKU_A", "shelf_position": {"x": 0.2, "y": 0.3}},
                 {"product_id": "SKU_A", "shelf_position": {"x": 0.2, "y": 0.3}},
@@ -266,9 +299,12 @@ def sample_planogram() -> dict:
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.4, "y": 0.7}},
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.4, "y": 0.7}},
                 {"product_id": "SKU_C", "shelf_position": {"x": 0.4, "y": 0.7}},
-                {"product_id": "SKU_C", "shelf_position": {"x": 0.8, "y": 0.8}}, # Misplaced!
+                {
+                    "product_id": "SKU_C",
+                    "shelf_position": {"x": 0.8, "y": 0.8},
+                },  # Misplaced!
             ],
-            {("MISPLACED_PRODUCT", "SKU_C")} # Expect misplaced SKU_C
+            {("MISPLACED_PRODUCT", "SKU_C")},  # Expect misplaced SKU_C
         ),
         # Case 6: Multiple issues
         (
@@ -288,18 +324,21 @@ def sample_planogram() -> dict:
                 {"product_id": "SKU_X", "shelf_position": {"x": 0.9, "y": 0.9}},
             ],
             {
-                ("LOW_STOCK", "SKU_A"), # Low A
-                ("LOW_STOCK", "SKU_B"), # B is too few detected (1 instead of 3)
-                ("MISPLACED_PRODUCT", "SKU_B"), # Detected B is misplaced
-                ("UNEXPECTED_PRODUCT", "SKU_X"), # Unexpected X
-            }
+                ("LOW_STOCK", "SKU_A"),  # Low A
+                ("LOW_STOCK", "SKU_B"),  # B is too few detected (1 instead of 3)
+                ("MISPLACED_PRODUCT", "SKU_B"),  # Detected B is misplaced
+                ("UNEXPECTED_PRODUCT", "SKU_X"),  # Unexpected X
+            },
         ),
     ],
-    ids=lambda x: x if isinstance(x, str) else "" # Use test_id
+    ids=lambda x: x if isinstance(x, str) else "",  # Use test_id
 )
 def test_compare_with_planogram(
-    shelf_monitoring_agent, sample_planogram,
-    test_id: str, detected_products: list, expected_issues_types_pids: set
+    shelf_monitoring_agent,
+    sample_planogram,
+    test_id: str,
+    detected_products: list,
+    expected_issues_types_pids: set,
 ):
     """Test planogram comparison logic for various scenarios."""
     # Use the agent's class method for the comparison
@@ -313,12 +352,20 @@ def test_compare_with_planogram(
         assert not issues, f"Expected no issues for perfect_match, but got: {issues}"
     else:
         # For all other cases, compare the sets directly
-        assert found_issues_set == expected_issues_types_pids, f"Issues mismatch in {test_id}:\nExpected: {sorted(list(expected_issues_types_pids))}\nActual: {sorted(list(found_issues_set))}"
+        assert found_issues_set == expected_issues_types_pids, (
+            f"Issues mismatch in {test_id}:\nExpected: {sorted(list(expected_issues_types_pids))}\nActual: {sorted(list(found_issues_set))}"
+        )
+
 
 # --- Test Report Issues --- #
 
+
 @pytest.mark.asyncio
-async def test_report_issues(shelf_monitoring_agent: ShelfMonitoringAgent, mock_inventory_system: AsyncMock, capsys):
+async def test_report_issues(
+    shelf_monitoring_agent: ShelfMonitoringAgent,
+    mock_inventory_system: AsyncMock,
+    capsys,
+):
     """Test that _report_issues calls inventory system and prints."""
     location_id = "LOC1"
     section_id = "SEC1"
@@ -348,17 +395,24 @@ async def test_report_issues(shelf_monitoring_agent: ShelfMonitoringAgent, mock_
     assert f"- {issues[0]['type']}: {issues[0]['product_id']}" in captured.out
     assert f"- {issues[1]['type']}: {issues[1]['product_id']}" in captured.out
 
+
 # --- Test _check_section Orchestration --- #
 
+
 @pytest.mark.asyncio
-@patch('agents.cv.cv2.VideoCapture')
-@patch.object(ShelfMonitoringAgent, '_preprocess_image')
-@patch.object(ShelfMonitoringAgent, '_process_detections')
-@patch.object(ShelfMonitoringAgent, '_compare_with_planogram')
-@patch.object(ShelfMonitoringAgent, '_report_issues', new_callable=AsyncMock) # Mock as AsyncMock
+@patch("agents.cv.cv2.VideoCapture")
+@patch.object(ShelfMonitoringAgent, "_preprocess_image")
+@patch.object(ShelfMonitoringAgent, "_process_detections")
+@patch.object(ShelfMonitoringAgent, "_compare_with_planogram")
+@patch.object(ShelfMonitoringAgent, "_report_issues", new_callable=AsyncMock)  # Mock as AsyncMock
 async def test_check_section_flow_with_issues(
-    mock_report, mock_compare, mock_process, mock_preprocess, mock_videocapture,
-    shelf_monitoring_agent: ShelfMonitoringAgent, mock_planogram_db: MagicMock
+    mock_report,
+    mock_compare,
+    mock_process,
+    mock_preprocess,
+    mock_videocapture,
+    shelf_monitoring_agent: ShelfMonitoringAgent,
+    mock_planogram_db: MagicMock,
 ):
     """Test the orchestration flow of _check_section when issues are found."""
     location_id = "L1"
@@ -372,13 +426,20 @@ async def test_check_section_flow_with_issues(
     mock_planogram_db.get_section_planogram.return_value = mock_planogram
     # Video Capture
     mock_stream = MagicMock()
-    mock_stream.read.return_value = (True, np.zeros((100, 100, 3), dtype=np.uint8)) # Return a valid frame
+    mock_stream.read.return_value = (
+        True,
+        np.zeros((100, 100, 3), dtype=np.uint8),
+    )  # Return a valid frame
     mock_videocapture.return_value = mock_stream
     # Preprocess
     mock_tensor = MagicMock()
     mock_preprocess.return_value = mock_tensor
     # Detection Model (The fixture `shelf_monitoring_agent` already has a mocked model)
-    mock_detection_result = {"detection_boxes": [], "detection_classes": [], "detection_scores": []}
+    mock_detection_result = {
+        "detection_boxes": [],
+        "detection_classes": [],
+        "detection_scores": [],
+    }
     # The agent's model is already mocked by the fixture, no need to patch here if fixture does it.
     # Ensure the fixture's mock model returns the desired result for this test.
     shelf_monitoring_agent.detection_model.return_value = mock_detection_result
@@ -400,26 +461,32 @@ async def test_check_section_flow_with_issues(
     # --- Assertions --- #
     mock_planogram_db.get_section_planogram.assert_awaited_once_with(location_id, section_id)
     mock_stream.read.assert_called_once()
-    mock_preprocess.assert_called_once() # Check frame was passed
+    mock_preprocess.assert_called_once()  # Check frame was passed
     # Assert the agent's mocked model was called
     shelf_monitoring_agent.detection_model.assert_called_once_with(mock_tensor)
-    mock_process.assert_called_once_with(mock_detection_result, 100, 100) # Check detections and frame shape
+    mock_process.assert_called_once_with(mock_detection_result, 100, 100)  # Check detections and frame shape
     mock_compare.assert_called_once_with(mock_detected_products, mock_planogram)
-    mock_report.assert_awaited_once() # Check issues and timestamp passed
+    mock_report.assert_awaited_once()  # Check issues and timestamp passed
     assert mock_report.await_args.args[0] == location_id
     assert mock_report.await_args.args[1] == section_id
     assert mock_report.await_args.args[2] == mock_issues
-    assert isinstance(mock_report.await_args.args[3], str) # Timestamp
+    assert isinstance(mock_report.await_args.args[3], str)  # Timestamp
+
 
 @pytest.mark.asyncio
-@patch('agents.cv.cv2.VideoCapture')
-@patch.object(ShelfMonitoringAgent, '_preprocess_image')
-@patch.object(ShelfMonitoringAgent, '_process_detections')
-@patch.object(ShelfMonitoringAgent, '_compare_with_planogram')
-@patch.object(ShelfMonitoringAgent, '_report_issues', new_callable=AsyncMock) # Mock as AsyncMock
+@patch("agents.cv.cv2.VideoCapture")
+@patch.object(ShelfMonitoringAgent, "_preprocess_image")
+@patch.object(ShelfMonitoringAgent, "_process_detections")
+@patch.object(ShelfMonitoringAgent, "_compare_with_planogram")
+@patch.object(ShelfMonitoringAgent, "_report_issues", new_callable=AsyncMock)  # Mock as AsyncMock
 async def test_check_section_flow_no_issues(
-    mock_report, mock_compare, mock_process, mock_preprocess, mock_videocapture,
-    shelf_monitoring_agent: ShelfMonitoringAgent, mock_planogram_db: MagicMock
+    mock_report,
+    mock_compare,
+    mock_process,
+    mock_preprocess,
+    mock_videocapture,
+    shelf_monitoring_agent: ShelfMonitoringAgent,
+    mock_planogram_db: MagicMock,
 ):
     """Test the orchestration flow of _check_section when no issues are found."""
     location_id = "L1"
@@ -437,7 +504,7 @@ async def test_check_section_flow_no_issues(
     # Ensure the agent's mocked model returns the desired result
     shelf_monitoring_agent.detection_model.return_value = {}
     mock_process.return_value = []
-    mock_compare.return_value = [] # <--- No issues found
+    mock_compare.return_value = []  # <--- No issues found
 
     shelf_monitoring_agent.active_streams[camera_id] = mock_stream
     await shelf_monitoring_agent._check_section(location_id, section_id, camera_id, mock_stream)
@@ -446,11 +513,12 @@ async def test_check_section_flow_no_issues(
     mock_planogram_db.get_section_planogram.assert_awaited_once()
     mock_stream.read.assert_called_once()
     mock_preprocess.assert_called_once()
-    shelf_monitoring_agent.detection_model.assert_called_once() # Assert model was called
+    shelf_monitoring_agent.detection_model.assert_called_once()  # Assert model was called
     mock_process.assert_called_once()
     mock_compare.assert_called_once()
-    mock_report.assert_not_awaited() # Report should NOT be called
+    mock_report.assert_not_awaited()  # Report should NOT be called
+
 
 # Placeholder tests
 # def test_report_issues(): ...
-# def test_check_section(): ... 
+# def test_check_section(): ...

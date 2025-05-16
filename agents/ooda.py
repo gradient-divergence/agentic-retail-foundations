@@ -2,9 +2,10 @@
 OODA (Observe-Orient-Decide-Act) agent for dynamic pricing in agentic-retail-foundations.
 """
 
-from datetime import datetime
-import random
 import logging
+import random
+from datetime import datetime
+
 from models.pricing import PricingProduct
 
 logger = logging.getLogger("AgentFrameworks")
@@ -31,9 +32,7 @@ class OODAPricingAgent:
         self.action_history: list[dict] = []
 
         logger.info(
-            f"OODA Pricing Agent init (Inv={inventory_weight}, "
-            f"Comp={competitor_weight}, Sales={sales_weight}, "
-            f"MaxChange={max_price_change_pct}%)"
+            f"OODA Pricing Agent init (Inv={inventory_weight}, Comp={competitor_weight}, Sales={sales_weight}, MaxChange={max_price_change_pct}%)"
         )
 
     def update_products(self, products_data: dict[str, PricingProduct]):
@@ -131,10 +130,7 @@ class OODAPricingAgent:
             "avg_daily_sales_7d": avg_s,
             "days_of_supply": days_of_supply,
         }
-        logger.info(
-            f"Orient {product_id}: {situation} "
-            f"(Inv={inv_status}, Sales={sales_assess}, Price={price_pos})"
-        )
+        logger.info(f"Orient {product_id}: {situation} (Inv={inv_status}, Sales={sales_assess}, Price={price_pos})")
         return orientation
 
     def decide(self, product_id: str, orientation: dict) -> dict:
@@ -172,14 +168,8 @@ class OODAPricingAgent:
         elif sales_assess == "stagnant":
             sales_component = -4.0
 
-        total_change = (
-            inv_component * self.inventory_weight
-            + comp_component * self.competitor_weight
-            + sales_component * self.sales_weight
-        )
-        capped_change = max(
-            -self.max_price_change_pct, min(self.max_price_change_pct, total_change)
-        )
+        total_change = inv_component * self.inventory_weight + comp_component * self.competitor_weight + sales_component * self.sales_weight
+        capped_change = max(-self.max_price_change_pct, min(self.max_price_change_pct, total_change))
         new_price = curr_price * (1 + capped_change / 100)
 
         # Respect min/max
@@ -192,11 +182,7 @@ class OODAPricingAgent:
             "competitor": abs(comp_component * self.competitor_weight),
             "sales": abs(sales_component * self.sales_weight),
         }
-        main_driver = (
-            max(comps, key=lambda k: comps[k])
-            if any(v > 0 for v in comps.values())
-            else "none"
-        )
+        main_driver = max(comps, key=lambda k: comps[k]) if any(v > 0 for v in comps.values()) else "none"
 
         decision = {
             "timestamp": datetime.now(),
@@ -206,10 +192,7 @@ class OODAPricingAgent:
             "capped_change_pct": capped_change,
             "primary_driver": main_driver,
         }
-        logger.info(
-            f"Decide {product_id}: ${curr_price:.2f} -> ${new_price:.2f} "
-            f"(Change={capped_change:.2f}%, Driver={main_driver})"
-        )
+        logger.info(f"Decide {product_id}: ${curr_price:.2f} -> ${new_price:.2f} (Change={capped_change:.2f}%, Driver={main_driver})")
         return decision
 
     def act(self, product_id: str, decision: dict) -> bool:

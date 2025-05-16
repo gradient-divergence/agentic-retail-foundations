@@ -2,15 +2,18 @@
 Procurement and auction mechanism classes for supplier selection and purchase order management in retail MAS.
 """
 
-from enum import Enum
+import asyncio
+import logging
+import uuid
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-import uuid
-import asyncio
-from collections import defaultdict
+from enum import Enum
 
 # Import supplier models
 from models.supplier import Supplier, SupplierStatus
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,9 +63,7 @@ class PurchaseOrder:
     winning_bid_details: SupplierBid | None = None  # Store the winning bid object
 
     def __post_init__(self):
-        self.required_delivery_date = self.creation_time + timedelta(
-            days=self.deadline_days
-        )
+        self.required_delivery_date = self.creation_time + timedelta(days=self.deadline_days)
         if self.quantity <= 0:
             raise ValueError("Purchase order quantity must be positive.")
         if self.maximum_acceptable_price < 0:
@@ -80,9 +81,7 @@ class ProcurementAuction:
     def __init__(self):
         self.purchase_orders: dict[str, PurchaseOrder] = {}
         self.suppliers: dict[str, Supplier] = {}
-        self.bids: dict[str, list[SupplierBid]] = defaultdict(
-            list
-        )  # PO ID -> List of Bids
+        self.bids: dict[str, list[SupplierBid]] = defaultdict(list)  # PO ID -> List of Bids
 
     def register_supplier(self, supplier: Supplier) -> None:
         """
@@ -91,11 +90,9 @@ class ProcurementAuction:
         if not isinstance(supplier, Supplier):
             raise TypeError("Can only register Supplier objects.")
         if supplier.supplier_id in self.suppliers:
-            print(f"Warning: Re-registering supplier {supplier.supplier_id}")
+            logger.warning(f"Warning: Re-registering supplier {supplier.supplier_id}")
         self.suppliers[supplier.supplier_id] = supplier
-        print(
-            f"Supplier {supplier.name} ({supplier.supplier_id}) registered for auctions."
-        )
+        logger.info(f"Supplier {supplier.name} ({supplier.supplier_id}) registered for auctions.")
 
     def create_purchase_order(
         self,
@@ -120,9 +117,7 @@ class ProcurementAuction:
         self.purchase_orders[po.id] = po
         # Initialize bid list for this PO
         self.bids[po.id] = []
-        print(
-            f"Created Purchase Order {po.id} for {quantity}x{product_id}, budget ${budget}, deadline {deadline_days} days."
-        )
+        logger.info(f"Created Purchase Order {po.id} for {quantity}x{product_id}, budget ${budget}, deadline {deadline_days} days.")
         return po.id
 
     async def collect_bids(
@@ -135,27 +130,18 @@ class ProcurementAuction:
         Simulates suppliers calculating and submitting bids.
         """
         if po_id not in self.purchase_orders:
-            print(f"Error: Cannot collect bids for non-existent PO {po_id}")
+            logger.error(f"Error: Cannot collect bids for non-existent PO {po_id}")
             return []
 
         purchase_order = self.purchase_orders[po_id]
         if purchase_order.status != PurchaseOrderStatus.BIDDING:
-            print(
-                f"Warning: PO {po_id} is not in BIDDING state (current: {purchase_order.status.name}). Cannot collect new bids."
-            )
+            logger.warning(f"Warning: PO {po_id} is not in BIDDING state (current: {purchase_order.status.name}). Cannot collect new bids.")
             return self.bids.get(po_id, [])  # Return existing bids if any
 
-        print(
-            f"--- Collecting bids for PO {po_id} ({purchase_order.quantity}x{purchase_order.product_id}) --- "
-        )
+        logger.info(f"--- Collecting bids for PO {po_id} ({purchase_order.quantity}x{purchase_order.product_id}) --- ")
 
-        potential_bidders = [
-            s
-            for s in self.suppliers.values()
-            if s.can_supply(purchase_order.product_id)
-            and s.status == SupplierStatus.ACTIVE
-        ]
-        print(f"Contacting {len(potential_bidders)} potential suppliers...")
+        potential_bidders = [s for s in self.suppliers.values() if s.can_supply(purchase_order.product_id) and s.status == SupplierStatus.ACTIVE]
+        logger.info(f"Contacting {len(potential_bidders)} potential suppliers...")
 
         # Simulate bid calculation concurrently (if supplier logic allows)
         # For now, assume calculate_bid is synchronous within the Supplier model itself
@@ -166,7 +152,7 @@ class ProcurementAuction:
             bid = self._simulate_supplier_bid_calculation(supplier, purchase_order)
             if bid:
                 calculated_bids.append(bid)
-                print(f"  Received bid from {supplier.name}")
+                logger.info(f"  Received bid from {supplier.name}")
             # else: Supplier cannot meet constraints or chooses not to bid
 
         # Store the collected bids
@@ -174,14 +160,10 @@ class ProcurementAuction:
 
         # Simulate bidding window delay
         await asyncio.sleep(bid_window_seconds)
-        print(
-            f"--- Bid collection finished for PO {po_id}. Total bids: {len(self.bids[po_id])} ---"
-        )
+        logger.info(f"--- Bid collection finished for PO {po_id}. Total bids: {len(self.bids[po_id])} ---")
         return self.bids[po_id]
 
-    def _simulate_supplier_bid_calculation(
-        self, supplier: Supplier, purchase_order: PurchaseOrder
-    ) -> SupplierBid | None:
+    def _simulate_supplier_bid_calculation(self, supplier: Supplier, purchase_order: PurchaseOrder) -> SupplierBid | None:
         """Internal helper to simulate a supplier generating a bid based on its factors."""
         # This replicates the logic previously inside Supplier.calculate_bid
         # It should ideally live within the Supplier agent/model or be called via message
@@ -199,23 +181,17 @@ class ProcurementAuction:
             total_price *= 0.95
 
         # Example Delivery Time Logic
-        delivery_days = int(
-            max(1, (purchase_order.quantity / 150.0) * supplier.speed_factor)
-        )
+        delivery_days = int(max(1, (purchase_order.quantity / 150.0) * supplier.speed_factor))
 
         # Example Quality Logic
         # Higher rating and lower quality_factor (lower defect rate) improve guarantee
         quality_guarantee = min(
             0.99,
-            0.80
-            + (supplier.rating.value * 0.06)
-            * (1.0 / max(0.1, supplier.quality_factor)),
+            0.80 + (supplier.rating.value * 0.06) * (1.0 / max(0.1, supplier.quality_factor)),
         )
 
         # --- Check Constraints ---
-        days_until_required = (
-            purchase_order.required_delivery_date - datetime.now()
-        ).days
+        days_until_required = (purchase_order.required_delivery_date - datetime.now()).days
         if delivery_days > days_until_required:
             # print(f"Supplier {supplier.name} cannot meet deadline for PO {purchase_order.id}")
             return None
@@ -242,18 +218,18 @@ class ProcurementAuction:
         Returns the ID of the winning supplier, or None if no winner.
         """
         if po_id not in self.purchase_orders:
-            print(f"Error: Cannot evaluate bids for non-existent PO {po_id}")
+            logger.error(f"Error: Cannot evaluate bids for non-existent PO {po_id}")
             return None
 
         purchase_order = self.purchase_orders[po_id]
         bids_to_evaluate = self.bids.get(po_id, [])
 
         if not bids_to_evaluate:
-            print(f"No bids found for PO {po_id} to evaluate.")
+            logger.info(f"No bids found for PO {po_id} to evaluate.")
             purchase_order.status = PurchaseOrderStatus.REJECTED
             return None
 
-        print(f"--- Evaluating {len(bids_to_evaluate)} bids for PO {po_id} --- ")
+        logger.info(f"--- Evaluating {len(bids_to_evaluate)} bids for PO {po_id} --- ")
 
         best_score = float("inf")
         winning_bid: SupplierBid | None = None
@@ -269,10 +245,7 @@ class ProcurementAuction:
 
             days_allowed = max(
                 1,
-                (
-                    purchase_order.required_delivery_date
-                    - bid.timestamp.replace(tzinfo=None)
-                ).days,
+                (purchase_order.required_delivery_date - bid.timestamp.replace(tzinfo=None)).days,
             )
             delivery_norm = bid.delivery_days / days_allowed
 
@@ -280,14 +253,11 @@ class ProcurementAuction:
             quality_norm = 1.0 - bid.quality_guarantee
 
             # Weighted score (lower is better)
-            score = (
-                (price_norm * W_PRICE)
-                + (delivery_norm * W_DELIVERY)
-                + (quality_norm * W_QUALITY)
-            )
+            score = (price_norm * W_PRICE) + (delivery_norm * W_DELIVERY) + (quality_norm * W_QUALITY)
 
-            print(
-                f"  Bidder: {self.suppliers[bid.supplier_id].name}, Score: {score:.4f} (P:{price_norm:.2f}, D:{delivery_norm:.2f}, Q:{quality_norm:.2f})"
+            logger.info(
+                f"  Bidder: {self.suppliers[bid.supplier_id].name}, Score: {score:.4f} "
+                f"(P:{price_norm:.2f}, D:{delivery_norm:.2f}, Q:{quality_norm:.2f})"
             )
 
             if score < best_score:
@@ -300,14 +270,15 @@ class ProcurementAuction:
             purchase_order.status = PurchaseOrderStatus.AWARDED
             purchase_order.selected_supplier_id = winner_supplier_id
             purchase_order.winning_bid_details = winning_bid  # Store the winning bid
-            print(
+            logger.info(
                 f"--> PO {po_id} awarded to {winner_supplier_name} (Score: {best_score:.4f})\n"
-                f"    Bid Details: ${winning_bid.price:.2f}, {winning_bid.delivery_days} days, {winning_bid.quality_guarantee:.2%} quality."
+                f"    Bid Details: ${winning_bid.price:.2f}, {winning_bid.delivery_days} days, "
+                f"{winning_bid.quality_guarantee:.2%} quality."
             )
-            print("-----------------------------------")
+            logger.info("-----------------------------------")
             return winner_supplier_id
         else:
-            print(f"--> No suitable winner found among bids for PO {po_id}.")
+            logger.info(f"--> No suitable winner found among bids for PO {po_id}.")
             purchase_order.status = PurchaseOrderStatus.REJECTED
-            print("-----------------------------------")
+            logger.info("-----------------------------------")
             return None

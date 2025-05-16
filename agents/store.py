@@ -2,12 +2,12 @@
 Defines the Store Agent class representing a store participating in protocols like CNP.
 """
 
-from dataclasses import dataclass, field
 import asyncio
 import random
+from dataclasses import dataclass, field
 
 # Import the data models from the models directory
-from models.task import TaskStatus, Task, Bid
+from models.task import Bid, Task, TaskStatus
 
 
 @dataclass
@@ -34,19 +34,13 @@ class StoreAgent:
         Returns None if the agent cannot perform the task.
         The bid_value represents the agent's cost/desirability (lower is better).
         """
-        used_capacity = sum(
-            t.required_capacity
-            for t in self.assigned_tasks
-            if t.status in [TaskStatus.ALLOCATED, TaskStatus.IN_PROGRESS]
-        )
+        used_capacity = sum(t.required_capacity for t in self.assigned_tasks if t.status in [TaskStatus.ALLOCATED, TaskStatus.IN_PROGRESS])
         if used_capacity + task.required_capacity > self.capacity:
             return None
 
         efficiency_cost = self.efficiency
 
-        urgency_factor = 1 + (task.urgency / 20.0) * (
-            len(self.assigned_tasks) / max(1, self.capacity)
-        )
+        urgency_factor = 1 + (task.urgency / 20.0) * (len(self.assigned_tasks) / max(1, self.capacity))
 
         location_penalty = 0.0
         if task.location and task.location != self.location:
@@ -56,9 +50,7 @@ class StoreAgent:
 
         bid_amount = (base_cost * efficiency_cost * urgency_factor) + location_penalty
 
-        current_workload_duration = sum(
-            t.required_capacity * self.efficiency for t in self.assigned_tasks
-        )
+        current_workload_duration = sum(t.required_capacity * self.efficiency for t in self.assigned_tasks)
         estimated_task_duration = task.required_capacity * self.efficiency
         completion_time = current_workload_duration + estimated_task_duration
 

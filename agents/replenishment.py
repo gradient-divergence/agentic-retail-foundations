@@ -1,4 +1,5 @@
 import logging
+
 from models.messaging import AgentMessage, Performative
 
 # Set up logging
@@ -7,33 +8,21 @@ logger = logging.getLogger(__name__)
 
 async def replenishment_agent_handler(msg: AgentMessage, log_messages: list):
     """Handles messages directed to the replenishment agent."""
-    logger.info(
-        f"Replenishment agent received: {msg.performative.value} from {msg.sender}"
-    )
-    log_messages.append(
-        f"Replenishment agent received: {msg.performative.value} from {msg.sender}"
-    )
+    logger.info(f"Replenishment agent received: {msg.performative.value} from {msg.sender}")
+    log_messages.append(f"Replenishment agent received: {msg.performative.value} from {msg.sender}")
 
     if msg.performative == Performative.INFORM and "stock_level" in msg.content:
         product_id = msg.content.get("product_id", "[unknown product]")
         stock_level = msg.content["stock_level"]
 
         if stock_level < 10:  # Example threshold
-            log_messages.append(
-                f"Low stock alert for {product_id}: {stock_level} units"
-            )
+            log_messages.append(f"Low stock alert for {product_id}: {stock_level} units")
             log_messages.append("Replenishment agent will create a restock order")
-            logger.warning(
-                f"Low stock detected for {product_id} ({stock_level} units). Initiating restock process."
-            )
+            logger.warning(f"Low stock detected for {product_id} ({stock_level} units). Initiating restock process.")
             # TODO: Add logic to actually create a restock order
         else:
-            log_messages.append(
-                f"Adequate stock level for {product_id}: {stock_level} units"
-            )
-            logger.info(
-                f"Adequate stock level for {product_id} ({stock_level} units). No action needed."
-            )
+            log_messages.append(f"Adequate stock level for {product_id}: {stock_level} units")
+            logger.info(f"Adequate stock level for {product_id} ({stock_level} units). No action needed.")
 
     # TODO: Add handling for other performatives if needed
 

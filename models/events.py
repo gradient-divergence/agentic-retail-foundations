@@ -5,6 +5,7 @@ Data models for events within the agent system.
 import uuid
 from datetime import datetime
 from typing import Any
+
 from pydantic import BaseModel, Field  # Use Pydantic as in notebook
 
 # Import relevant Enums

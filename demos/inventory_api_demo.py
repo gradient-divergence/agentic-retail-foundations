@@ -9,26 +9,25 @@ import asyncio
 import json
 import logging
 
-# Use standard library for background tasks
-from fastapi import FastAPI, HTTPException, BackgroundTasks
 import redis.asyncio as redis  # Use async redis client
 
+# Use standard library for background tasks
+from fastapi import BackgroundTasks, FastAPI, HTTPException
+
+from models.enums import InventoryEventType
+
 # Import refactored models and enums
-from models.events import (
+from models.events import (  # Add Reserved/Released if needed
+    InventoryAdjusted,
     InventoryEvent,
     InventoryReceived,
     InventorySold,
-    InventoryAdjusted,
     InventoryTransferred,
-    # Add Reserved/Released if needed
 )
 from models.state import ProductInventoryState
-from models.enums import InventoryEventType
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("inventory-api")
 
 # Initialize FastAPI app
@@ -50,9 +49,7 @@ async def startup_event():
     """Initialize Redis connection on startup."""
     global redis_client
     try:
-        redis_client = redis.Redis(
-            host="localhost", port=6379, db=0, decode_responses=True
-        )
+        redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
         await redis_client.ping()  # Verify connection
         logger.info("Connected to Redis successfully.")
     except Exception as e:
@@ -85,9 +82,7 @@ async def publish_event_to_stream(event: InventoryEvent) -> None:
         # Use pipeline for atomic adds if needed, basic XADD for demo
         await redis_client.xadd(stream_key, {"data": json.dumps(event_data)})
         await redis_client.xadd(all_events_stream, {"data": json.dumps(event_data)})
-        logger.info(
-            f"Published {event.event_type.value} event: {event.event_id} to streams."
-        )
+        logger.info(f"Published {event.event_type.value} event: {event.event_id} to streams.")
     except Exception as e:
         logger.error(f"Failed to publish event {event.event_id} to Redis: {str(e)}")
         # Optionally re-raise or handle differently
@@ -104,9 +99,7 @@ async def update_inventory_state(event: InventoryEvent) -> None:
         # Get current state or initialize
         current = inventory_state_cache.get(key)
         if not current:
-            current = ProductInventoryState(
-                product_id=product_id, location_id=location_id
-            )
+            current = ProductInventoryState(product_id=product_id, location_id=location_id)
             inventory_state_cache[key] = current
 
         # Store previous quantities for logging/validation
@@ -133,9 +126,7 @@ async def update_inventory_state(event: InventoryEvent) -> None:
             # Another event should be published for the destination location
             current.quantity_on_hand -= qty
         else:
-            logger.warning(
-                f"Unhandled inventory event type: {event.event_type} for {key}"
-            )
+            logger.warning(f"Unhandled inventory event type: {event.event_type} for {key}")
             return  # Don't update state for unhandled types
 
         # Recalculate available quantity
@@ -156,9 +147,7 @@ async def update_inventory_state(event: InventoryEvent) -> None:
 
 
 @app.post("/event/receive", status_code=202)
-async def receive_inventory_event(
-    event: InventoryReceived, background_tasks: BackgroundTasks
-):
+async def receive_inventory_event(event: InventoryReceived, background_tasks: BackgroundTasks):
     """API endpoint for receiving inventory."""
     if event.quantity <= 0:
         raise HTTPException(400, "Received quantity must be positive")
@@ -191,9 +180,7 @@ async def sell_inventory_event(event: InventorySold, background_tasks: Backgroun
 
 
 @app.post("/event/adjust", status_code=202)
-async def adjust_inventory_event(
-    event: InventoryAdjusted, background_tasks: BackgroundTasks
-):
+async def adjust_inventory_event(event: InventoryAdjusted, background_tasks: BackgroundTasks):
     """API endpoint for inventory adjustments."""
     key = f"{event.product_id}:{event.location_id}"
     if event.quantity < 0:  # If reducing stock
@@ -210,9 +197,7 @@ async def adjust_inventory_event(
 
 
 @app.post("/event/transfer", status_code=202)
-async def transfer_inventory_event(
-    event: InventoryTransferred, background_tasks: BackgroundTasks
-):
+async def transfer_inventory_event(event: InventoryTransferred, background_tasks: BackgroundTasks):
     """API endpoint for inventory transfers (records the outgoing part)."""
     if event.quantity <= 0:
         raise HTTPException(400, "Transfer quantity must be positive")

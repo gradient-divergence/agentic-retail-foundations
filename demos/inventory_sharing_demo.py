@@ -3,20 +3,17 @@ Demonstrates the Inventory Collaboration Network.
 """
 
 import asyncio
-import random
 import logging
+import random
+
 import pandas as pd
 
 # Import necessary components from the project structure
-from agents.protocols.inventory_sharing import (
-    InventoryCollaborationNetwork,
-)
+from agents.protocols.inventory_sharing import InventoryCollaborationNetwork
 from models.store import Store  # Assumed location
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -69,9 +66,7 @@ async def demo_collaborative_inventory_sharing():
         "final_inventory": [],
         "log_messages": [],  # Capture log messages
     }
-    results["log_messages"].append(
-        "Initializing Collaborative Inventory Sharing Demo..."
-    )
+    results["log_messages"].append("Initializing Collaborative Inventory Sharing Demo...")
 
     # Create Network
     network = InventoryCollaborationNetwork(max_transfer_distance=50.0)
@@ -148,9 +143,7 @@ async def demo_collaborative_inventory_sharing():
     results["log_messages"].append("Identifying transfer opportunities...")
     logger.info("Identifying transfer opportunities...")
     opportunities_cycle1 = await network.identify_transfer_opportunities()
-    results["log_messages"].append(
-        f"Found {len(opportunities_cycle1)} potential transfers."
-    )
+    results["log_messages"].append(f"Found {len(opportunities_cycle1)} potential transfers.")
     logger.info(f"Found {len(opportunities_cycle1)} potential transfers.")
 
     if opportunities_cycle1:
@@ -161,20 +154,14 @@ async def demo_collaborative_inventory_sharing():
             if sender and receiver:
                 log_msg = f"{i + 1}. {sender.name} -> {receiver.name}: {opp['quantity']} of {opp['product_id']} (Value: {opp['net_value']:.2f})"
                 results["log_messages"].append(log_msg)
-                results["cycle1_opportunities"].append(
-                    {**opp, "sender_name": sender.name, "receiver_name": receiver.name}
-                )
+                results["cycle1_opportunities"].append({**opp, "sender_name": sender.name, "receiver_name": receiver.name})
             else:
-                results["log_messages"].append(
-                    f"Warning: Sender/Receiver not found for opp: {opp}"
-                )
+                results["log_messages"].append(f"Warning: Sender/Receiver not found for opp: {opp}")
                 logger.warning(f"Sender or Receiver not found for opportunity: {opp}")
 
         # Simulate Execution (Warning: execute_transfer not fully implemented on Network)
         approved_transfers_c1 = [o for o in opportunities_cycle1 if o["net_value"] > 0]
-        results["log_messages"].append(
-            f"\nExecuting {len(approved_transfers_c1)} approved transfers..."
-        )
+        results["log_messages"].append(f"\nExecuting {len(approved_transfers_c1)} approved transfers...")
         logger.info(f"Executing {len(approved_transfers_c1)} approved transfers...")
         executed_count_c1 = 0
         for proposal in approved_transfers_c1:
@@ -187,16 +174,12 @@ async def demo_collaborative_inventory_sharing():
                     results["cycle1_executed"].append(proposal)
                 else:
                     logger.warning("Network does not have execute_transfer method.")
-                    results["log_messages"].append(
-                        "Warning: Network.execute_transfer not implemented."
-                    )
+                    results["log_messages"].append("Warning: Network.execute_transfer not implemented.")
             else:
                 skip_msg = f"Simulated skip/fail for transfer: {proposal.get('product_id')} from {proposal.get('sender_id')} to {proposal.get('receiver_id')}"
                 results["log_messages"].append(skip_msg)
                 logger.info(skip_msg)
-        results["log_messages"].append(
-            f"Simulated execution of {executed_count_c1} transfers."
-        )
+        results["log_messages"].append(f"Simulated execution of {executed_count_c1} transfers.")
         logger.info(f"Simulated execution of {executed_count_c1} transfers.")
     else:
         results["log_messages"].append("No transfer opportunities found in Cycle 1.")
@@ -221,14 +204,10 @@ async def demo_collaborative_inventory_sharing():
     # --- Cycle 2 ---
     results["log_messages"].append("\n=== Cycle 2 ===")
     logger.info("\n=== Cycle 2 ===")
-    results["log_messages"].append(
-        "Identifying transfer opportunities after changes..."
-    )
+    results["log_messages"].append("Identifying transfer opportunities after changes...")
     logger.info("Identifying transfer opportunities after changes...")
     opportunities_cycle2 = await network.identify_transfer_opportunities()
-    results["log_messages"].append(
-        f"Found {len(opportunities_cycle2)} potential transfers."
-    )
+    results["log_messages"].append(f"Found {len(opportunities_cycle2)} potential transfers.")
     logger.info(f"Found {len(opportunities_cycle2)} potential transfers.")
 
     if opportunities_cycle2:
@@ -239,20 +218,14 @@ async def demo_collaborative_inventory_sharing():
             if sender and receiver:
                 log_msg = f"{i + 1}. {sender.name} -> {receiver.name}: {opp['quantity']} of {opp['product_id']} (Value: {opp['net_value']:.2f})"
                 results["log_messages"].append(log_msg)
-                results["cycle2_opportunities"].append(
-                    {**opp, "sender_name": sender.name, "receiver_name": receiver.name}
-                )
+                results["cycle2_opportunities"].append({**opp, "sender_name": sender.name, "receiver_name": receiver.name})
             else:
-                results["log_messages"].append(
-                    f"Warning: Sender/Receiver not found for opp: {opp}"
-                )
+                results["log_messages"].append(f"Warning: Sender/Receiver not found for opp: {opp}")
                 logger.warning(f"Sender or Receiver not found for opportunity: {opp}")
 
         # Simulate Execution
         approved_transfers_c2 = [o for o in opportunities_cycle2 if o["net_value"] > 0]
-        results["log_messages"].append(
-            f"\nExecuting {len(approved_transfers_c2)} approved transfers..."
-        )
+        results["log_messages"].append(f"\nExecuting {len(approved_transfers_c2)} approved transfers...")
         logger.info(f"Executing {len(approved_transfers_c2)} approved transfers...")
         executed_count_c2 = 0
         for proposal in approved_transfers_c2:
@@ -263,16 +236,12 @@ async def demo_collaborative_inventory_sharing():
                     results["cycle2_executed"].append(proposal)
                 else:
                     logger.warning("Network does not have execute_transfer method.")
-                    results["log_messages"].append(
-                        "Warning: Network.execute_transfer not implemented."
-                    )
+                    results["log_messages"].append("Warning: Network.execute_transfer not implemented.")
             else:
                 skip_msg = f"Simulated skip/fail for transfer: {proposal.get('product_id')} from {proposal.get('sender_id')} to {proposal.get('receiver_id')}"
                 results["log_messages"].append(skip_msg)
                 logger.info(skip_msg)
-        results["log_messages"].append(
-            f"Simulated execution of {executed_count_c2} transfers."
-        )
+        results["log_messages"].append(f"Simulated execution of {executed_count_c2} transfers.")
         logger.info(f"Simulated execution of {executed_count_c2} transfers.")
     else:
         results["log_messages"].append("No transfer opportunities found in Cycle 2.")
@@ -286,9 +255,7 @@ async def demo_collaborative_inventory_sharing():
         for st in stores:
             store_inv_details = []
             transfer_history = getattr(st, "transfer_history", [])
-            out_trans = len(
-                [t for t in transfer_history if t.get("direction") == "out"]
-            )
+            out_trans = len([t for t in transfer_history if t.get("direction") == "out"])
             in_trans = len([t for t in transfer_history if t.get("direction") == "in"])
 
             if hasattr(st, "inventory") and isinstance(st.inventory, dict):
@@ -297,11 +264,7 @@ async def demo_collaborative_inventory_sharing():
                     status = getattr(pos, "get_status", lambda: None)()
                     status_value = status.value if hasattr(status, "value") else "N/A"
                     days_supply = getattr(pos, "days_of_supply", lambda: -1)()
-                    days_supply_str = (
-                        f"{days_supply:.1f}"
-                        if isinstance(days_supply, (int, float)) and days_supply >= 0
-                        else "N/A"
-                    )
+                    days_supply_str = f"{days_supply:.1f}" if isinstance(days_supply, (int, float)) and days_supply >= 0 else "N/A"
                     store_inv_details.append(
                         {
                             "Product ID": pid,
@@ -331,11 +294,7 @@ async def demo_collaborative_inventory_sharing():
     if results["cycle1_opportunities"]:
         print("**Potential Transfers Identified:**")
         opp1_df = pd.DataFrame(results["cycle1_opportunities"])
-        print(
-            opp1_df[
-                ["sender_name", "receiver_name", "product_id", "quantity", "net_value"]
-            ].to_string(index=False)
-        )
+        print(opp1_df[["sender_name", "receiver_name", "product_id", "quantity", "net_value"]].to_string(index=False))
     if results["cycle1_executed"]:
         print(f"\n**Simulated Executed Transfers:** {len(results['cycle1_executed'])}")
     else:
@@ -346,11 +305,7 @@ async def demo_collaborative_inventory_sharing():
     if results["cycle2_opportunities"]:
         print("**Potential Transfers Identified:**")
         opp2_df = pd.DataFrame(results["cycle2_opportunities"])
-        print(
-            opp2_df[
-                ["sender_name", "receiver_name", "product_id", "quantity", "net_value"]
-            ].to_string(index=False)
-        )
+        print(opp2_df[["sender_name", "receiver_name", "product_id", "quantity", "net_value"]].to_string(index=False))
     if results["cycle2_executed"]:
         print(f"\n**Simulated Executed Transfers:** {len(results['cycle2_executed'])}")
     else:

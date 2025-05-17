@@ -36,7 +36,6 @@ class FulfillmentMethod(str, Enum):
     DROPSHIP_FROM_VENDOR = "dropship_from_vendor"
 
 
-
 class OrderStatus(str, Enum):
     """Possible states of a retail order"""
 

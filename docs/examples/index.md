@@ -15,9 +15,12 @@ These scripts are located in the `demos/` directory and can typically be run dir
 -   **`procurement_auction_demo.py`:** 
     -   *Purpose:* Demonstrates a reverse auction for supplier selection via `ProcurementAuction`.
     -   *Run:* `python demos/procurement_auction_demo.py`
--   **`inventory_sharing_demo.py`:** 
+-   **`inventory_sharing_demo.py`:**
     -   *Purpose:* Simulates cooperative inventory transfers using `InventoryCollaborationNetwork`.
     -   *Run:* `python demos/inventory_sharing_demo.py`
+-   **`openai_agents_multi_agent_demo.py`:**
+    -   *Purpose:* Demonstrates coordinating multiple OpenAI agents via the Agents SDK.
+    -   *Run:* `python demos/openai_agents_multi_agent_demo.py`
 
 ## Cross-Functional Coordination
 

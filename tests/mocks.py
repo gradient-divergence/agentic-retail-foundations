@@ -2,9 +2,11 @@
 
 from unittest.mock import AsyncMock
 
+
 # Basic mock for the OpenAI client
 class MockAsyncOpenAI(AsyncMock):
     pass
+
 
 # Mock for Product Database
 class MockProductDB:
@@ -24,6 +26,7 @@ class MockProductDB:
             return "RESOLVED_ID_123"
         return None
 
+
 # Mock for Order Management System
 class MockOrderSystem:
     async def get_order_details(self, order_id):
@@ -32,7 +35,7 @@ class MockOrderSystem:
         elif order_id == "ORD456":
             return {"order_id": order_id, "status": "Processing", "items": ["item2"]}
         elif order_id == "REGEX999":
-             return {"order_id": order_id, "status": "Delivered", "items": ["item3"]}
+            return {"order_id": order_id, "status": "Delivered", "items": ["item3"]}
         return None
 
     async def get_recent_orders(self, customer_id, limit=3):
@@ -45,11 +48,16 @@ class MockOrderSystem:
         # Use normal quotes
         return {"eligible": True, "reason": None} if order_id == "ORD123" else {"eligible": False, "reason": "Too old"}
 
+
 # Mock for Customer Database
 class MockCustomerDB:
     async def get_customer(self, customer_id):
         # Use normal quotes
-        return {"customer_id": customer_id, "name": "Test Customer", "loyalty_tier": "Gold"}
+        return {
+            "customer_id": customer_id,
+            "name": "Test Customer",
+            "loyalty_tier": "Gold",
+        }
 
     async def log_interaction(self, *args, **kwargs):
-        pass # No operation needed for current tests
+        pass  # No operation needed for current tests

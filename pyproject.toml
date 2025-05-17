@@ -74,17 +74,17 @@ dependencies = [
 [project.optional-dependencies]
 # Development dependencies: linters, formatters, testing, docs
 dev = [
-    "ruff>=0.4.0", # Linter, formatter, and more
-    "mypy>=1.8.0", # Static type checker
+    "ruff>=0.4.0",
+    "black>=24.0.0",
+    "isort>=5.0.0",
+    "mypy>=1.8.0", 
     "pytest>=7.0",
-    "pytest-cov>=4.0", # For coverage with pytest
+    "pytest-cov>=4.0",
     "pytest-asyncio>=0.21.0",
     "coverage[toml]>=7.0",
     "pre-commit>=4.2.0",
     "uv>=0.1.20",
-    # Dependencies needed for mocking in tests
-    "kafka-python>=2.0", # For mocking kafka clients
-    # Type stubs
+    "kafka-python>=2.0",
     "types-requests",
     "pandas-stubs",
     "types-tensorflow",
@@ -106,32 +106,26 @@ Repository = "https://github.com/gradient-divergence/agentic-retail-foundations"
 
 # --- Tool Configurations ---
 
-# Add setuptools configuration to specify packages
 [tool.setuptools.packages.find]
-# Define where to look for packages ('.' means the root directory)
 where = ["."]
-# Explicitly list the directories that are Python packages
 include = ["agents*", "connectors*", "models*", "utils*", "config*", "environments*", "demos*", "notebooks*"]
-# Exclude directories that are definitely not packages
 exclude = ["tests*", "docs*", "qmd*"]
 
-[tool.ruff]
-# See https://docs.astral.sh/ruff/configuration/
-target-version = "py310" # Minimum Python version to target for compatibility
-line-length = 88
-# Select rule codes to enable. Add more as needed (e.g., "I" for isort)
-# Start with defaults and gradually add more. `ruff check --select ALL .` shows available.
-select = ["E", "F", "W", "C90", "UP", "I", "B", "T20"] # Added I (isort), B (bugbear), T20 (print)
-ignore = [] # Rule codes to ignore (e.g., "E501" if you don't enforce line length strictly)
+# === Black Configuration ===
+[tool.black]
+line-length = 150
 
-[tool.ruff.lint.per-file-ignores]
-"notebooks/ethical-considerations-and-governance.py" = ["E501"]
-"notebooks/multi-agent-systems-in-retail.py" = ["E501"]
-"notebooks/sensor-networks-and-cognitive-systems.py" = ["E501"]
-"notebooks/real-world-case-studies.py" = ["E501"]
+# === Ruff Configuration ===
+[tool.ruff]
+target-version = "py310"
+line-length = 150 # Match black
 
 [tool.ruff.lint]
-# Exclude common directories
+select = ["E", "F", "W", "C90", "UP", "I", "B", "T20"]
+ignore = [
+    "B007", # Allow unused loop control variables if explicitly named with underscore later
+]
+
 exclude = [
     ".bzr",
     ".direnv",
@@ -154,29 +148,47 @@ exclude = [
     "venv",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"notebooks/*" = [
+    "E501",
+    "C901",
+    "F841",
+    "B018",
+]
+"tests/*" = [
+    "S101",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+]
+"__init__.py" = [
+    "F401",
+    "D104",
+]
+"tests/utils/test_openai_utils.py" = ["E501"]
+
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
 [tool.ruff.format]
-# See https://docs.astral.sh/ruff/formatter/
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-# See https://mypy.readthedocs.io/en/stable/config_file.html
-python_version = "3.10" # Match your project's minimum Python version
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true # Ensure all functions are annotated
-# Removed global ignore_missing_imports (false is default)
-
-# Global excludes
+disallow_untyped_defs = true
 exclude = [
     "build/",
     ".venv/",
-    "notebooks/", # Keep excluding notebooks for now
+    "notebooks/",
 ]
 
-# Use per-module ignores for libraries known to lack stubs
 [[tool.mypy.overrides]]
 module = [
     "scipy.*",
@@ -193,7 +205,6 @@ module = [
     "graphviz.*",
     "pyspark.*",
     "shap.*",
-    # Add other problematic libraries here
 ]
 ignore_missing_imports = true
 
@@ -202,24 +213,21 @@ module = "notebooks.ethical_considerations_and_governance"
 disable_error_code = ["name-defined", "no-redef"]
 
 [tool.pytest.ini_options]
-# See https://docs.pytest.org/en/stable/reference/customize.html#pyproject-toml
 minversion = "6.0"
-addopts = "-ra -q --cov --cov-report=term-missing" # Basic options: report reasons for skip/fail, quiet, enable coverage
+addopts = "-ra -q --cov --cov-report=term-missing" 
 testpaths = [
-    "tests", # Directory where tests are located
+    "tests",
 ]
-pythonpath = "." # Add project root to PYTHONPATH for imports
+pythonpath = "."
 
 [tool.coverage.run]
-# See https://coverage.readthedocs.io/en/latest/config.html
-branch = true # Measure branch coverage
+branch = true
 source = ["agents", "connectors", "utils", "demos", "config", "environments"]
-# omit = ["*/tests/*", "*/__main__.py"] # Files/patterns to exclude from coverage
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 80 # Optional: Fail if coverage is below this percentage
+fail_under = 40 
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

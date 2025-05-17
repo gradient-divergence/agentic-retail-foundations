@@ -2,10 +2,10 @@
 PricingAgent for developing launch pricing and pricing remediation in retail MAS.
 """
 
-from datetime import datetime, timedelta
-from typing import Any
 import asyncio
 import random
+from datetime import datetime, timedelta
+from typing import Any
 
 
 class PricingAgent:
@@ -20,25 +20,14 @@ class PricingAgent:
         """Placeholder: Determine and set the initial launch price."""
         cost = product_data.get("unit_cost", 0)
         target_margin = product_data.get("margin_targets", {}).get("target_margin", 0.4)
-        competitor_prices = [
-            p.get("price", 0)
-            for p in product_data.get("competitor_products", {}).values()
-        ]
-        avg_comp_price = (
-            sum(competitor_prices) / len(competitor_prices)
-            if competitor_prices
-            else cost / (1 - target_margin) * 1.1
-        )
+        competitor_prices = [p.get("price", 0) for p in product_data.get("competitor_products", {}).values()]
+        avg_comp_price = sum(competitor_prices) / len(competitor_prices) if competitor_prices else cost / (1 - target_margin) * 1.1
 
         # Simple pricing logic: aim for target margin but consider competitors
         calculated_price = cost / (1 - target_margin)
-        initial_price = round(
-            min(calculated_price, avg_comp_price * 0.95), 2
-        )  # Undercut slightly
+        initial_price = round(min(calculated_price, avg_comp_price * 0.95), 2)  # Undercut slightly
 
-        print(
-            f"Pricing: Setting initial price based on cost {cost}, target margin {target_margin}, and competitor avg {avg_comp_price:.2f}..."
-        )
+        print(f"Pricing: Setting initial price based on cost {cost}, target margin {target_margin}, and competitor avg {avg_comp_price:.2f}...")
         await asyncio.sleep(0.15)  # Simulate calculation time
         print(f"Pricing: Initial price set to ${initial_price:.2f}")
         return {"status": "price_set", "initial_price": initial_price}
@@ -62,9 +51,7 @@ class PricingAgent:
             details = "Margin target data missing."
         else:
             # Simulate occasional requirement for final review
-            needs_review = random.choice(
-                [True, False, False, False]
-            )  # 25% chance needs review
+            needs_review = random.choice([True, False, False, False])  # 25% chance needs review
             if needs_review:
                 details = "Pricing model complete, awaiting final review/approval."
                 status = "blocked"
@@ -98,9 +85,7 @@ class PricingAgent:
         print(f"Pricing: Developing pricing strategy for {product_id}")
         await asyncio.sleep(0.3)
         base_price = cost * (1 + margin_targets["target_margin"])
-        competitor_avg = sum(c["price"] for c in competitor_data.values()) / len(
-            competitor_data
-        )
+        competitor_avg = sum(c["price"] for c in competitor_data.values()) / len(competitor_data)
         recommended_price = (base_price * 0.7) + (competitor_avg * 0.3)
         return {
             "status": "ready",
@@ -110,9 +95,7 @@ class PricingAgent:
             "competitor_analysis": f"We are positioned {'above' if recommended_price > competitor_avg else 'below'} market average",
         }
 
-    async def suggest_remediation(
-        self, product_id: str, current_status: str
-    ) -> dict[str, Any]:
+    async def suggest_remediation(self, product_id: str, current_status: str) -> dict[str, Any]:
         """
         Suggest remediation steps for pricing issues.
         """

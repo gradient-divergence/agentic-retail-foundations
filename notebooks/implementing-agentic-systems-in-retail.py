@@ -1,5 +1,5 @@
-import marimo as mo
 import marimo  # Ensure marimo is imported for app definition
+import marimo as mo
 
 __generated_with = "0.1.69"
 app = marimo.App()
@@ -8,12 +8,12 @@ app = marimo.App()
 @app.cell
 def _():
     # Import all required modules
+    import os
+
+    import psycopg2
     from fastapi import FastAPI, HTTPException
     from psycopg2.extras import RealDictCursor
     from supabase import create_client
-    import os
-    import psycopg2
-    import marimo as mo
 
     # Return all modules needed by other cells
     return mo, FastAPI, HTTPException, RealDictCursor, create_client, os, psycopg2
@@ -26,9 +26,7 @@ def _(FastAPI, os, create_client):
 
     # Initialize Supabase client
     url = os.getenv("SUPABASE_URL")
-    key = os.getenv(
-        "SUPABASE_SERVICE_ROLE_KEY"
-    )  # using a service role key for full DB access
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")  # using a service role key for full DB access
     supabase = None
     try:
         supabase = create_client(url, key)
@@ -93,9 +91,7 @@ def _(InventoryAgent, mo):
         predicted_demand = {"Jeans": 15, "T-Shirt": 5}
         orders = agent.evaluate_restock(current_stock, predicted_demand)
         # The agent should order Jeans because 5 < 15+10, but not T-Shirt because 20 >= 5+10
-        assert "Jeans" in orders and orders["Jeans"] >= 20, (
-            "Jeans restock quantity should be at least 20"
-        )
+        assert "Jeans" in orders and orders["Jeans"] >= 20, "Jeans restock quantity should be at least 20"
         assert orders["T-Shirt"] == 0, "T-Shirt should not be reordered"
 
         # Scenario: plenty of stock should result in no orders

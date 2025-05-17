@@ -1,8 +1,9 @@
-import pytest
-from rdflib import Graph, Literal, URIRef, Namespace
-from rdflib.namespace import RDF, RDFS, XSD
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+from rdflib import Graph, Literal, Namespace
+from rdflib.namespace import RDF, RDFS, XSD
 
 # Module to test
 from agents.knowledge_graph import RetailKnowledgeGraph
@@ -14,6 +15,7 @@ CATEGORY = Namespace("http://retail.example.org/category/")
 CUSTOMER = Namespace("http://retail.example.org/customer/")
 
 # --- Test Initialization --- #
+
 
 def test_kg_initialization():
     """Test basic initialization without SPARQL endpoint."""
@@ -29,9 +31,10 @@ def test_kg_initialization():
     assert (RETAIL.Product, RDF.type, RDFS.Class) in kg.graph
     assert (RETAIL.name, RDF.type, RDF.Property) in kg.graph
 
+
 # Test with mocked SPARQLWrapper
-@patch('agents.knowledge_graph._SPARQLWrapper')
-@patch('agents.knowledge_graph._JSON')
+@patch("agents.knowledge_graph._SPARQLWrapper")
+@patch("agents.knowledge_graph._JSON")
 def test_kg_initialization_with_sparql_uri_success(mock_json, mock_sparql_wrapper, capfd):
     """Test KG initialization with a valid SPARQL URI (mocked success)."""
     endpoint_uri = "http://localhost:7200/repositories/test"
@@ -51,9 +54,10 @@ def test_kg_initialization_with_sparql_uri_success(mock_json, mock_sparql_wrappe
     captured = capfd.readouterr()
     assert f"SPARQL endpoint configured for: {endpoint_uri}" in captured.out
 
+
 # Test with SPARQLWrapper import failing
-@patch('agents.knowledge_graph._SPARQLWrapper', None) # Simulate import failure
-@patch('agents.knowledge_graph._JSON', None)
+@patch("agents.knowledge_graph._SPARQLWrapper", None)  # Simulate import failure
+@patch("agents.knowledge_graph._JSON", None)
 def test_kg_initialization_with_sparql_uri_import_error(capfd):
     """Test KG initialization when SPARQLWrapper library is missing."""
     endpoint_uri = "http://localhost:7200/repositories/test"
@@ -65,6 +69,7 @@ def test_kg_initialization_with_sparql_uri_import_error(capfd):
     # Check logs/print output
     captured = capfd.readouterr()
     assert f"Cannot configure SPARQL endpoint {endpoint_uri}: SPARQLWrapper library not found." in captured.out
+
 
 def test_kg_initialization_no_sparql_uri():
     """Test KG initialization without a SPARQL URI."""
@@ -80,7 +85,9 @@ def test_kg_initialization_no_sparql_uri():
     assert (RETAIL.Product, RDF.type, RDFS.Class) in kg.graph
     assert (RETAIL.name, RDF.type, RDF.Property) in kg.graph
 
+
 # --- Test add_product --- #
+
 
 def test_add_product_full_details():
     """Test adding a product with all details."""
@@ -105,7 +112,11 @@ def test_add_product_full_details():
     assert g.value(subject=product_uri, predicate=RETAIL.hasBrand) == Literal(brand)
     # Check categories
     assert (product_uri, RETAIL.hasCategory, CATEGORY["Dairy"]) in g
-    assert (CATEGORY["Dairy"], RDF.type, RETAIL.Category) in g # Category type also added
+    assert (
+        CATEGORY["Dairy"],
+        RDF.type,
+        RETAIL.Category,
+    ) in g  # Category type also added
     assert (product_uri, RETAIL.hasCategory, CATEGORY["Organic"]) in g
     assert (CATEGORY["Organic"], RDF.type, RETAIL.Category) in g
     # Check attributes
@@ -114,6 +125,7 @@ def test_add_product_full_details():
     # Verify attribute properties were added to ontology implicitly
     assert (RETAIL.size, RDF.type, RDF.Property) in g
     assert (RETAIL.fat_content, RDF.type, RDF.Property) in g
+
 
 def test_add_product_minimal_details():
     """Test adding a product with only required details."""
@@ -134,6 +146,7 @@ def test_add_product_minimal_details():
     assert g.value(subject=product_uri, predicate=RETAIL.hasBrand) is None
     assert g.value(subject=product_uri, predicate=RETAIL.size) is None
 
+
 def test_add_product_invalid_input():
     """Test adding product with invalid input raises ValueError."""
     kg = RetailKnowledgeGraph(store_id="S001")
@@ -142,7 +155,9 @@ def test_add_product_invalid_input():
     with pytest.raises(ValueError, match="product_id and name are required."):
         kg.add_product("ValidID", "", 1.0, ["Cat"])
 
+
 # --- Test add_product_relationship --- #
+
 
 def test_add_product_relationship_simple():
     """Test adding a simple relationship between products."""
@@ -156,26 +171,25 @@ def test_add_product_relationship_simple():
     # Check the relationship triple exists
     assert (p1_uri, RETAIL.isSubstituteFor, p2_uri) in kg.graph
 
+
 def test_add_product_relationship_with_strength_and_metadata():
     """Test adding a relationship with strength and metadata."""
     kg = RetailKnowledgeGraph(store_id="S001")
     p1_uri = kg.add_product("P1", "Product 1", 10.0, ["CatA"])
     p3_uri = kg.add_product("P3", "Product 3", 5.0, ["CatB"])
 
-    kg.add_product_relationship(
-        "P1", "complement", "P3", strength=0.8, metadata={"source": "algo_v2"}
-    )
+    kg.add_product_relationship("P1", "complement", "P3", strength=0.8, metadata={"source": "algo_v2"})
 
     # Check the direct triple exists
     assert (p1_uri, RETAIL.complementsWith, p3_uri) in kg.graph
 
     # Find the statement node and check its properties
     stmt_node = None
-    for s, p, o in kg.graph.triples((None, RDF.type, RDF.Statement)):
+    for s, _p, _o in kg.graph.triples((None, RDF.type, RDF.Statement)):
         if (
-            kg.graph.value(s, RDF.subject) == p1_uri and
-            kg.graph.value(s, RDF.predicate) == RETAIL.complementsWith and
-            kg.graph.value(s, RDF.object) == p3_uri
+            kg.graph.value(s, RDF.subject) == p1_uri
+            and kg.graph.value(s, RDF.predicate) == RETAIL.complementsWith
+            and kg.graph.value(s, RDF.object) == p3_uri
         ):
             stmt_node = s
             break
@@ -185,6 +199,7 @@ def test_add_product_relationship_with_strength_and_metadata():
     assert strength_literal == Literal(0.8, datatype=XSD.decimal)
     meta_literal = kg.graph.value(stmt_node, RETAIL.source)
     assert meta_literal == Literal("algo_v2")
+
 
 def test_add_product_relationship_invalid_strength():
     """Test that strength outside [0, 1] is ignored (no statement created)."""
@@ -201,7 +216,9 @@ def test_add_product_relationship_invalid_strength():
     stmt_nodes = list(kg.graph.subjects(RDF.type, RDF.Statement))
     assert len(stmt_nodes) == 0
 
+
 # --- Test add_customer_purchase --- #
+
 
 def test_add_customer_purchase_full():
     """Test adding a purchase event with all details."""
@@ -215,15 +232,14 @@ def test_add_customer_purchase_full():
 
     # Add product first so it exists
     product_uri = kg.add_product(pid, "Test Prod", 5.0, ["Test"])
-    customer_uri = CUSTOMER[cid] # Define customer URI
+    customer_uri = CUSTOMER[cid]  # Define customer URI
 
     kg.add_customer_purchase(cid, pid, timestamp, quantity, order_id, channel)
 
     # Find the purchase node (it's a BNode, so query by type and properties)
     purchase_node = None
-    for s, p, o in kg.graph.triples((None, RDF.type, RETAIL.Purchase)):
-        if kg.graph.value(s, RETAIL.hasCustomer) == customer_uri and \
-           kg.graph.value(s, RETAIL.hasProduct) == product_uri:
+    for s, _p, _o in kg.graph.triples((None, RDF.type, RETAIL.Purchase)):
+        if kg.graph.value(s, RETAIL.hasCustomer) == customer_uri and kg.graph.value(s, RETAIL.hasProduct) == product_uri:
             purchase_node = s
             break
 
@@ -241,6 +257,7 @@ def test_add_customer_purchase_full():
     # Verify the direct purchase link
     assert (customer_uri, RETAIL.purchased, product_uri) in g
 
+
 def test_add_customer_purchase_minimal():
     """Test adding a purchase event with minimal details."""
     kg = RetailKnowledgeGraph(store_id="S001")
@@ -254,20 +271,21 @@ def test_add_customer_purchase_minimal():
     kg.add_customer_purchase(cid, pid, timestamp)
 
     purchase_node = None
-    for s, p, o in kg.graph.triples((None, RDF.type, RETAIL.Purchase)):
-        if kg.graph.value(s, RETAIL.hasCustomer) == customer_uri and \
-           kg.graph.value(s, RETAIL.hasProduct) == product_uri:
+    for s, _p, _o in kg.graph.triples((None, RDF.type, RETAIL.Purchase)):
+        if kg.graph.value(s, RETAIL.hasCustomer) == customer_uri and kg.graph.value(s, RETAIL.hasProduct) == product_uri:
             purchase_node = s
             break
     assert purchase_node is not None
 
     g = kg.graph
-    assert g.value(purchase_node, RETAIL.quantity) == Literal(1, datatype=XSD.integer) # Default quantity
-    assert g.value(purchase_node, RETAIL.channel) == Literal("in_store") # Default channel
-    assert g.value(purchase_node, RETAIL.orderID) is None # Optional field not present
+    assert g.value(purchase_node, RETAIL.quantity) == Literal(1, datatype=XSD.integer)  # Default quantity
+    assert g.value(purchase_node, RETAIL.channel) == Literal("in_store")  # Default channel
+    assert g.value(purchase_node, RETAIL.orderID) is None  # Optional field not present
     assert (customer_uri, RETAIL.purchased, product_uri) in g
 
+
 # --- Test Query Methods --- #
+
 
 @pytest.fixture
 def kg_with_relations() -> RetailKnowledgeGraph:
@@ -278,17 +296,17 @@ def kg_with_relations() -> RetailKnowledgeGraph:
     kg.add_product("P_B", "Product B", 11.0, ["Cat1"], brand="BrandX")
     kg.add_product("P_C", "Product C", 9.50, ["Cat1"], brand="BrandY")
     kg.add_product("P_D", "Product D", 15.0, ["Cat1"], brand="BrandX")
-    kg.add_product("P_E", "Product E", 10.50, ["Cat2"], brand="BrandY") # Complement
-    kg.add_product("P_F", "Product F", 9.80, ["Cat1"], brand="BrandZ") # Substitute
-    kg.add_product("P_G", "Product G", 10.20, ["Cat1"], brand="BrandX") # Substitute
-    kg.add_product("P_H", "Product H", 8.00, ["Cat3"], brand="BrandX") # Co-purchase
-    kg.add_product("P_I", "Product I", 12.00, ["Cat3"], brand="BrandZ") # Accessory
+    kg.add_product("P_E", "Product E", 10.50, ["Cat2"], brand="BrandY")  # Complement
+    kg.add_product("P_F", "Product F", 9.80, ["Cat1"], brand="BrandZ")  # Substitute
+    kg.add_product("P_G", "Product G", 10.20, ["Cat1"], brand="BrandX")  # Substitute
+    kg.add_product("P_H", "Product H", 8.00, ["Cat3"], brand="BrandX")  # Co-purchase
+    kg.add_product("P_I", "Product I", 12.00, ["Cat3"], brand="BrandZ")  # Accessory
 
     # Relationships
     kg.add_product_relationship("P_F", "substitute", "P_A")
     kg.add_product_relationship("P_G", "substitute", "P_A", strength=0.9)
     kg.add_product_relationship("P_A", "complement", "P_E", strength=0.8)
-    kg.add_product_relationship("P_I", "accessory", "P_A") # P_I is accessory FOR P_A
+    kg.add_product_relationship("P_I", "accessory", "P_A")  # P_I is accessory FOR P_A
 
     # --- Restore purchase history ---
     ts = "2024-01-01T10:00:00"
@@ -307,6 +325,7 @@ def kg_with_relations() -> RetailKnowledgeGraph:
     # --- End purchase history ---
 
     return kg
+
 
 def test_find_substitutes(kg_with_relations: RetailKnowledgeGraph):
     """Test finding substitutes via direct relations and category matching."""
@@ -334,7 +353,10 @@ def test_find_substitutes(kg_with_relations: RetailKnowledgeGraph):
     assert substitutes[0]["product_id"] == "P_F"
     assert substitutes[1]["product_id"] == "P_G"
     # Order of P_C and P_B might swap if strength calculation isn't exact 0.7 or price sorting dominates
-    assert {substitutes[2]["product_id"], substitutes[3]["product_id"]} == {"P_C", "P_B"}
+    assert {substitutes[2]["product_id"], substitutes[3]["product_id"]} == {
+        "P_C",
+        "P_B",
+    }
     if substitutes[2]["product_id"] == "P_C":
         assert substitutes[3]["product_id"] == "P_B"
     else:
@@ -346,13 +368,14 @@ def test_find_substitutes(kg_with_relations: RetailKnowledgeGraph):
     assert p_f_data["name"] == "Product F"
     assert p_f_data["price"] == 9.80
     assert p_f_data["brand"] == "BrandZ"
-    assert p_f_data["strength"] == pytest.approx(1.0) # Default strength
+    assert p_f_data["strength"] == pytest.approx(1.0)  # Default strength
 
     p_g_data = next(s for s in substitutes if s["product_id"] == "P_G")
     assert p_g_data["strength"] == pytest.approx(0.9)
 
     p_c_data = next(s for s in substitutes if s["product_id"] == "P_C")
-    assert p_c_data["strength"] == pytest.approx(0.7) # Category match strength
+    assert p_c_data["strength"] == pytest.approx(0.7)  # Category match strength
+
 
 def test_find_substitutes_limit(kg_with_relations: RetailKnowledgeGraph):
     """Test the max_results limit for find_substitutes."""
@@ -363,12 +386,14 @@ def test_find_substitutes_limit(kg_with_relations: RetailKnowledgeGraph):
     found_ids = {s["product_id"] for s in substitutes}
     assert found_ids == {"P_F", "P_G"}
 
+
 def test_find_substitutes_not_found(kg_with_relations: RetailKnowledgeGraph):
     """Test finding substitutes for a product with no expected substitutes."""
     kg = kg_with_relations
     # P_E is in Cat2, no explicit substitutes defined
     substitutes = kg.find_substitutes("P_E")
     assert substitutes == []
+
 
 def test_find_complementary_products(kg_with_relations: RetailKnowledgeGraph):
     """Test finding complementary products via relations and co-purchase."""
@@ -400,14 +425,16 @@ def test_find_complementary_products(kg_with_relations: RetailKnowledgeGraph):
 
     assert complements[2]["product_id"] == "P_H"
     assert complements[2]["relation_type"] == "co_purchase"
-    assert complements[2]["strength"] == pytest.approx(0.25) # 5 / 20
+    assert complements[2]["strength"] == pytest.approx(0.25)  # 5 / 20
+
 
 def test_find_complementary_products_limit(kg_with_relations: RetailKnowledgeGraph):
     """Test max_results limit for complements."""
     kg = kg_with_relations
     complements = kg.find_complementary_products("P_A", max_results=1)
     assert len(complements) == 1
-    assert complements[0]["product_id"] == "P_I" # Highest strength
+    assert complements[0]["product_id"] == "P_I"  # Highest strength
+
 
 def test_find_complementary_products_not_found(kg_with_relations: RetailKnowledgeGraph):
     """Test finding complements for a product with none."""
@@ -416,7 +443,9 @@ def test_find_complementary_products_not_found(kg_with_relations: RetailKnowledg
     complements = kg.find_complementary_products("P_B")
     assert complements == []
 
+
 # --- Test generate_recommendations --- #
+
 
 @pytest.mark.parametrize(
     "customer_id, expected_reco_ids_scores",
@@ -433,28 +462,22 @@ def test_find_complementary_products_not_found(kg_with_relations: RetailKnowledg
         # Expected: P_I (0.8), then P_B, P_C, P_D, P_F, P_G (0.5) - sorted by score DESC, name ASC
         (
             "C1",
-            {
-                "P_I": 0.8, "P_B": 0.5, "P_C": 0.5,
-                "P_D": 0.5, "P_F": 0.5, "P_G": 0.5
-            }
+            {"P_I": 0.8, "P_B": 0.5, "P_C": 0.5, "P_D": 0.5, "P_F": 0.5, "P_G": 0.5},
         ),
         # C2 purchased P_A (Cat1) and P_B (Cat1)
         # Recos should be other Cat1 items (P_C, P_D, P_F, P_G)
         # No complement boosts apply.
         # Expected: P_C, P_D, P_F, P_G (all 0.5) - sorted by name ASC
-        (
-            "C2",
-            {"P_C": 0.5, "P_D": 0.5, "P_F": 0.5, "P_G": 0.5}
-        ),
+        ("C2", {"P_C": 0.5, "P_D": 0.5, "P_F": 0.5, "P_G": 0.5}),
         # C_NO_PURCHASE has no history
         ("C_NO_PURCHASE", {}),
     ],
-    ids=["C1_purchased_A_H", "C2_purchased_A_B", "C_NO_PURCHASE"]
+    ids=["C1_purchased_A_H", "C2_purchased_A_B", "C_NO_PURCHASE"],
 )
 def test_generate_recommendations(
     kg_with_relations: RetailKnowledgeGraph,
     customer_id: str,
-    expected_reco_ids_scores: dict[str, float]
+    expected_reco_ids_scores: dict[str, float],
 ):
     """Test generating recommendations based on purchase history."""
     kg = kg_with_relations
@@ -476,12 +499,13 @@ def test_generate_recommendations(
     if len(recommendations) > 1:
         for i in range(len(recommendations) - 1):
             score_i = recommendations[i]["relevance_score"]
-            score_j = recommendations[i+1]["relevance_score"]
+            score_j = recommendations[i + 1]["relevance_score"]
             name_i = recommendations[i]["name"]
-            name_j = recommendations[i+1]["name"]
+            name_j = recommendations[i + 1]["name"]
             assert score_i >= score_j
             if score_i == score_j:
                 assert name_i <= name_j
+
 
 def test_generate_recommendations_limit(kg_with_relations: RetailKnowledgeGraph):
     """Test max_results limit for recommendations."""
@@ -493,7 +517,9 @@ def test_generate_recommendations_limit(kg_with_relations: RetailKnowledgeGraph)
     # The specific second item depends on stable sort, check possibilities
     assert recommendations[1]["product_id"] in ["P_B", "P_C", "P_D", "P_F", "P_G"]
 
+
 # --- Test Graph Utilities --- #
+
 
 def test_export_load_graph(kg_with_relations: RetailKnowledgeGraph, tmp_path: Path):
     """Test exporting the graph and loading it back."""
@@ -504,7 +530,7 @@ def test_export_load_graph(kg_with_relations: RetailKnowledgeGraph, tmp_path: Pa
 
     # Get original triple count
     original_triple_count = len(kg1.graph)
-    assert original_triple_count > 10 # Ensure we have some data
+    assert original_triple_count > 10  # Ensure we have some data
 
     # Export
     kg1.export_graph(str(export_file), format=graph_format)
@@ -518,7 +544,7 @@ def test_export_load_graph(kg_with_relations: RetailKnowledgeGraph, tmp_path: Pa
     kg2_graph.bind("product", kg1.PRODUCT)
     kg2_graph.bind("category", kg1.CATEGORY)
     kg2_graph.bind("customer", kg1.CUSTOMER)
-    
+
     kg2_graph.parse(source=str(export_file), format=graph_format)
 
     # Compare triple counts (simplest check)
@@ -529,6 +555,7 @@ def test_export_load_graph(kg_with_relations: RetailKnowledgeGraph, tmp_path: Pa
     p_a_uri = PRODUCT["P_A"]
     assert (p_a_uri, RDF.type, RETAIL.Product) in kg2_graph
     assert kg2_graph.value(p_a_uri, RETAIL.name) == Literal("Product A")
+
 
 def test_clear_graph(kg_with_relations: RetailKnowledgeGraph):
     """Test clearing the graph with and without preserving ontology."""
@@ -560,4 +587,4 @@ def test_clear_graph(kg_with_relations: RetailKnowledgeGraph):
 # Placeholder tests
 # def test_execute_query(): ... # Implicitly tested by query methods
 # def test_export_load_graph(): ...
-# def test_clear_graph(): ... 
+# def test_clear_graph(): ...

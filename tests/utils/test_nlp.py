@@ -1,7 +1,8 @@
-import logging
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import builtins
+import logging
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Module to test
 from utils import nlp as nlp_mod
@@ -31,9 +32,9 @@ class _FakeCompletion:
 async def test_classify_intent(monkeypatch):
     async def fake_safe_chat_completion(*args, **kwargs):  # noqa: D401,E501
         assert len(args) > 0  # client is positional
-        assert 'messages' in kwargs
+        assert "messages" in kwargs
         # Check if the system prompt is correct
-        assert "You are an intent classification system" in kwargs['messages'][0]['content']
+        assert "You are an intent classification system" in kwargs["messages"][0]["content"]
         return _FakeCompletion("order_status")
 
     monkeypatch.setattr(nlp_mod, "safe_chat_completion", fake_safe_chat_completion)
@@ -46,7 +47,7 @@ async def test_classify_intent(monkeypatch):
         # Otherwise, fallback to the real isinstance
         return builtins.isinstance(obj, classinfo)
 
-    with patch('utils.nlp.isinstance', mock_isinstance):
+    with patch("utils.nlp.isinstance", mock_isinstance):
         # Use the new signature
         intent = await nlp_mod.classify_intent(
             client=AsyncMock(),
@@ -56,22 +57,38 @@ async def test_classify_intent(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "llm_response_content, expected_intent, expect_warning_log",
+    "llm_response_content, expected_intent, expect_warning_log, expected_log_substring",
     [
-        (None, "unknown", False),
-        ("", "unknown", True), # Empty string fails validation -> unknown, warning
-        ("   ", "unknown", True), # Whitespace strips empty -> unknown, warning
-        ("cancel_order", "unknown", True), # Unexpected intent -> unknown, WITH warning
+        (None, "unknown", False, None),
+        ("", "unknown", True, "LLM completion failed or gave empty content."),
+        (
+            "   ",
+            "unknown",
+            True,
+            "LLM returned unexpected intent:",
+        ),  # Strips to empty, then fails validation
+        (
+            "cancel_order",
+            "unknown",
+            True,
+            "LLM returned unexpected intent:",
+        ),  # Unexpected intent
     ],
 )
 @pytest.mark.asyncio
 async def test_classify_intent_edge_cases(
-    monkeypatch, caplog, llm_response_content, expected_intent, expect_warning_log
+    monkeypatch,
+    caplog,
+    llm_response_content,
+    expected_intent,
+    expect_warning_log,
+    expected_log_substring,
 ):
     """Test classify_intent with None or unexpected LLM responses."""
+
     async def fake_safe_chat_completion(*args, **kwargs):
         if llm_response_content is None:
-            return None # Simulate completion failure
+            return None  # Simulate completion failure
         return _FakeCompletion(llm_response_content)
 
     monkeypatch.setattr(nlp_mod, "safe_chat_completion", fake_safe_chat_completion)
@@ -82,51 +99,54 @@ async def test_classify_intent_edge_cases(
             return True
         return builtins.isinstance(obj, classinfo)
 
-    with patch('utils.nlp.isinstance', mock_isinstance), caplog.at_level(logging.WARNING):
+    with (
+        patch("utils.nlp.isinstance", mock_isinstance),
+        caplog.at_level(logging.WARNING),
+    ):
         intent = await nlp_mod.classify_intent(
             client=AsyncMock(),
             message="Some message",
         )
 
     assert intent == expected_intent
-    # Adjust log check based on the specific warning expected
-    log_present = False
-    expected_log_substring = None
-    if llm_response_content is not None:
-        # Handle the specific test cases explicitly
-        if llm_response_content == "": # Empty string
-            expected_log_substring = "LLM completion failed or gave empty content."
-        elif llm_response_content == "   ": # Whitespace only
-             expected_log_substring = "LLM returned unexpected intent:"
-        elif llm_response_content == "cancel_order": # Non-empty, unexpected
-             expected_log_substring = "LLM returned unexpected intent:"
-        # Add other specific unexpected content checks here if needed
 
-    if expect_warning_log and expected_log_substring:
-        log_present = expected_log_substring in caplog.text
-    elif expect_warning_log and not expected_log_substring:
-        # This case shouldn't happen if parametrize is correct, but indicates a mismatch
-        log_present = False
-    elif not expect_warning_log:
-        # If we don't expect a log, ensure *none* of the warning substrings are present
-        log_present = not any(sub in caplog.text for sub in [
-            "LLM completion failed or gave empty content.",
-            "LLM returned unexpected intent:"
-        ] if sub)
-    else: # Should not happen
-        log_present = False
+    log_actually_present = False
+    if expect_warning_log:
+        if expected_log_substring:
+            log_actually_present = expected_log_substring in caplog.text
+        else:
+            # If we expect a generic warning but no specific substring,
+            # check if any warning occurred.
+            # This branch might need refinement based on actual desired behavior
+            # for generic warnings.
+            log_actually_present = any(record.levelno == logging.WARNING for record in caplog.records)
+    else:
+        # If we don't expect a log, ensure no warnings related to intent
+        # classification are present.
+        # This is a bit broad; ideally, we'd ensure *no* warnings if that's the
+        # strict expectation.
+        unexpected_log_present = any(
+            sub in caplog.text
+            for sub in [
+                "LLM completion failed or gave empty content.",
+                "LLM returned unexpected intent:",
+            ]
+            if sub
+        )
+        log_actually_present = not unexpected_log_present
 
-    assert log_present == expect_warning_log, \
-           f"Log check failed. Expected log? {expect_warning_log}. Expected substring: '{expected_log_substring}'. Actual logs: {caplog.text!r}"
+    assert log_actually_present == expect_warning_log, (
+        f"Log check failed. Expected warning? {expect_warning_log}. Expected substring: '{expected_log_substring}'. Actual logs: {caplog.text!r}"
+    )
 
 
 @pytest.mark.asyncio
 async def test_extract_order_id(monkeypatch):
     async def fake_safe_chat_completion(*args, **kwargs):  # noqa: D401,E501
         assert len(args) > 0
-        assert 'messages' in kwargs
+        assert "messages" in kwargs
         # Check system prompt related to order IDs
-        assert "You extract order IDs" in kwargs['messages'][0]['content']
+        assert "You extract order IDs" in kwargs["messages"][0]["content"]
         return _FakeCompletion("ABC123")
 
     monkeypatch.setattr(nlp_mod, "safe_chat_completion", fake_safe_chat_completion)
@@ -145,8 +165,8 @@ async def test_extract_order_id(monkeypatch):
     "llm_response_content, expected_order_id",
     [
         (None, None),
-        ("", None),    # Empty string after strip should result in None
-        ("   ", None), # Whitespace strips to empty, should result in None
+        ("", None),  # Empty string after strip should result in None
+        ("   ", None),  # Whitespace strips to empty, should result in None
         ("none", None),
         ("None", None),
         ("ambiguous", None),
@@ -155,10 +175,9 @@ async def test_extract_order_id(monkeypatch):
     ],
 )
 @pytest.mark.asyncio
-async def test_extract_order_id_llm_edge_cases(
-    monkeypatch, llm_response_content, expected_order_id
-):
+async def test_extract_order_id_llm_edge_cases(monkeypatch, llm_response_content, expected_order_id):
     """Test extract_order_id_llm with None or explicit non-ID LLM responses."""
+
     async def fake_safe_chat_completion(*args, **kwargs):
         if llm_response_content is None:
             return None
@@ -169,7 +188,7 @@ async def test_extract_order_id_llm_edge_cases(
     order_id = await nlp_mod.extract_order_id_llm(
         client=AsyncMock(),
         message="Check order status",
-        recent_order_ids=["XYZ789"], # Provide some context
+        recent_order_ids=["XYZ789"],  # Provide some context
         model="dummy",
         logger=logging.getLogger(__name__),
     )
@@ -180,8 +199,8 @@ async def test_extract_order_id_llm_edge_cases(
 async def test_extract_product_identifier(monkeypatch):
     async def fake_safe_chat_completion(*args, **kwargs):  # noqa: D401,E501
         assert len(args) > 0
-        assert 'messages' in kwargs
-        assert "You extract product names or SKUs" in kwargs['messages'][0]['content']
+        assert "messages" in kwargs
+        assert "You extract product names or SKUs" in kwargs["messages"][0]["content"]
         return _FakeCompletion("Yoga Mat")
 
     monkeypatch.setattr(nlp_mod, "safe_chat_completion", fake_safe_chat_completion)
@@ -199,18 +218,20 @@ async def test_extract_product_identifier(monkeypatch):
     "llm_response_content, expected_product_id",
     [
         (None, None),
-        ("", None),    # Empty string after strip should result in None
-        ("   ", None), # Whitespace strips to empty, should result in None
+        ("", None),  # Empty string after strip should result in None
+        ("   ", None),  # Whitespace strips to empty, should result in None
         ("none", None),
         ("None", None),
-        ("I couldn't find a specific product mentioned in your query, could you please clarify?", None),
+        (
+            ("I couldn't find a specific product mentioned in your query, could you please clarify?"),
+            None,
+        ),
     ],
 )
 @pytest.mark.asyncio
-async def test_extract_product_id_edge_cases(
-    monkeypatch, llm_response_content, expected_product_id
-):
+async def test_extract_product_id_edge_cases(monkeypatch, llm_response_content, expected_product_id):
     """Test extract_product_id with None or non-ID LLM responses."""
+
     async def fake_safe_chat_completion(*args, **kwargs):
         if llm_response_content is None:
             return None
@@ -231,8 +252,8 @@ async def test_extract_product_id_edge_cases(
 async def test_analyze_sentiment(monkeypatch):
     async def fake_safe_chat_completion(*args, **kwargs):  # noqa: D401,E501
         assert len(args) > 0
-        assert 'messages' in kwargs
-        assert "You classify text sentiment" in kwargs['messages'][0]['content']
+        assert "messages" in kwargs
+        assert "You classify text sentiment" in kwargs["messages"][0]["content"]
         return _FakeCompletion("positive")
 
     monkeypatch.setattr(nlp_mod, "safe_chat_completion", fake_safe_chat_completion)
@@ -249,18 +270,34 @@ async def test_analyze_sentiment(monkeypatch):
 @pytest.mark.parametrize(
     "llm_response_content, expected_sentiment, log_level, log_message",
     [
-        (None, "neutral", None, None), # Simulate safe_chat_completion returning None
-        ("", "neutral", None, None),    # Simulate empty content
-        ("   ", "neutral", None, None), # Simulate whitespace content
-        ("mostly_positive", "neutral", logging.WARNING, "LLM returned unexpected sentiment: mostly_positive"), # Simulate unexpected sentiment
-        ("positive but maybe neutral", "neutral", logging.WARNING, "LLM returned unexpected sentiment: positive but maybe neutral"), # Simulate conversational junk
+        (None, "neutral", None, None),  # Simulate safe_chat_completion returning None
+        ("", "neutral", None, None),  # Simulate empty content
+        ("   ", "neutral", None, None),  # Simulate whitespace content
+        (
+            "mostly_positive",
+            "neutral",
+            logging.WARNING,
+            "LLM returned unexpected sentiment: mostly_positive",
+        ),  # Simulate unexpected sentiment
+        (
+            "positive but maybe neutral",
+            "neutral",
+            logging.WARNING,
+            "LLM returned unexpected sentiment: positive but maybe neutral",
+        ),  # Simulate conversational junk
     ],
 )
 @pytest.mark.asyncio
 async def test_analyze_sentiment_edge_cases(
-    monkeypatch, caplog, llm_response_content, expected_sentiment, log_level, log_message
+    monkeypatch,
+    caplog,
+    llm_response_content,
+    expected_sentiment,
+    log_level,
+    log_message,
 ):
     """Test sentiment_analysis with None or unexpected LLM responses."""
+
     async def fake_safe_chat_completion(*args, **kwargs):
         if llm_response_content is None:
             return None

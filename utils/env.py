@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+from dotenv import load_dotenv
+
 """Environment helper utilities.
 
 Automatically loads a `.env` file from the project root so that environment
@@ -7,10 +11,6 @@ variables (e.g., ``OPENAI_API_KEY``) defined there become available via
 ``os.getenv``.  Uses `python-dotenv`, which is already listed in
 `pyproject.toml` dependencies.
 """
-
-from pathlib import Path
-
-from dotenv import load_dotenv
 
 __all__ = ["load_project_dotenv"]
 

@@ -4,14 +4,15 @@ Module: agents.cv
 Contains the ShelfMonitoringAgent class for computer vision-based shelf monitoring in retail.
 """
 
-from typing import Any
 import asyncio
+import logging
 import time
 from datetime import datetime
+from typing import Any
+
 import cv2
 import numpy as np
 import tensorflow as tf
-import logging
 
 
 class ShelfMonitoringAgent:
@@ -38,8 +39,7 @@ class ShelfMonitoringAgent:
             self.detection_model = tf.saved_model.load(model_path)
         except (OSError, ValueError) as e:
             logging.warning(
-                "ShelfMonitoringAgent: Could not load model from '%s': %s. "
-                "Falling back to a dummy detection model (no detections will be produced).",
+                "ShelfMonitoringAgent: Could not load model from '%s': %s. Falling back to a dummy detection model (no detections will be produced).",
                 model_path,
                 e,
             )
@@ -73,14 +73,10 @@ class ShelfMonitoringAgent:
         """Begin monitoring a specific shelf section at a location."""
         camera_id = await self.planogram_db.get_section_camera(location_id, section_id)
         if not camera_id or camera_id not in self.camera_streams:
-            print(
-                f"No camera configured for section {section_id} at location {location_id}"
-            )
+            print(f"No camera configured for section {section_id} at location {location_id}")
             return
         if camera_id not in self.active_streams:
-            self.active_streams[camera_id] = cv2.VideoCapture(
-                self.camera_streams[camera_id]
-            )
+            self.active_streams[camera_id] = cv2.VideoCapture(self.camera_streams[camera_id])
         self.last_check_times[section_id] = 0
         self.detected_issues[section_id] = []
         await self._monitor_section_loop(location_id, section_id)
@@ -102,10 +98,7 @@ class ShelfMonitoringAgent:
         stream = self.active_streams.get(camera_id)
         while stream and stream.isOpened():
             current_time = time.time()
-            if (
-                current_time - self.last_check_times.get(section_id, 0)
-                >= self.check_frequency
-            ):
+            if current_time - self.last_check_times.get(section_id, 0) >= self.check_frequency:
                 await self._check_section(location_id, section_id, camera_id, stream)
                 self.last_check_times[section_id] = current_time
             await asyncio.sleep(1)
@@ -118,9 +111,7 @@ class ShelfMonitoringAgent:
         stream: cv2.VideoCapture,
     ):
         """Analyze current shelf state for a specific section."""
-        planogram = await self.planogram_db.get_section_planogram(
-            location_id, section_id
-        )
+        planogram = await self.planogram_db.get_section_planogram(location_id, section_id)
         if not planogram:
             return
         ret, frame = stream.read()
@@ -129,9 +120,7 @@ class ShelfMonitoringAgent:
             return
         input_tensor = self._preprocess_image(frame)
         detections = self.detection_model(input_tensor)
-        detected_products = self._process_detections(
-            detections, frame.shape[1], frame.shape[0]
-        )
+        detected_products = self._process_detections(detections, frame.shape[1], frame.shape[0])
         issues = self._compare_with_planogram(detected_products, planogram)
         if issues:
             timestamp = datetime.now().isoformat()
@@ -147,9 +136,7 @@ class ShelfMonitoringAgent:
         input_tensor = tf.expand_dims(image_normalized, 0)
         return input_tensor
 
-    def _process_detections(
-        self, detections: dict, img_w: int, img_h: int
-    ) -> list[dict[str, Any]]:
+    def _process_detections(self, detections: dict, img_w: int, img_h: int) -> list[dict[str, Any]]:
         """Process raw detections into structured product data."""
         # Assuming model output dictionary values are lists of tensors/objects
         # Access the first element (index 0) which is the tensor for the first (only) batch image
@@ -165,7 +152,7 @@ class ShelfMonitoringAgent:
         class_mapping = self._get_class_mapping()
         products = []
         # Loop through detections FOR THE FIRST IMAGE in the batch (index 0)
-        num_detections = detection_scores_np.shape[0] # Number of detections for this image
+        num_detections = detection_scores_np.shape[0]  # Number of detections for this image
         for i in range(num_detections):
             if detection_scores_np[i] >= self.confidence_threshold:
                 box = detection_boxes_np[i]
@@ -250,10 +237,7 @@ class ShelfMonitoringAgent:
                 if expected_product["product_id"] == product_id:
                     expected_pos = expected_product["position"]
                     actual_pos = product["shelf_position"]
-                    distance = np.sqrt(
-                        (expected_pos["x"] - actual_pos["x"]) ** 2
-                        + (expected_pos["y"] - actual_pos["y"]) ** 2
-                    )
+                    distance = np.sqrt((expected_pos["x"] - actual_pos["x"]) ** 2 + (expected_pos["y"] - actual_pos["y"]) ** 2)
                     if distance > tol:
                         issues.append(
                             {
@@ -282,9 +266,7 @@ class ShelfMonitoringAgent:
             "issues": issues,
         }
         await self.inventory_system.report_visual_audit(issue_summary)
-        print(
-            f"[{timestamp}] Detected {len(issues)} issues in section {section_id} at {location_id}"
-        )
+        print(f"[{timestamp}] Detected {len(issues)} issues in section {section_id} at {location_id}")
         for issue in issues:
             print(f"  - {issue['type']}: {issue['product_id']}")
 

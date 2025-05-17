@@ -22,7 +22,8 @@ class PNCounter:
         # Dictionary of node_id -> decrement count
         self.decrements: dict[str, int] = {}
 
-        # If initial value is provided, represent it as increments/decrements from a conceptual 'initial' node
+        # If initial value is provided, represent it as increments/decrements
+        # from a conceptual 'initial' node
         if initial_value > 0:
             self.increments["initial"] = initial_value
         elif initial_value < 0:
@@ -41,13 +42,15 @@ class PNCounter:
         self.decrements[node_id] = self.decrements.get(node_id, 0) + value
 
     def value(self) -> int:
-        """Get current counter value by summing increments and subtracting decrements."""
+        """Get current counter value by summing increments and subtracting
+        decrements."""
         return sum(self.increments.values()) - sum(self.decrements.values())
 
     def merge(self, other: "PNCounter") -> None:
         """
         Merge another PN Counter state into this one.
-        The merge operation takes the maximum count for each node's increments/decrements.
+        The merge operation takes the maximum count for each node's
+        increments/decrements.
         This operation is commutative, associative, and idempotent.
         Modifies the current counter in-place.
         """
@@ -55,22 +58,14 @@ class PNCounter:
             raise TypeError("Can only merge with another PNCounter")
 
         # Merge increments (take max value for each node)
-        all_inc_keys: set[str] = set(self.increments.keys()) | set(
-            other.increments.keys()
-        )
+        all_inc_keys: set[str] = set(self.increments.keys()) | set(other.increments.keys())
         for key in all_inc_keys:
-            self.increments[key] = max(
-                self.increments.get(key, 0), other.increments.get(key, 0)
-            )
+            self.increments[key] = max(self.increments.get(key, 0), other.increments.get(key, 0))
 
         # Merge decrements (take max value for each node)
-        all_dec_keys: set[str] = set(self.decrements.keys()) | set(
-            other.decrements.keys()
-        )
+        all_dec_keys: set[str] = set(self.decrements.keys()) | set(other.decrements.keys())
         for key in all_dec_keys:
-            self.decrements[key] = max(
-                self.decrements.get(key, 0), other.decrements.get(key, 0)
-            )
+            self.decrements[key] = max(self.decrements.get(key, 0), other.decrements.get(key, 0))
 
     @property
     def state(self) -> dict[str, Any]:
@@ -89,21 +84,11 @@ class PNCounter:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PNCounter":
         """Create from dictionary representation."""
-        if not all(
-            k in data for k in ["product_id", "location_id", "increments", "decrements"]
-        ):
+        if not all(k in data for k in ["product_id", "location_id", "increments", "decrements"]):
             raise ValueError("Invalid data format for PNCounter.from_dict")
 
         counter = cls(data["product_id"], data["location_id"])
         # Ensure increments/decrements are dicts, provide default empty dict
-        counter.increments = (
-            data.get("increments", {})
-            if isinstance(data.get("increments", {}), dict)
-            else {}
-        )
-        counter.decrements = (
-            data.get("decrements", {})
-            if isinstance(data.get("decrements", {}), dict)
-            else {}
-        )
+        counter.increments = data.get("increments", {}) if isinstance(data.get("increments", {}), dict) else {}
+        counter.decrements = data.get("decrements", {}) if isinstance(data.get("decrements", {}), dict) else {}
         return counter

@@ -1,15 +1,14 @@
-from environments.mdp import DynamicPricingMDP
+import os
+import tempfile
+
 from agents.qlearning import QLearningAgent
 from config.config import DynamicPricingMDPConfig, QLearningAgentConfig
-import tempfile
-import os
+from environments.mdp import DynamicPricingMDP
 
 
 def make_env_agent():
     env_config = DynamicPricingMDPConfig(initial_inventory=20, season_length_weeks=4)
-    agent_config = QLearningAgentConfig(
-        action_space_size=len(env_config.available_discounts)
-    )
+    agent_config = QLearningAgentConfig(action_space_size=len(env_config.available_discounts))
     env = DynamicPricingMDP(env_config)
     agent = QLearningAgent(agent_config)
     return env, agent
@@ -44,7 +43,7 @@ def test_training_loop_short():
     """Test a short training loop end-to-end."""
     env, agent = make_env_agent()
     num_episodes = 10
-    for episode in range(num_episodes):
+    for _episode in range(num_episodes):
         state = env.reset()
         done = False
         while not done:

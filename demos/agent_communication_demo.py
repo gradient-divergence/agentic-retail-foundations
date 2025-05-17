@@ -5,14 +5,13 @@ Demonstrates the basic agent communication framework using MessageBroker.
 import asyncio
 import logging
 
-# Import necessary components from the project structure
-from models.messaging import AgentMessage, Performative
 from agents.messaging import MessageBroker
 
+# Import necessary components from the project structure
+from models.messaging import AgentMessage, Performative
+
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -25,9 +24,7 @@ async def demo_retail_agent_communication():
     broker = MessageBroker()
 
     async def inventory_agent_handler(msg: AgentMessage):
-        log_msg = (
-            f"Inventory agent received: {msg.performative.value} from {msg.sender}"
-        )
+        log_msg = f"Inventory agent received: {msg.performative.value} from {msg.sender}"
         log_messages.append(log_msg)
         logger.info(log_msg)
 
@@ -51,9 +48,7 @@ async def demo_retail_agent_communication():
             logger.info(log_msg)
 
     async def replenishment_agent_handler(msg: AgentMessage):
-        log_msg = (
-            f"Replenishment agent received: {msg.performative.value} from {msg.sender}"
-        )
+        log_msg = f"Replenishment agent received: {msg.performative.value} from {msg.sender}"
         log_messages.append(log_msg)
         logger.info(log_msg)
 

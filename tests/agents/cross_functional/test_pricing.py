@@ -1,4 +1,5 @@
 import pytest
+
 from agents.cross_functional.pricing import PricingAgent
 
 
@@ -10,9 +11,7 @@ async def test_develop_launch_pricing():
     competitor_data = {"comp1": {"price": 12.0}, "comp2": {"price": 11.0}}
     margin_targets = {"target_margin": 0.2}
     price_elasticity = 1.5
-    result = await agent.develop_launch_pricing(
-        product_id, cost, competitor_data, margin_targets, price_elasticity
-    )
+    result = await agent.develop_launch_pricing(product_id, cost, competitor_data, margin_targets, price_elasticity)
     assert result["status"] == "ready"
     assert "recommended_price" in result
     assert result["recommended_price"] > 0

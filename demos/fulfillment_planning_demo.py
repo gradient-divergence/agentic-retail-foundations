@@ -2,18 +2,16 @@
 Demonstration of the fulfillment planning system.
 """
 
+import logging
 import random
 import time
-import logging
 
 # Import the refactored components
-from models.fulfillment import Item, Order, Associate, OrderLineItem
-from utils.planning import StoreLayout, FulfillmentPlanner
+from models.fulfillment import Associate, Item, Order, OrderLineItem
+from utils.planning import FulfillmentPlanner, StoreLayout
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -129,9 +127,9 @@ def demo_fulfillment_system(mo_instance=None):  # Allow passing mo for notebook 
             # Assign random quantity and price for the demo
             order_line_items.append(
                 OrderLineItem(
-                    product_id=physical_item.item_id, # Use the correct ID
+                    product_id=physical_item.item_id,  # Use the correct ID
                     quantity=random.randint(1, 5),
-                    price=round(random.uniform(1.0, 50.0), 2)
+                    price=round(random.uniform(1.0, 50.0), 2),
                 )
             )
 
@@ -140,8 +138,8 @@ def demo_fulfillment_system(mo_instance=None):  # Allow passing mo for notebook 
         orders.append(
             Order(
                 order_id=f"ORD{i}",
-                items=order_line_items, # Pass the list of OrderLineItem
-                customer_id=f"CUST{random.randint(100, 999)}"
+                items=order_line_items,  # Pass the list of OrderLineItem
+                customer_id=f"CUST{random.randint(100, 999)}",
                 # created_at, status, etc., will use defaults from Order definition
             )
         )
@@ -201,15 +199,9 @@ def demo_fulfillment_system(mo_instance=None):  # Allow passing mo for notebook 
         return mo_instance.vstack(
             [
                 mo_instance.md("### Fulfillment Plan Explanation"),
-                mo_instance.md(
-                    f"```\n{explanation_text}\n```"
-                ),  # Display explanation as code block
+                mo_instance.md(f"```\n{explanation_text}\n```"),  # Display explanation as code block
                 mo_instance.md("### Fulfillment Plan Visualization"),
-                (
-                    plan_figure
-                    if plan_figure
-                    else mo_instance.md("_Could not generate visualization._")
-                ),
+                (plan_figure if plan_figure else mo_instance.md("_Could not generate visualization._")),
             ]
         )
     else:

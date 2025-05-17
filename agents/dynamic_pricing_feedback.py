@@ -12,8 +12,8 @@ import logging
 from datetime import datetime, timedelta
 
 # Assume Redis and Kafka clients are appropriately configured/imported
-import redis.asyncio as redis # Use built-in asyncio from redis-py
-from kafka import KafkaProducer, KafkaConsumer  # Requires kafka-python
+import redis.asyncio as redis  # Use built-in asyncio from redis-py
+from kafka import KafkaConsumer, KafkaProducer  # Requires kafka-python
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class DynamicPricingAgent:
     """Dynamic pricing agent using feedback loop (Extracted from notebook)"""
 
-    redis_client: redis.Redis | None = None # Type hint uses the alias
+    redis_client: redis.Redis | None = None  # Type hint uses the alias
 
     def __init__(
         self,
@@ -48,13 +48,9 @@ class DynamicPricingAgent:
 
         # Connect to data streams
         try:
-            self.redis_client = redis.Redis(
-                host=redis_host, port=redis_port, decode_responses=True
-            )
+            self.redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
         except Exception as e:
-            logger.error(
-                f"Failed to connect to Redis at {redis_host}:{redis_port}: {e}"
-            )
+            logger.error(f"Failed to connect to Redis at {redis_host}:{redis_port}: {e}")
             self.redis_client = None
 
         try:
@@ -97,14 +93,10 @@ class DynamicPricingAgent:
                 logger.debug(f"Computed optimal price: ${new_price:.2f}")
 
                 # 3. Update price if sufficiently different
-                if (
-                    abs(new_price - self.current_price) / self.current_price > 0.02
-                ):  # 2% threshold
+                if abs(new_price - self.current_price) / self.current_price > 0.02:  # 2% threshold
                     await self.update_price(new_price)
                 else:
-                    logger.debug(
-                        "Price change below threshold, maintaining current price."
-                    )
+                    logger.debug("Price change below threshold, maintaining current price.")
 
                 # 4. Process feedback from actual sales (from Kafka - simplified blocking poll)
                 # In a fully async system, Kafka consumption might use aiokafka
@@ -118,9 +110,7 @@ class DynamicPricingAgent:
         except asyncio.CancelledError:
             logger.info(f"Pricing agent {self.product_id} feedback loop cancelled.")
         except KeyboardInterrupt:
-            logger.info(
-                f"Pricing agent {self.product_id} stopping due to KeyboardInterrupt."
-            )
+            logger.info(f"Pricing agent {self.product_id} stopping due to KeyboardInterrupt.")
         except Exception as e:
             logger.error(
                 f"Error in pricing agent {self.product_id} feedback loop: {e}",
@@ -148,9 +138,7 @@ class DynamicPricingAgent:
         key = f"sales:{self.product_id}:quantity"  # Example key structure
 
         try:
-            sales_data = await self.redis_client.execute_command(
-                "TS.RANGE", key, str(start_ts_ms), str(end_ts_ms)
-            )
+            sales_data = await self.redis_client.execute_command("TS.RANGE", key, str(start_ts_ms), str(end_ts_ms))
             # Redis TS.RANGE returns list of [timestamp_str, value_str]
             return [(int(ts), float(val)) for ts, val in sales_data]
         except Exception as e:
@@ -231,9 +219,7 @@ class DynamicPricingAgent:
         except Exception as e:
             logger.error(f"Error storing price in Redis TS key '{key}': {e}")
 
-        logger.info(
-            f"Updated price for product {self.product_id}: ${new_price:.2f} (was ${old_price:.2f})"
-        )
+        logger.info(f"Updated price for product {self.product_id}: ${new_price:.2f} (was ${old_price:.2f})")
 
     async def process_sales_feedback(self, poll_timeout_ms=100):
         """Process recent sales data from Kafka to update demand history and elasticity model."""
@@ -266,13 +252,9 @@ class DynamicPricingAgent:
                             total_demand_in_period += quantity
                             processed_count += 1
                     except Exception as e:
-                        logger.error(
-                            f"Error processing Kafka record: {e} - Record: {record}"
-                        )
+                        logger.error(f"Error processing Kafka record: {e} - Record: {record}")
 
-            logger.debug(
-                f"Processed {processed_count} sales messages for {self.product_id}. Total demand: {total_demand_in_period}"
-            )
+            logger.debug(f"Processed {processed_count} sales messages for {self.product_id}. Total demand: {total_demand_in_period}")
 
             if processed_count > 0:
                 self.demand_history.append(total_demand_in_period)
@@ -292,13 +274,9 @@ class DynamicPricingAgent:
             # self.kafka_consumer.commit()
 
         except Exception as e:
-            logger.error(
-                f"Error polling/processing Kafka sales messages: {e}", exc_info=True
-            )
+            logger.error(f"Error polling/processing Kafka sales messages: {e}", exc_info=True)
 
-    async def update_elasticity_model(
-        self, previous_price, current_price, previous_demand, current_demand
-    ):
+    async def update_elasticity_model(self, previous_price, current_price, previous_demand, current_demand):
         """Update price elasticity based on observed price and demand changes."""
         if previous_price == current_price:
             logger.debug("Price hasn't changed, skipping elasticity update.")
@@ -317,24 +295,18 @@ class DynamicPricingAgent:
 
         # Basic sanity check - elasticity should usually be negative
         if observed_elasticity > 0.1:  # Allow slightly positive for noise
-            logger.warning(
-                f"Observed positive elasticity ({observed_elasticity:.2f}). Skipping update. Check data/model."
-            )
+            logger.warning(f"Observed positive elasticity ({observed_elasticity:.2f}). Skipping update. Check data/model.")
             return
 
         # Bound elasticity to prevent extreme values
         observed_elasticity = max(-10.0, min(-0.1, observed_elasticity))
 
         # Update elasticity estimate using learning rate (Exponential Moving Average)
-        self.price_elasticity = (
-            1 - self.learning_rate
-        ) * self.price_elasticity + self.learning_rate * observed_elasticity
+        self.price_elasticity = (1 - self.learning_rate) * self.price_elasticity + self.learning_rate * observed_elasticity
         # Bound the learned elasticity as well
         self.price_elasticity = max(-10.0, min(-0.1, self.price_elasticity))
 
-        logger.info(
-            f"Updated elasticity for product {self.product_id}: {self.price_elasticity:.3f} (Observed: {observed_elasticity:.3f})"
-        )
+        logger.info(f"Updated elasticity for product {self.product_id}: {self.price_elasticity:.3f} (Observed: {observed_elasticity:.3f})")
 
         # Store updated elasticity in Redis (optional)
         key = f"elasticity:{self.product_id}"

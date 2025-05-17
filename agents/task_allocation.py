@@ -2,19 +2,16 @@
 Task allocation and contract net protocol classes for distributed task management in retail MAS.
 """
 
-from enum import Enum
-from dataclasses import dataclass
-import uuid
 import asyncio
-import random
-from typing import Optional, Any
-from collections import defaultdict
 import logging
+from collections import defaultdict
+from typing import Any
 
-# Import the data models from the models directory
-from models.task import TaskStatus, TaskType, Task, Bid
 # Import StoreAgent from its new location
 from agents.store import StoreAgent
+
+# Import the data models from the models directory
+from models.task import Bid, Task, TaskStatus, TaskType
 
 
 class RetailCoordinator:
@@ -46,9 +43,9 @@ class RetailCoordinator:
         description: str,
         urgency: int,
         required_capacity: int,
-        location: Optional[str] = None,
-        deadline: Optional[float] = None,
-        data: Optional[dict[str, Any]] = None,
+        location: str | None = None,
+        deadline: float | None = None,
+        data: dict[str, Any] | None = None,
     ) -> str:
         """
         Create a new task and add it to the coordinator's task list.
@@ -68,7 +65,7 @@ class RetailCoordinator:
         print(f"Coordinator created Task {new_task.id}: {description[:50]}...")
         return new_task.id
 
-    async def allocate_task(self, task_id: str) -> Optional[str]:
+    async def allocate_task(self, task_id: str) -> str | None:
         """
         Perform the CNP allocation for a specific task:
         1. Announce Task (Implicit - task is already created and ANNOUNCED)
@@ -83,9 +80,7 @@ class RetailCoordinator:
 
         task = self.tasks[task_id]
         if task.status != TaskStatus.ANNOUNCED:
-            print(
-                f"Warning: Task {task_id} is not in ANNOUNCED state (current: {task.status.name}), cannot allocate."
-            )
+            print(f"Warning: Task {task_id} is not in ANNOUNCED state (current: {task.status.name}), cannot allocate.")
             return None
 
         print(f"\n--- Allocating Task {task_id} ({task.description[:30]}...) ---")
@@ -113,9 +108,7 @@ class RetailCoordinator:
         task.winning_bid = best_bid.bid_value
         winner_agent.assigned_tasks.append(task)
 
-        print(
-            f"--> Task {task_id} awarded to {winner_agent.name} (Bid: {best_bid.bid_value:.2f})"
-        )
+        print(f"--> Task {task_id} awarded to {winner_agent.name} (Bid: {best_bid.bid_value:.2f})")
         print("----------------------------------------------------")
         return winner_id
 
@@ -136,18 +129,14 @@ class RetailCoordinator:
                     tasks_to_execute.append(agent.execute_task(task))
                     agent_task_map[agent_id].append(task_id)
                 else:
-                    logging.error(
-                        f"Agent {agent_id} assigned to task {task_id} not found during execution phase."
-                    )
+                    logging.error(f"Agent {agent_id} assigned to task {task_id} not found during execution phase.")
                     task.status = TaskStatus.FAILED
 
         if not tasks_to_execute:
             print("No tasks currently allocated for execution.")
             return
 
-        print(
-            f"Starting execution for {len(tasks_to_execute)} tasks across {len(agent_task_map)} agents..."
-        )
+        print(f"Starting execution for {len(tasks_to_execute)} tasks across {len(agent_task_map)} agents...")
         results = await asyncio.gather(*tasks_to_execute, return_exceptions=True)
         print("--- Task Execution Cycle Complete ---")
 
@@ -156,9 +145,7 @@ class RetailCoordinator:
             for task_id in task_ids:
                 result = results[i]
                 if isinstance(result, Exception):
-                    logging.error(
-                        f"Error during execution of task {task_id} by agent {agent_id}: {result}"
-                    )
+                    logging.error(f"Error during execution of task {task_id} by agent {agent_id}: {result}")
                     if task_id in self.tasks:
                         self.tasks[task_id].status = TaskStatus.FAILED
                 i += 1

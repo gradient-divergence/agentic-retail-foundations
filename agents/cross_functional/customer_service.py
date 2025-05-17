@@ -2,10 +2,10 @@
 CustomerServiceAgent for preparing customer support and support remediation in retail MAS.
 """
 
-from datetime import datetime, timedelta
-from typing import Any
 import asyncio
 import random
+from datetime import datetime, timedelta
+from typing import Any
 
 
 class CustomerServiceAgent:
@@ -40,9 +40,7 @@ class CustomerServiceAgent:
             "return_policy_configured": "extended_period" in return_policy,
         }
 
-    async def suggest_remediation(
-        self, product_id: str, current_status: str
-    ) -> dict[str, Any]:
+    async def suggest_remediation(self, product_id: str, current_status: str) -> dict[str, Any]:
         """
         Suggest remediation steps for customer service issues.
         """
@@ -56,9 +54,7 @@ class CustomerServiceAgent:
         """Placeholder: Prepare support team with training materials and FAQs."""
         support_materials = product_data.get("support_materials", [])
         faqs = product_data.get("anticipated_questions", [])
-        print(
-            f"CustomerService: Preparing support team with {len(support_materials)} materials and {len(faqs)} FAQs..."
-        )
+        print(f"CustomerService: Preparing support team with {len(support_materials)} materials and {len(faqs)} FAQs...")
         await asyncio.sleep(0.1)  # Simulate prep time
         print("CustomerService: Support team briefing scheduled.")
         return {"status": "support_prepared"}
@@ -67,19 +63,14 @@ class CustomerServiceAgent:
         """Simulate checking if customer service is ready (FAQs, training, docs)."""
         agent_name = self.__class__.__name__
         product_id = product_data.get("id", "Unknown Product")
-        planned_launch_date = product_data.get(
-            "planned_launch_date", datetime.now() + timedelta(days=30)
-        )
+        planned_launch_date = product_data.get("planned_launch_date", datetime.now() + timedelta(days=30))
         print(f"CustomerService: Checking readiness for {product_id}")
         await asyncio.sleep(random.uniform(0.05, 0.1))
 
         # Check for required data/content
         support_materials = product_data.get("support_materials", [])
         faqs = product_data.get("anticipated_questions", [])
-        has_manual = (
-            "user_manual" in support_materials
-            or "quick_start_guide" in support_materials
-        )
+        has_manual = "user_manual" in support_materials or "quick_start_guide" in support_materials
         has_faqs = len(faqs) >= 3  # Need at least a few FAQs
 
         status = "blocked"

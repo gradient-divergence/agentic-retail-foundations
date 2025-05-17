@@ -2,11 +2,10 @@
 Agent communication protocol classes for FIPA-inspired messaging in retail multi-agent systems.
 """
 
-from typing import Any
-from collections.abc import Coroutine
-from collections.abc import Callable
-from collections import defaultdict
 import asyncio
+from collections import defaultdict
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 # Import the data models from the models directory
 from models.messaging import AgentMessage
@@ -20,13 +19,9 @@ class MessageBroker:
 
     def __init__(self):
         # Stores agent_id -> persistent handler mapping
-        self._primary_handlers: dict[
-            str, Callable[[AgentMessage], Coroutine[Any, Any, None]]
-        ] = {}
+        self._primary_handlers: dict[str, Callable[[AgentMessage], Coroutine[Any, Any, None]]] = {}
         # Stores agent_id -> the next one-time handler (if any)
-        self._one_time_handlers: dict[
-            str, Callable[[AgentMessage], Coroutine[Any, Any, None]]
-        ] = {}
+        self._one_time_handlers: dict[str, Callable[[AgentMessage], Coroutine[Any, Any, None]]] = {}
         # Stores topic -> set of subscriber agent_ids
         self._subscriptions: dict[str, set[str]] = defaultdict(set)
 
@@ -93,9 +88,7 @@ class MessageBroker:
             raise ValueError("agent_id and topic cannot be empty")
         # Agent must be registered to subscribe (have a primary handler)
         if agent_id not in self._primary_handlers:
-            print(
-                f"Warning: Agent {agent_id} must be registered before subscribing to topics."
-            )
+            print(f"Warning: Agent {agent_id} must be registered before subscribing to topics.")
             return
 
         self._subscriptions[topic].add(agent_id)
@@ -106,9 +99,7 @@ class MessageBroker:
         Unsubscribe an agent from a topic.
         """
         if topic in self._subscriptions:
-            self._subscriptions[topic].discard(
-                agent_id
-            )  # Use discard to avoid KeyError
+            self._subscriptions[topic].discard(agent_id)  # Use discard to avoid KeyError
             if not self._subscriptions[topic]:  # Clean up empty topic lists
                 del self._subscriptions[topic]
             print(f"Agent {agent_id} unsubscribed from topic {topic}.")
@@ -139,9 +130,7 @@ class MessageBroker:
                     await handler_to_run(message)
                     executed = True
                 except Exception as e:
-                    print(
-                        f"  Error in one-time handler for {agent_id}: {e}", flush=True
-                    )
+                    print(f"  Error in one-time handler for {agent_id}: {e}", flush=True)
             # If no one-time handler was executed, try the primary handler
             elif agent_id in self._primary_handlers:
                 handler_to_run = self._primary_handlers[agent_id]

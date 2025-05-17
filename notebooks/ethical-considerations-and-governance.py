@@ -43,9 +43,7 @@ def __(FastAPI, Dict, mo):  # type: ignore[no-redef]
     from fastapi import FastAPI
 
     app = FastAPI()
-    pending_reviews: dict[
-        int, dict
-    ] = {}  # In-memory store for pending decisions (for demo)
+    pending_reviews: dict[int, dict] = {}  # In-memory store for pending decisions (for demo)
 
     # Endpoint for AI to propose a price change
     @app.post("/ai/propose_price")
@@ -216,8 +214,8 @@ def __(mo):  # type: ignore[no-redef]
 
 @app.cell
 def __(mo):  # type: ignore[no-redef]
-    import pandas as pd
     import numpy as np
+    import pandas as pd
     import shap
     from sklearn.ensemble import RandomForestRegressor
 
@@ -229,9 +227,7 @@ def __(mo):  # type: ignore[no-redef]
             "days_to_season_end": [10, 5, 30, 20, 15],  # days until end-of-season
         }
     )
-    target = np.array(
-        [45, 40, 60, 50, 35]
-    )  # historical optimal prices for those scenarios
+    target = np.array([45, 40, 60, 50, 35])  # historical optimal prices for those scenarios
 
     # Train a simple model (Random Forest) to predict optimal price
     model = RandomForestRegressor(random_state=0).fit(data, target)
@@ -254,9 +250,7 @@ def __(mo):  # type: ignore[no-redef]
 
     # Pair each feature with its SHAP contribution value
     explanation = {}
-    for feature_name, value, shap_val in zip(
-        product.columns, product.iloc[0], shap_values[0]
-    ):
+    for feature_name, value, shap_val in zip(product.columns, product.iloc[0], shap_values[0], strict=False):
         explanation[feature_name] = round(shap_val, 2)
         print(f"  {feature_name}: {value} -> contribution {shap_val:+.2f}")
 

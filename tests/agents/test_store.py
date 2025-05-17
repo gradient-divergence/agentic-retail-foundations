@@ -2,13 +2,13 @@
 Tests for the StoreAgent class.
 """
 
-import pytest
 from dataclasses import replace
-import asyncio
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from agents.store import StoreAgent
-from models.task import Task, TaskStatus, TaskType, Bid
+from models.task import Bid, Task, TaskStatus, TaskType
 
 
 # Fixtures
@@ -116,15 +116,15 @@ def test_calculate_bid_busy_agent(store_agent_south_busy, sample_task):
     # location_penalty = 0.0
     # expected_bid = (4.0 * 1.2 * 1.0125) + 0.0 = 4.86
     assert bid.bid_value == pytest.approx(4.86)
-    # completion_time = (8 * 1.2) (current workload) + (2 * 1.2) (task duration) = 9.6 + 2.4 = 12.0
+    # completion_time = (8 * 1.2) (current workload) + (2 * 1.2) (task duration)
+    # = 9.6 + 2.4 = 12.0
     assert bid.estimated_completion_time == pytest.approx(12.0)
     # -------------------------- #
 
 
-def test_calculate_bid_busy_agent_insufficient(
-    store_agent_south_busy, high_capacity_task
-):
-    """Test bid calculation fails if busy agent doesn't have enough remaining capacity."""
+def test_calculate_bid_busy_agent_insufficient(store_agent_south_busy, high_capacity_task):
+    """Test bid calculation fails if busy agent doesn't have enough remaining
+    capacity."""
     # Agent has capacity 20, used 8, needs 15 -> requires 23 total -> insufficient
     adjusted_task = replace(high_capacity_task, location="South")  # Match location
     bid = store_agent_south_busy.calculate_bid(adjusted_task)
@@ -148,19 +148,15 @@ def test_calculate_bid_location_mismatch(store_agent_north, sample_task):
     assert bid_north.bid_value == pytest.approx(4.0)
     assert bid_south.bid_value == pytest.approx(9.0)
     # ----------------------------------- #
-    assert (
-        bid_south.bid_value > bid_north.bid_value
-    )  # Bid for South task should be higher due to penalty
+    assert bid_south.bid_value > bid_north.bid_value  # Bid for South task should be higher due to penalty
 
 
 @pytest.mark.asyncio
-@patch('asyncio.sleep', new_callable=AsyncMock)
+@patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_execute_task_success(mock_sleep, store_agent_north, sample_task, monkeypatch):
     """Test successful task execution flow and sleep duration."""
     # Patch random.random to ensure success
-    monkeypatch.setattr(
-        "random.random", lambda: 0.1
-    )  # Guarantees < success_probability
+    monkeypatch.setattr("random.random", lambda: 0.1)  # Guarantees < success_probability
     store_agent_north.assigned_tasks.append(sample_task)  # Assume task was assigned
 
     assert sample_task.status == TaskStatus.PENDING  # Initial state
@@ -177,13 +173,11 @@ async def test_execute_task_success(mock_sleep, store_agent_north, sample_task, 
 
 
 @pytest.mark.asyncio
-@patch('asyncio.sleep', new_callable=AsyncMock)
+@patch("asyncio.sleep", new_callable=AsyncMock)
 async def test_execute_task_failure(mock_sleep, store_agent_north, sample_task, monkeypatch):
     """Test failed task execution flow and sleep duration."""
     # Patch random.random to ensure failure
-    monkeypatch.setattr(
-        "random.random", lambda: 0.99
-    )  # Guarantees >= success_probability
+    monkeypatch.setattr("random.random", lambda: 0.99)  # Guarantees >= success_probability
     store_agent_north.assigned_tasks.append(sample_task)
 
     assert sample_task.status == TaskStatus.PENDING  # Initial state

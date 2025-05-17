@@ -1,5 +1,7 @@
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
+
 from agents.cross_functional.supply_chain import SupplyChainAgent
 
 
@@ -10,9 +12,7 @@ async def test_plan_initial_distribution():
     target_date = datetime.now() + timedelta(days=10)
     forecast_units = 100
     store_allocation = {"store1": 60, "store2": 40}
-    result = await agent.plan_initial_distribution(
-        product_id, target_date, forecast_units, store_allocation
-    )
+    result = await agent.plan_initial_distribution(product_id, target_date, forecast_units, store_allocation)
     assert result["status"] == "ready"
     assert result["allocation_by_store"] == store_allocation
     assert forecast_units == sum(store_allocation.values())

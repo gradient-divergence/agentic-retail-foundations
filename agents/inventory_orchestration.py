@@ -5,16 +5,17 @@ This agent listens for validated orders and allocates inventory.
 Distinguish from agents/inventory.py which implements (s, S) policy.
 """
 
+import asyncio
 import logging
 from typing import Any
 
-# Import Base Agent, Models, and Utilities
-from .base import BaseAgent
 from models.enums import AgentType, FulfillmentMethod
 from models.events import RetailEvent
 from models.fulfillment import Order  # Assuming Order might be fetched
 from utils.event_bus import EventBus
-import asyncio
+
+# Import Base Agent, Models, and Utilities
+from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -63,16 +64,12 @@ class InventoryAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error allocating inventory for order {order_id}: {e}")
             # Use the base class exception handler
-            await self.handle_exception(
-                e, {"stage": "inventory_allocation", "order_id": order_id}, order=order
-            )
+            await self.handle_exception(e, {"stage": "inventory_allocation", "order_id": order_id}, order=order)
 
     async def _get_order(self, order_id: str) -> Order | None:
         """Mock implementation to get order details."""
         # Fetch from a database/order service in reality
-        logger.warning(
-            f"_get_order is a mock. Returning None for order {order_id}. Implement real fetching."
-        )
+        logger.warning(f"_get_order is a mock. Returning None for order {order_id}. Implement real fetching.")
         return None
 
     def _get_allocation_details(self, order: Order) -> dict[str, Any]:
@@ -85,9 +82,7 @@ class InventoryAgent(BaseAgent):
                 {
                     "product_id": item.product_id,
                     "quantity": item.quantity,
-                    "fulfillment_method": item.fulfillment_method.value
-                    if item.fulfillment_method
-                    else None,
+                    "fulfillment_method": (item.fulfillment_method.value if item.fulfillment_method else None),
                     "location_id": item.fulfillment_location_id,
                 }
                 for item in order.items
@@ -101,9 +96,7 @@ class InventoryAgent(BaseAgent):
         This is a placeholder. Real logic would check inventory levels,
         apply rules, reserve stock, and update order items.
         """
-        logger.debug(
-            f"Simulating inventory allocation logic for order {order.order_id}..."
-        )
+        logger.debug(f"Simulating inventory allocation logic for order {order.order_id}...")
         # Logic to determine optimal fulfillment locations & methods based on:
         # - Current stock levels across locations (stores, warehouses)
         # - Order preferences (pickup, ship, delivery address)
@@ -123,10 +116,7 @@ class InventoryAgent(BaseAgent):
         for item in order.items:
             # Simple mock logic:
             # Prefer pickup if specified, else ship from warehouse, else ship from store A
-            if (
-                preferred_method == FulfillmentMethod.PICKUP_IN_STORE
-                and pickup_location
-            ):
+            if preferred_method == FulfillmentMethod.PICKUP_IN_STORE and pickup_location:
                 item.fulfillment_method = FulfillmentMethod.PICKUP_IN_STORE
                 item.fulfillment_location_id = pickup_location
             elif item.product_id == "PROD-001":  # Assume warehouse only has PROD-001
@@ -134,12 +124,8 @@ class InventoryAgent(BaseAgent):
                 item.fulfillment_location_id = "WAREHOUSE_01"
             else:  # Default to shipping from Store A (if available)
                 item.fulfillment_method = FulfillmentMethod.SHIP_FROM_STORE
-                item.fulfillment_location_id = (
-                    "STORE_A"  # Need to verify STORE_A exists/has stock
-                )
-            logger.debug(
-                f"  Allocated item {item.product_id} to {item.fulfillment_method.value} from {item.fulfillment_location_id}"
-            )
+                item.fulfillment_location_id = "STORE_A"  # Need to verify STORE_A exists/has stock
+            logger.debug(f"  Allocated item {item.product_id} to {item.fulfillment_method.value} from {item.fulfillment_location_id}")
         # ---- End Placeholder ----
 
         # In reality, update inventory DB/Cache to reserve stock here

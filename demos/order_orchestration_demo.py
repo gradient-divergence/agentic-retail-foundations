@@ -5,20 +5,19 @@ Demonstration of the event-driven order orchestration framework.
 import asyncio
 import logging
 
-# Import refactored components
-from utils.event_bus import EventBus
+from agents.fulfillment import FulfillmentAgent
 
 # Use the specific event-driven InventoryAgent
 from agents.inventory_orchestration import InventoryAgent
-from agents.fulfillment import FulfillmentAgent
 from agents.orchestrator import MasterOrchestrator
-from models.events import RetailEvent
 from models.enums import AgentType
+from models.events import RetailEvent
+
+# Import refactored components
+from utils.event_bus import EventBus
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -88,10 +87,7 @@ async def run_orchestration_simulation():
 
     logger.info("--- Order Orchestration Simulation Finished --- ")
     # Print final state from orchestrator (optional)
-    if (
-        hasattr(master_orchestrator, "orders")
-        and order_id in master_orchestrator.orders
-    ):
+    if hasattr(master_orchestrator, "orders") and order_id in master_orchestrator.orders:
         print(f"\nFinal tracked state for Order {order_id}:")
         import json
 

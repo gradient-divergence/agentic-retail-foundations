@@ -1,17 +1,19 @@
-import pytest
-import asyncio
 import logging
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
+import pytest
+
+from models.enums import AgentType  # Required for RetailEvent
+from models.events import RetailEvent  # Required for type hints and publish tests later
 from utils.event_bus import EventBus
-from models.events import RetailEvent # Required for type hints and publish tests later
-from models.enums import AgentType # Required for RetailEvent
+
 
 # Test Initialization
 def test_event_bus_initialization():
     """Test that the EventBus initializes with an empty subscribers dict."""
     bus = EventBus()
     assert bus.subscribers == {}
+
 
 # Test Subscription Logic
 @pytest.mark.asyncio
@@ -26,6 +28,7 @@ async def test_subscribe_single_callback():
     assert event_type in bus.subscribers
     assert len(bus.subscribers[event_type]) == 1
     assert bus.subscribers[event_type][0] is mock_callback
+
 
 @pytest.mark.asyncio
 async def test_subscribe_multiple_callbacks_same_event():
@@ -42,6 +45,7 @@ async def test_subscribe_multiple_callbacks_same_event():
     assert len(bus.subscribers[event_type]) == 2
     assert mock_callback1 in bus.subscribers[event_type]
     assert mock_callback2 in bus.subscribers[event_type]
+
 
 @pytest.mark.asyncio
 async def test_subscribe_multiple_callbacks_different_events():
@@ -63,6 +67,7 @@ async def test_subscribe_multiple_callbacks_different_events():
     assert len(bus.subscribers[event_type2]) == 1
     assert bus.subscribers[event_type2][0] is mock_callback2
 
+
 @pytest.mark.asyncio
 async def test_subscribe_duplicate_callback(caplog):
     """Test that subscribing the exact same callback twice is ignored."""
@@ -72,12 +77,13 @@ async def test_subscribe_duplicate_callback(caplog):
 
     with caplog.at_level(logging.WARNING):
         bus.subscribe(event_type, mock_callback)
-        bus.subscribe(event_type, mock_callback) # Attempt duplicate subscription
+        bus.subscribe(event_type, mock_callback)  # Attempt duplicate subscription
 
     assert event_type in bus.subscribers
-    assert len(bus.subscribers[event_type]) == 1 # Should only be one
+    assert len(bus.subscribers[event_type]) == 1  # Should only be one
     assert bus.subscribers[event_type][0] is mock_callback
-    assert "already subscribed" in caplog.text # Check for warning log
+    assert "already subscribed" in caplog.text  # Check for warning log
+
 
 def test_subscribe_non_callable():
     """Test that subscribing a non-callable raises TypeError."""
@@ -86,9 +92,10 @@ def test_subscribe_non_callable():
     event_type = "test_event"
 
     with pytest.raises(TypeError, match="Callback must be a callable async function."):
-        bus.subscribe(event_type, non_callable) # type: ignore [arg-type]
+        bus.subscribe(event_type, non_callable)  # type: ignore [arg-type]
 
-    assert event_type not in bus.subscribers # Ensure nothing was added
+    assert event_type not in bus.subscribers  # Ensure nothing was added
+
 
 # Test Unsubscription Logic
 @pytest.mark.asyncio
@@ -109,6 +116,7 @@ async def test_unsubscribe_single_callback():
     assert bus.subscribers[event_type][0] is mock_callback2
     assert mock_callback1 not in bus.subscribers[event_type]
 
+
 @pytest.mark.asyncio
 async def test_unsubscribe_last_callback():
     """Test unsubscribing the last callback removes the event type."""
@@ -121,6 +129,7 @@ async def test_unsubscribe_last_callback():
 
     assert event_type not in bus.subscribers
 
+
 @pytest.mark.asyncio
 async def test_unsubscribe_nonexistent_callback(caplog):
     """Test unsubscribing a callback not subscribed to the event logs warning."""
@@ -132,11 +141,12 @@ async def test_unsubscribe_nonexistent_callback(caplog):
     bus.subscribe(event_type, mock_callback1)
 
     with caplog.at_level(logging.WARNING):
-        bus.unsubscribe(event_type, mock_callback2) # Attempt to unsubscribe cb2
+        bus.unsubscribe(event_type, mock_callback2)  # Attempt to unsubscribe cb2
 
-    assert event_type in bus.subscribers # cb1 should still be there
+    assert event_type in bus.subscribers  # cb1 should still be there
     assert len(bus.subscribers[event_type]) == 1
-    assert "Callback AsyncMock not found" in caplog.text # Use class name
+    assert "Callback AsyncMock not found" in caplog.text  # Use class name
+
 
 @pytest.mark.asyncio
 async def test_unsubscribe_from_nonexistent_event_type():
@@ -150,15 +160,18 @@ async def test_unsubscribe_from_nonexistent_event_type():
 
     assert event_type not in bus.subscribers
 
+
 # Test Publishing Logic
+
 
 # Helper to create a dummy RetailEvent for testing
 def create_test_event(event_type: str, payload: dict | None = None) -> RetailEvent:
     return RetailEvent(
         event_type=event_type,
         payload=payload if payload is not None else {},
-        source=AgentType.TEST_AGENT, # Use a dummy source
+        source=AgentType.TEST_AGENT,  # Use a dummy source
     )
+
 
 @pytest.mark.asyncio
 async def test_publish_calls_correct_subscribers():
@@ -185,6 +198,7 @@ async def test_publish_calls_correct_subscribers():
     # Check that event_b subscriber was not called
     mock_callback_b1.assert_not_called()
 
+
 @pytest.mark.asyncio
 async def test_publish_no_subscribers():
     """Test publishing an event with no subscribers."""
@@ -193,6 +207,7 @@ async def test_publish_no_subscribers():
 
     # Should complete without errors
     await bus.publish(test_event)
+
 
 @pytest.mark.asyncio
 async def test_publish_with_callback_exception(caplog):
@@ -217,8 +232,9 @@ async def test_publish_with_callback_exception(caplog):
     failing_callback.assert_called_once_with(test_event)
 
     # Verify the error was logged
-    assert "Error in subscriber callback \'AsyncMock\'" in caplog.text # Use class name
-    assert "Callback failed!" in caplog.text # Check the specific exception message too
+    assert "Error in subscriber callback 'AsyncMock'" in caplog.text  # Use class name
+    assert "Callback failed!" in caplog.text  # Check the specific exception message too
+
 
 @pytest.mark.asyncio
 async def test_publish_invalid_event_object(caplog):
@@ -228,13 +244,13 @@ async def test_publish_invalid_event_object(caplog):
     event_type = "test_event"
     bus.subscribe(event_type, mock_callback)
 
-    invalid_event = {"event_type": event_type, "payload": {}} # A dict, not RetailEvent
+    invalid_event = {"event_type": event_type, "payload": {}}  # A dict, not RetailEvent
 
     with caplog.at_level(logging.ERROR):
-        await bus.publish(invalid_event) # type: ignore [arg-type]
+        await bus.publish(invalid_event)  # type: ignore [arg-type]
 
     # Verify error log
     assert f"Attempted to publish invalid event type: {type(invalid_event)}" in caplog.text
 
     # Verify callback was not called
-    mock_callback.assert_not_called() 
+    mock_callback.assert_not_called()

@@ -7,8 +7,9 @@ a predefined function when prompted by the user.
 
 import json
 import logging
-from openai import OpenAI, OpenAIError
+
 from dotenv import load_dotenv
+from openai import OpenAI, OpenAIError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # --- Tool Definition ---
+
 
 def recommend_outfit(style: str) -> list:
     """
@@ -43,6 +45,7 @@ def recommend_outfit(style: str) -> list:
     logger.info(f"Recommendation function generated: {suggestions}")
     return suggestions
 
+
 # --- OpenAI Function Calling Setup ---
 
 tool_schema = [
@@ -67,11 +70,14 @@ tool_schema = [
 
 # --- Demo Execution ---
 
-def run_assistant_demo(user_message: str = "I need an outfit idea for a summer party.") -> str:
+
+def run_assistant_demo(
+    user_message: str = "I need an outfit idea for a summer party.",
+) -> str:
     """Runs the virtual shopping assistant demo with the given user message."""
     logger.info("--- Starting Virtual Shopping Assistant Demo ---")
     logger.info(f"User Message: {user_message}")
-    assistant_reply: str | None = None # Initialize to allow for None return on error
+    assistant_reply: str | None = None  # Initialize to allow for None return on error
 
     try:
         # Initialize OpenAI client (ensure OPENAI_API_KEY is set in environment)
@@ -85,7 +91,7 @@ def run_assistant_demo(user_message: str = "I need an outfit idea for a summer p
             model="gpt-4o",
             messages=[{"role": "user", "content": user_message}],
             tools=tool_schema,
-            tool_choice="auto" # Let the model decide
+            tool_choice="auto",  # Let the model decide
         )
 
         response_message = response.choices[0].message
@@ -110,13 +116,13 @@ def run_assistant_demo(user_message: str = "I need an outfit idea for a summer p
                     logger.info("Function executed successfully.")
                     message_history = [
                         {"role": "user", "content": user_message},
-                        response_message, # Include the assistant's first message (with tool call)
+                        response_message,  # Include the assistant's first message (with tool call)
                         {
                             "role": "tool",
                             "tool_call_id": tool_call.id,
                             "name": func_name,
                             "content": result_json,
-                        }
+                        },
                     ]
 
                 except Exception as e:
@@ -130,16 +136,15 @@ def run_assistant_demo(user_message: str = "I need an outfit idea for a summer p
                             "role": "tool",
                             "tool_call_id": tool_call.id,
                             "name": func_name,
-                            "content": result_json, # Send error back to model
-                        }
+                            "content": result_json,  # Send error back to model
+                        },
                     ]
-
 
                 # Send the function result back to the model
                 logger.info("Calling OpenAI API (with function result)...")
                 final_response = client.chat.completions.create(
                     model="gpt-4o",
-                    messages=message_history, # Correctly typed messages
+                    messages=message_history,  # Correctly typed messages
                 )
                 assistant_reply = final_response.choices[0].message.content
             else:
@@ -154,8 +159,8 @@ def run_assistant_demo(user_message: str = "I need an outfit idea for a summer p
         logger.error(f"OpenAI API Error: {e}")
         assistant_reply = f"Sorry, there was an error communicating with the AI service: {e}"
     except ValueError as e:
-         logger.error(f"Configuration Error: {e}")
-         assistant_reply = f"Sorry, there was a configuration error: {e}"
+        logger.error(f"Configuration Error: {e}")
+        assistant_reply = f"Sorry, there was a configuration error: {e}"
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
         assistant_reply = f"Sorry, an unexpected error occurred: {e}"
@@ -163,6 +168,7 @@ def run_assistant_demo(user_message: str = "I need an outfit idea for a summer p
     logger.info(f"Assistant Response: {assistant_reply}")
     logger.info("--- Virtual Shopping Assistant Demo Finished ---")
     return assistant_reply if assistant_reply is not None else "An unknown error occurred."
+
 
 if __name__ == "__main__":
     # Example of running the demo directly

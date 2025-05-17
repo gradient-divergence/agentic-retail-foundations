@@ -34,13 +34,7 @@ class FulfillmentMethod(str, Enum):
     PICKUP_IN_STORE = "pickup_in_store"
     DELIVERY_FROM_STORE = "delivery_from_store"
     DROPSHIP_FROM_VENDOR = "dropship_from_vendor"
-    CREATED = "created"
-    VALIDATED = "validated"
-    ALLOCATED = "allocated"
-    PAYMENT_PROCESSED = "payment_processed"
-    PROCESSING = "processing"
-    PICKING = "picking"
-    PACKING = "packing"
+
 
 
 class OrderStatus(str, Enum):

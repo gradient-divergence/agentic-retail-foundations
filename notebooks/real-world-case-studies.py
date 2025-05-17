@@ -1,9 +1,10 @@
-import marimo as mo
 import marimo  # Ensure marimo is imported for app definition
+import marimo as mo
+
+from demos.dynamic_pricing_agent_demo import run_pricing_demo
 
 # Import functions from the new demo scripts
 from demos.inventory_management_agent_demo import run_inventory_demo
-from demos.dynamic_pricing_agent_demo import run_pricing_demo
 from demos.virtual_shopping_assistant_demo import run_assistant_demo
 
 __generated_with = "0.1.69"
@@ -14,6 +15,7 @@ app = marimo.App()
 def __():
     # Import necessary libraries
     import marimo as mo
+
     return (
         mo,
         run_assistant_demo,
@@ -54,18 +56,15 @@ def __(mo, run_inventory_demo):
     run_inventory_button = mo.ui.button(
         label="Run Inventory Agent Demo",
         on_click=lambda _: run_inventory_demo(),
-        kind="success"
+        kind="success",
     )
-    return run_inventory_button,
+    return (run_inventory_button,)
 
 
 @app.cell
 def __(run_inventory_button):
     # Display the button and its output value (which will update on click)
-    mo.vstack([
-        run_inventory_button,
-        mo.md(f"**Demo Output:** {run_inventory_button.value}")
-    ])
+    mo.vstack([run_inventory_button, mo.md(f"**Demo Output:** {run_inventory_button.value}")])
 
 
 @app.cell
@@ -96,18 +95,15 @@ def __(mo, run_pricing_demo):
     run_pricing_button = mo.ui.button(
         label="Run Dynamic Pricing Agent Demo",
         on_click=lambda _: run_pricing_demo(),
-        kind="success"
+        kind="success",
     )
-    return run_pricing_button,
+    return (run_pricing_button,)
 
 
 @app.cell
 def __(run_pricing_button):
     # Display the button and its output value
-    mo.vstack([
-        run_pricing_button,
-        mo.md(f"**Demo Output:** {run_pricing_button.value}")
-    ])
+    mo.vstack([run_pricing_button, mo.md(f"**Demo Output:** {run_pricing_button.value}")])
 
 
 @app.cell
@@ -141,7 +137,7 @@ def __(mo, run_assistant_demo):
     run_assistant_button = mo.ui.button(
         label="Run Virtual Assistant Demo",
         on_click=lambda _: run_assistant_demo(user_query.value),
-        kind="success"
+        kind="success",
     )
     return run_assistant_button, user_query
 
@@ -149,11 +145,13 @@ def __(mo, run_assistant_demo):
 @app.cell
 def __(run_assistant_button, user_query):
     # Display the input, button, and output value
-    mo.vstack([
-        user_query,
-        run_assistant_button,
-        mo.md(f"**Assistant Response:** {run_assistant_button.value}")
-    ])
+    mo.vstack(
+        [
+            user_query,
+            run_assistant_button,
+            mo.md(f"**Assistant Response:** {run_assistant_button.value}"),
+        ]
+    )
 
 
 @app.cell

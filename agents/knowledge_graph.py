@@ -13,15 +13,17 @@ Key Capabilities:
 Adapted from the in-notebook implementation in sensor-networks-and-cognitive-systems.py.
 """
 
-from typing import Any
-from datetime import datetime
-from rdflib import Graph, Literal, BNode, Namespace, RDF, URIRef
-from rdflib.namespace import RDFS, XSD
 import random
+from datetime import datetime
+from typing import Any
+
+from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
+from rdflib.namespace import RDFS, XSD
 
 # Attempt to import SPARQLWrapper at module level
 try:
-    from SPARQLWrapper import SPARQLWrapper as _SPARQLWrapper, JSON as _JSON
+    from SPARQLWrapper import JSON as _JSON
+    from SPARQLWrapper import SPARQLWrapper as _SPARQLWrapper
 except ImportError:
     _SPARQLWrapper = None
     _JSON = None
@@ -75,7 +77,7 @@ class RetailKnowledgeGraph:
                 print(f"Failed to initialize SPARQLWrapper for {graph_uri}: {e}")
                 self.sparql_endpoint = None  # Ensure it's None on failure
         elif graph_uri and (not _SPARQLWrapper or not _JSON):
-             print(f"Cannot configure SPARQL endpoint {graph_uri}: SPARQLWrapper library not found.")
+            print(f"Cannot configure SPARQL endpoint {graph_uri}: SPARQLWrapper library not found.")
 
     def _load_ontology(self):
         """Load the retail domain ontology into the graph."""
@@ -103,12 +105,8 @@ class RetailKnowledgeGraph:
         self.graph.add((self.RETAIL.complementsWith, RDFS.domain, self.RETAIL.Product))
         self.graph.add((self.RETAIL.complementsWith, RDFS.range, self.RETAIL.Product))
         # Symmetric and transitive properties (Restore)
-        self.graph.add(
-            (self.RETAIL.complementsWith, RDF.type, self.RETAIL.SymmetricProperty)
-        )
-        self.graph.add(
-            (self.RETAIL.hasSubcategory, RDF.type, self.RETAIL.TransitiveProperty)
-        )
+        self.graph.add((self.RETAIL.complementsWith, RDF.type, self.RETAIL.SymmetricProperty))
+        self.graph.add((self.RETAIL.hasSubcategory, RDF.type, self.RETAIL.TransitiveProperty))
 
     def add_product(
         self,
@@ -125,9 +123,7 @@ class RetailKnowledgeGraph:
         product_uri = self.PRODUCT[product_id]
         self.graph.add((product_uri, RDF.type, self.RETAIL.Product))
         self.graph.add((product_uri, self.RETAIL.name, Literal(name)))
-        self.graph.add(
-            (product_uri, self.RETAIL.price, Literal(price, datatype=XSD.decimal))
-        )
+        self.graph.add((product_uri, self.RETAIL.price, Literal(price, datatype=XSD.decimal)))
         if brand:
             self.graph.add((product_uri, self.RETAIL.hasBrand, Literal(brand)))
         if category_ids:
@@ -174,7 +170,7 @@ class RetailKnowledgeGraph:
         # Only create BNode if needed for strength or metadata
         relation_node = None
         needs_statement_node = False
-        
+
         if strength is not None and 0.0 <= strength <= 1.0:
             needs_statement_node = True
             relation_node = BNode()
@@ -189,7 +185,7 @@ class RetailKnowledgeGraph:
                     Literal(strength, datatype=XSD.decimal),
                 )
             )
-        
+
         if metadata:
             needs_statement_node = True
             # Create BNode if not already created for strength
@@ -199,7 +195,7 @@ class RetailKnowledgeGraph:
                 self.graph.add((relation_node, RDF.subject, source_uri))
                 self.graph.add((relation_node, RDF.predicate, relation))
                 self.graph.add((relation_node, RDF.object, target_uri))
-        
+
             for key, value in metadata.items():
                 meta_property = self.RETAIL[key]
                 # Avoid adding RDF.type property if it already exists implicitly via schema
@@ -222,12 +218,12 @@ class RetailKnowledgeGraph:
         """Record a customer purchase in the knowledge graph."""
         customer_uri = self.CUSTOMER[customer_id]
         product_uri = self.PRODUCT[product_id]
-        
+
         # Generate a unique URI for the purchase event instead of using BNode
         # Include timestamp and a random element for uniqueness
         # Replace potentially problematic characters in timestamp for URI
         ts_part = timestamp.replace(":", "-").replace("T", "_")
-        purchase_id = f"purchase_{customer_id}_{product_id}_{ts_part}_{random.randint(1000,9999)}"
+        purchase_id = f"purchase_{customer_id}_{product_id}_{ts_part}_{random.randint(1000, 9999)}"
         purchase_uri = self.RETAIL[purchase_id]
 
         # Use purchase_uri instead of purchase_node
@@ -241,28 +237,26 @@ class RetailKnowledgeGraph:
             datetime.fromisoformat(timestamp)
             self.graph.add(
                 (
-                    purchase_uri, # Use purchase_uri
+                    purchase_uri,  # Use purchase_uri
                     self.RETAIL.timestamp,
                     Literal(timestamp, datatype=XSD.dateTime),
                 )
             )
         except ValueError:
-            pass 
+            pass
         if quantity > 0:
             self.graph.add(
                 (
-                    purchase_uri, # Use purchase_uri
+                    purchase_uri,  # Use purchase_uri
                     self.RETAIL.quantity,
                     Literal(quantity, datatype=XSD.integer),
                 )
             )
         if order_id:
-            self.graph.add((purchase_uri, self.RETAIL.orderID, Literal(order_id))) # Use purchase_uri
-        self.graph.add((purchase_uri, self.RETAIL.channel, Literal(channel))) # Use purchase_uri
+            self.graph.add((purchase_uri, self.RETAIL.orderID, Literal(order_id)))  # Use purchase_uri
+        self.graph.add((purchase_uri, self.RETAIL.channel, Literal(channel)))  # Use purchase_uri
 
-    def find_substitutes(
-        self, product_id: str, max_results: int = 5
-    ) -> list[dict[str, Any]]:
+    def find_substitutes(self, product_id: str, max_results: int = 5) -> list[dict[str, Any]]:
         """Find substitute products for a given product."""
         # --- REMOVED TEMPORARY DEBUG QUERY --- #
         # --- Modified Original Query Below --- #
@@ -336,16 +330,14 @@ class RetailKnowledgeGraph:
                         "name": str(row["name"]),
                         "price": float(row["price"]),
                         "brand": str(row["brand"]),
-                        "strength": float(row["final_strength"]), # Use the correct variable
+                        "strength": float(row["final_strength"]),  # Use the correct variable
                     }
                 )
             except (KeyError, ValueError, TypeError):
                 continue
         return substitutes
 
-    def find_complementary_products(
-        self, product_id: str, max_results: int = 5
-    ) -> list[dict[str, Any]]:
+    def find_complementary_products(self, product_id: str, max_results: int = 5) -> list[dict[str, Any]]:
         """Find products that complement a given product."""
         query = f"""
         PREFIX retail: <http://retail.example.org/ontology#>
@@ -533,8 +525,7 @@ class RetailKnowledgeGraph:
                 triple
                 for triple in self.graph
                 # Convert subject to string before calling startswith
-                if str(triple[0]).startswith(str(self.RETAIL))  # Cast both to str
-                and triple[1] in (RDF.type, RDFS.domain, RDFS.range)
+                if str(triple[0]).startswith(str(self.RETAIL)) and triple[1] in (RDF.type, RDFS.domain, RDFS.range)  # Cast both to str
             ]
             self.graph = Graph()
             self.graph.bind("retail", self.RETAIL)

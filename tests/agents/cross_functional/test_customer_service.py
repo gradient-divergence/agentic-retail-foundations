@@ -1,5 +1,7 @@
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
+
 from agents.cross_functional.customer_service import CustomerServiceAgent
 
 
@@ -12,9 +14,7 @@ async def test_prepare_product_support():
     support_docs = ["user_manual", "quick_start"]
     faq = ["Q1", "Q2", "Q3", "Q4", "Q5"]
     return_policy = {"extended_period": True}
-    result = await agent.prepare_product_support(
-        product_id, launch_date, product_specs, support_docs, faq, return_policy
-    )
+    result = await agent.prepare_product_support(product_id, launch_date, product_specs, support_docs, faq, return_policy)
     assert result["status"] in ("ready", "delayed")
     assert "knowledge_base_updated" in result
     assert "support_team_briefed" in result

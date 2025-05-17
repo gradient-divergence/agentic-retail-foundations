@@ -8,6 +8,7 @@ import asyncio
 import json
 from datetime import datetime, timedelta
 from typing import Any
+
 from fastapi import FastAPI, WebSocket
 
 # Note: inventory_system and alert_system must be provided by the user of this class.
@@ -37,15 +38,9 @@ class SensorDataProcessor:
             "smart_shelf": 0.75,
             "computer_vision": 0.80,
         }
-        self.recent_readings: dict[
-            str, list[dict[str, Any]]
-        ] = {}  # Raw recent sensor readings
-        self.product_state: dict[
-            str, dict[str, Any]
-        ] = {}  # Current believed state of products
-        self.discrepancies: dict[
-            str, dict[str, Any]
-        ] = {}  # Tracking inventory discrepancies
+        self.recent_readings: dict[str, list[dict[str, Any]]] = {}  # Raw recent sensor readings
+        self.product_state: dict[str, dict[str, Any]] = {}  # Current believed state of products
+        self.discrepancies: dict[str, dict[str, Any]] = {}  # Tracking inventory discrepancies
         self.app = FastAPI()
         self.setup_routes()
         self.active_connections: set[WebSocket] = set()
@@ -87,9 +82,7 @@ class SensorDataProcessor:
         self.recent_readings[sensor_id].append(message)
         cutoff = datetime.now() - timedelta(hours=24)
         self.recent_readings[sensor_id] = [
-            reading
-            for reading in self.recent_readings[sensor_id]
-            if datetime.fromisoformat(reading.get("timestamp", "")) > cutoff
+            reading for reading in self.recent_readings[sensor_id] if datetime.fromisoformat(reading.get("timestamp", "")) > cutoff
         ]
         if sensor_type == "rfid":
             await self._process_rfid_reading(message)
@@ -108,22 +101,14 @@ class SensorDataProcessor:
             return
         detected_products = message.get("detected_products", [])
         detected_ids = set(item.get("product_id") for item in detected_products)
-        expected_location = (
-            f"{reader_location.get('zone')}.{reader_location.get('section')}"
-        )
-        expected_ids = await self.inventory_system.get_expected_products(
-            self.store_id, expected_location
-        )
+        expected_location = f"{reader_location.get('zone')}.{reader_location.get('section')}"
+        expected_ids = await self.inventory_system.get_expected_products(self.store_id, expected_location)
         missing_ids = expected_ids - detected_ids
         if missing_ids:
-            await self._handle_inventory_discrepancy(
-                expected_location, list(missing_ids), "missing", "rfid"
-            )
+            await self._handle_inventory_discrepancy(expected_location, list(missing_ids), "missing", "rfid")
         unexpected_ids = detected_ids - expected_ids
         if unexpected_ids:
-            await self._handle_inventory_discrepancy(
-                expected_location, list(unexpected_ids), "unexpected", "rfid"
-            )
+            await self._handle_inventory_discrepancy(expected_location, list(unexpected_ids), "unexpected", "rfid")
         await self.inventory_system.update_product_locations(
             self.store_id,
             [
@@ -146,13 +131,9 @@ class SensorDataProcessor:
         product_info = message.get("product_info", {})
 
         # Check if weights are valid numbers before comparing
-        if isinstance(current_weight, (int, float)) and isinstance(
-            expected_weight, (int, float)
-        ):
+        if isinstance(current_weight, (int, float)) and isinstance(expected_weight, (int, float)):
             weight_diff = abs(current_weight - expected_weight)
-            unit_weight = product_info.get(
-                "unit_weight_grams", 1
-            )  # Default to 1 to avoid division by zero
+            unit_weight = product_info.get("unit_weight_grams", 1)  # Default to 1 to avoid division by zero
             if not isinstance(unit_weight, (int, float)) or unit_weight <= 0:
                 unit_weight = 1  # Ensure unit_weight is a positive number
 
@@ -161,9 +142,7 @@ class SensorDataProcessor:
                 estimated_units = max(0, round(current_weight / unit_weight))
                 expected_units = max(0, round(expected_weight / unit_weight))
                 if estimated_units < expected_units:
-                    discrepancy_type = (
-                        "low_stock" if estimated_units > 0 else "out_of_stock"
-                    )
+                    discrepancy_type = "low_stock" if estimated_units > 0 else "out_of_stock"
                     await self._handle_inventory_discrepancy(
                         f"{location.get('zone')}.{location.get('section')}.{shelf_id}",
                         [product_info.get("product_id")],
@@ -184,9 +163,7 @@ class SensorDataProcessor:
                     source="smart_shelf",
                 )
         else:
-            print(
-                f"Warning: Invalid weight values for smart shelf {shelf_id}: current={current_weight}, expected={expected_weight}"
-            )
+            print(f"Warning: Invalid weight values for smart shelf {shelf_id}: current={current_weight}, expected={expected_weight}")
 
     async def _process_environmental_reading(self, message: dict[str, Any]):
         """Process environmental sensor data."""
@@ -208,15 +185,11 @@ class SensorDataProcessor:
                     threshold_exceeded = True
                     alert_priority = "high" if value > -10 else "medium"
             elif sensor_type == "humidity":
-                if location.get("zone_type") == "produce" and (
-                    value < 80 or value > 95
-                ):
+                if location.get("zone_type") == "produce" and (value < 80 or value > 95):
                     threshold_exceeded = True
                     alert_priority = "medium"
         else:
-            print(
-                f"Warning: Invalid or missing numeric value for environmental sensor {message.get('sensor_id')}: {value}"
-            )
+            print(f"Warning: Invalid or missing numeric value for environmental sensor {message.get('sensor_id')}: {value}")
 
         if threshold_exceeded:
             await self.alert_system.send_alert(
@@ -261,12 +234,8 @@ class SensorDataProcessor:
                     "product_id": product_id,
                 },
             )
-        expected_price = await self.inventory_system.get_current_price(
-            self.store_id, product_id
-        )
-        if isinstance(price_displayed, (int, float)) and isinstance(
-            expected_price, (int, float)
-        ):
+        expected_price = await self.inventory_system.get_current_price(self.store_id, product_id)
+        if isinstance(price_displayed, (int, float)) and isinstance(expected_price, (int, float)):
             if price_displayed != expected_price:
                 await self.alert_system.send_alert(
                     alert_type="price_discrepancy",
@@ -280,17 +249,11 @@ class SensorDataProcessor:
                     },
                 )
                 if isinstance(tag_id, str) and isinstance(product_id, str):
-                    await self._request_price_tag_update(
-                        tag_id, product_id, expected_price
-                    )
+                    await self._request_price_tag_update(tag_id, product_id, expected_price)
                 else:
-                    print(
-                        f"Warning: Invalid tag_id ({tag_id}) or product_id ({product_id}) for price update."
-                    )
+                    print(f"Warning: Invalid tag_id ({tag_id}) or product_id ({product_id}) for price update.")
         elif expected_price is not None:
-            print(
-                f"Warning: Could not compare prices for tag {tag_id}. Displayed: {price_displayed}, Expected: {expected_price}"
-            )
+            print(f"Warning: Could not compare prices for tag {tag_id}. Displayed: {price_displayed}, Expected: {expected_price}")
 
     async def _handle_inventory_discrepancy(
         self,
@@ -347,9 +310,7 @@ class SensorDataProcessor:
                             },
                         )
 
-    def _calculate_discrepancy_confidence(
-        self, discrepancy_record: dict[str, Any]
-    ) -> float:
+    def _calculate_discrepancy_confidence(self, discrepancy_record: dict[str, Any]) -> float:
         """Calculate confidence score for a discrepancy based on sources and frequency."""
         confidence = 0.5
         source_count = len(discrepancy_record["sources"])
@@ -367,9 +328,7 @@ class SensorDataProcessor:
             confidence += (source_confidence - 0.7) * 0.5
         return min(0.99, confidence)
 
-    async def _request_price_tag_update(
-        self, tag_id: str, product_id: str, price: float
-    ):
+    async def _request_price_tag_update(self, tag_id: str, product_id: str, price: float):
         """Request update for a digital price tag."""
         # Implementation would depend on your ESL system
         pass

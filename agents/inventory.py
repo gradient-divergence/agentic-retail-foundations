@@ -5,7 +5,7 @@ Defines the InventoryAgent class for inventory management using (s, S) policy.
 
 import logging
 from models.messaging import AgentMessage, Performative
-from agents.messaging import MessageBroker  # Assuming MessageBroker is defined here
+from agents.messaging import MessageBroker  # MessageBroker is imported from agents.messaging
 
 # Set up logging
 logger = logging.getLogger(__name__)

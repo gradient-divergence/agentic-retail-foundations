@@ -78,7 +78,7 @@ async def extract_order_id_llm(
     """Extract an order ID using LLM, returning None if unable."""
     # Ensure client is AsyncOpenAI
     if not isinstance(client, AsyncOpenAI):
-        pass # Or raise TypeError("Expected AsyncOpenAI client for async function")
+        raise TypeError("client must be an AsyncOpenAI instance")
 
     prompt = build_order_id_inference_prompt(message, recent_order_ids)
     messages = [

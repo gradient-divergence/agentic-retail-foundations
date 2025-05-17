@@ -527,7 +527,6 @@ def test_execute_intentions_prioritization_and_filtering(
         intention_reorder_p1_high,  # Highest priority for P1
         intention_unknown_p4,
     ]
-    initial_intentions = bdi_agent.active_intentions.copy()
 
     # Execute
     executed_actions = bdi_agent.execute_intentions()

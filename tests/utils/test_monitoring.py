@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from agents.base import BaseAgent
-from utils.monitoring import AgentMonitor
 from models.enums import AgentType
 from utils.event_bus import EventBus
+from utils.monitoring import AgentMonitor
 
 # --- Test Fixtures --- #
 
@@ -604,7 +604,7 @@ def _mock_is_decreasing_helper(history, test_id, metrics_history_map):
 def _mock_check_drift_helper(metric_name, value, test_id, metric_thresholds_dict):
     if metric_name == "error_rate":
         if "error_rate_drift_increasing" in test_id or "multiple_drifts_recos" in test_id:
-            return True # Explicitly return True if test_id indicates this scenario
+            return True  # Explicitly return True if test_id indicates this scenario
 
     # Simplified logic for _mock_check_drift_helper based on test_id patterns for drift
     if metric_name == "conversion_rate" and ("conversion_drift_decreasing" in test_id or "multiple_drifts_recos" in test_id):
@@ -699,7 +699,7 @@ class MockAgent(BaseAgent):
     def __init__(self, agent_id: str, agent_type: AgentType, event_bus: MagicMock):
         super().__init__(agent_id, agent_type, event_bus)
         self.current_behavior = "default"
-        self.logger = logging.getLogger(f"MockAgent.{agent_id}") # Ensure logger is initialized
+        self.logger = logging.getLogger(f"MockAgent.{agent_id}")  # Ensure logger is initialized
 
     def adapt_behavior(self, new_behavior_params: dict[str, Any]):
         self.current_behavior = new_behavior_params.get("strategy", self.current_behavior)
@@ -813,17 +813,32 @@ def test_recommend_adaptation_scenarios(
 
     # Setup side effects for mocks using the extracted helper functions
     mock_is_decreasing.side_effect = lambda h, w: _mock_is_decreasing_helper(h, test_id, metrics_history)
-    # mock_detect_drift.side_effect = lambda metric, window_size=30, change_threshold_percent=15.0: _mock_check_drift_helper(metric, None, test_id, adaptation_monitor.metric_thresholds)
+    # mock_detect_drift.side_effect = (
+    #     lambda metric, window_size=30, change_threshold_percent=15.0:
+    #     _mock_check_drift_helper(
+    #         metric,
+    #         None,
+    #         test_id,
+    #         adaptation_monitor.metric_thresholds,
+    #     )
+    # )
     # The _mock_check_drift_helper seems to be problematic / overly complex for this mock's purpose.
     # AgentMonitor.detect_drift is already tested thoroughly in `test_detect_drift`.
     # For `test_recommend_adaptation_scenarios`, we primarily need to control the *outcome* of detect_drift for specific metrics.
     # We can use the `drift_results` from the test parameters directly.
 
     # Simpler mock for detect_drift based on test parameters:
-    drift_outcomes = {}
-    if hasattr(adaptation_monitor, 'agent_instance') and adaptation_monitor.agent_instance:
-        drift_outcomes = {metric: _mock_check_drift_helper(metric, None, test_id, adaptation_monitor.metric_thresholds) for metric in metrics_history.keys()}
-    else: # Fallback if agent_instance is not available, rely on direct drift_results from parametrized test
+    if hasattr(adaptation_monitor, "agent_instance") and adaptation_monitor.agent_instance:
+        _ = {
+            metric: _mock_check_drift_helper(
+                metric,
+                None,
+                test_id,
+                adaptation_monitor.metric_thresholds,
+            )
+            for metric in metrics_history.keys()
+        }
+    else:  # Fallback if agent_instance is not available, rely on direct drift_results from parametrized test
         # This part is tricky as _mock_check_drift_helper depends on adaptation_monitor which has the agent_instance.
         # The test `test_recommend_adaptation` already provides `drift_results` directly.
         # Let's ensure test_recommend_adaptation_scenarios also uses a similar direct approach if agent_instance is not used.
@@ -831,9 +846,10 @@ def test_recommend_adaptation_scenarios(
         # For AgentMonitor, if `agent_instance` is not part of its state, then `recommend_adaptation` logic shouldn't depend on it.
         # The `hasattr` checks are there because AgentMonitor doesn't have `agent_instance`.
         # So, the `_mock_check_drift_helper` shouldn't be called if `agent_instance` is not there.
-        # The patch should be on `adaptation_monitor.detect_drift` if it's an instance method, or `AgentMonitor.detect_drift` if it's a class/static method being called.
+        # The patch should be on `adaptation_monitor.detect_drift` if it's an instance method,
+        # or `AgentMonitor.detect_drift` if it's a class/static method being called.
         # It's an instance method. So, we should directly mock its return based on test_id and metric_name.
-        pass # Will be handled by the drift_results in `test_recommend_adaptation`
+        pass  # Will be handled by the drift_results in `test_recommend_adaptation`
 
     # Revised mocking strategy for detect_drift in test_recommend_adaptation_scenarios:
     # The goal is to control the drift outcome based on `test_id` and `metric_name` for this specific test.
@@ -846,13 +862,13 @@ def test_recommend_adaptation_scenarios(
     # And `adaptation_monitor` is an `AgentMonitor`, not the `MockAgent`.
     # Let's make `_mock_check_drift_helper` use the `thresholds` directly defined in the `adaptation_monitor` fixture.
 
-    mock_detect_drift.side_effect = lambda metric, window_size=30, change_threshold_percent=15.0: \
-        _mock_check_drift_helper(metric, None, test_id, adaptation_monitor.metric_thresholds) # Pass adaptation_monitor.metric_thresholds which is the dict
+    mock_detect_drift.side_effect = lambda metric, window_size=30, change_threshold_percent=15.0: _mock_check_drift_helper(
+        metric, None, test_id, adaptation_monitor.metric_thresholds
+    )  # Pass adaptation_monitor.metric_thresholds which is the dict
 
-
-    if hasattr(adaptation_monitor, 'agent_instance') and adaptation_monitor.agent_instance:
+    if hasattr(adaptation_monitor, "agent_instance") and adaptation_monitor.agent_instance:
         adaptation_monitor.agent_instance.logger = logging.getLogger("MockAgentLogger")
-    elif isinstance(adaptation_monitor, AgentMonitor) and test_id: # If it's an AgentMonitor and we have a test_id, set up a logger for it for caplog
+    elif isinstance(adaptation_monitor, AgentMonitor) and test_id:  # If it's an AgentMonitor and we have a test_id, set up a logger for it for caplog
         # This branch is problematic as AgentMonitor itself doesn't have an agent_instance to attach a logger to in this way.
         # The logger for AgentMonitor itself is `utils.monitoring.logger`.
         # The test `test_recommend_adaptation` (not _scenarios) correctly uses `caplog.at_level(logging.INFO)` with the monitor.
@@ -860,7 +876,7 @@ def test_recommend_adaptation_scenarios(
         # The logging related to "Agent ... adapted behavior" comes from MockAgent.adapt_behavior, which needs an agent instance.
         # Since AgentMonitor doesn't have an agent_instance, the `expect_adaptation_log` part of the test might be obsolete for AgentMonitor
         # unless `recommend_adaptation` is changed to *return* an adaptation action that the test can then apply to a mock agent.
-        pass # The existing hasattr check correctly handles this for MockAgent.
+        pass  # The existing hasattr check correctly handles this for MockAgent.
 
     caplog.clear()
     with caplog.at_level(logging.INFO):
@@ -871,8 +887,8 @@ def test_recommend_adaptation_scenarios(
     if not expected_recommendations:
         assert f"No adaptation recommendations for agent {adaptation_monitor.agent_id}" in caplog.text
 
-    if expect_adaptation_log and hasattr(adaptation_monitor, 'agent_instance') and adaptation_monitor.agent_instance:
+    if expect_adaptation_log and hasattr(adaptation_monitor, "agent_instance") and adaptation_monitor.agent_instance:
         # This assertion depends on MockAgent's adapt_behavior logging
         assert f"Agent {adaptation_monitor.agent_id} adapted behavior" in caplog.text
-    elif hasattr(adaptation_monitor, 'agent_instance') and adaptation_monitor.agent_instance:
+    elif hasattr(adaptation_monitor, "agent_instance") and adaptation_monitor.agent_instance:
         assert f"Agent {adaptation_monitor.agent_id} adapted behavior" not in caplog.text

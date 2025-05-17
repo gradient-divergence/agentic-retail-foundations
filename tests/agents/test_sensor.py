@@ -870,10 +870,13 @@ async def test_handle_inventory_discrepancy_first_detection(
     # Simulate low confidence initially
     mock_calc_conf.return_value = 0.6
 
-    await sensor_processor._handle_inventory_discrepancy(location, [product_id], discrepancy_type, source, details)
+    await sensor_processor._handle_inventory_discrepancy(
+        location, [product_id], discrepancy_type, source, details
+    )
+
+    discrepancy_key = f"{product_id}:{location}:{discrepancy_type}"
 
     # Verify record created
-    discrepancy_key = f"{product_id}:{location}:{discrepancy_type}"
     assert discrepancy_key in sensor_processor.discrepancies
     _record = sensor_processor.discrepancies[discrepancy_key]
     assert _record["product_id"] == product_id
@@ -959,9 +962,6 @@ async def test_handle_inventory_discrepancy_reaches_confidence_threshold(
     mock_calc_conf.return_value = 0.95
 
     await sensor_processor._handle_inventory_discrepancy(location, [product_id], discrepancy_type, source, details)
-
-    discrepancy_key = f"{product_id}:{location}:{discrepancy_type}"
-    record = sensor_processor.discrepancies[discrepancy_key]
 
     # Verify report issue called
     mock_inventory_system.report_inventory_issue.assert_awaited_once_with(

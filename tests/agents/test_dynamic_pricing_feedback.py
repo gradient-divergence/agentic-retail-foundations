@@ -635,7 +635,6 @@ async def test_update_elasticity_model_redis_error(mocked_agent: DynamicPricingA
     """Test elasticity update handles Redis set error."""
     mocked_agent.price_elasticity = -1.5  # Explicitly set initial elasticity for this test
     mocked_agent.learning_rate = 0.1  # Explicitly set learning rate for this test
-    mock_redis = mocked_agent.redis_client  # Correct attribute
     # Ensure the method being awaited is an AsyncMock - configure on the agent's client
     mocked_agent.redis_client.set = AsyncMock(side_effect=Exception("Redis set failed"))
 

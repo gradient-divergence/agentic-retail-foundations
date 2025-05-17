@@ -131,13 +131,20 @@ async def test_extract_order_id(monkeypatch):
 
     monkeypatch.setattr(nlp_mod, "safe_chat_completion", fake_safe_chat_completion)
 
-    order_id = await nlp_mod.extract_order_id_llm(
-        client=AsyncMock(),
-        message="I need an update on order ABC123 please.",
-        recent_order_ids=["ABC123", "XYZ789"],
-        model="dummy",
-        logger=logging.getLogger(__name__),
-    )
+    # Mock isinstance to treat AsyncMock as AsyncOpenAI
+    def mock_isinstance(obj, classinfo):
+        if classinfo is nlp_mod.AsyncOpenAI and isinstance(obj, AsyncMock):
+            return True
+        return builtins.isinstance(obj, classinfo)
+
+    with patch("utils.nlp.isinstance", mock_isinstance):
+        order_id = await nlp_mod.extract_order_id_llm(
+            client=AsyncMock(),
+            message="I need an update on order ABC123 please.",
+            recent_order_ids=["ABC123", "XYZ789"],
+            model="dummy",
+            logger=logging.getLogger(__name__),
+        )
     assert order_id == "ABC123"
 
 
@@ -166,14 +173,33 @@ async def test_extract_order_id_llm_edge_cases(
 
     monkeypatch.setattr(nlp_mod, "safe_chat_completion", fake_safe_chat_completion)
 
-    order_id = await nlp_mod.extract_order_id_llm(
-        client=AsyncMock(),
-        message="Check order status",
-        recent_order_ids=["XYZ789"], # Provide some context
-        model="dummy",
-        logger=logging.getLogger(__name__),
-    )
+    def mock_isinstance(obj, classinfo):
+        if classinfo is nlp_mod.AsyncOpenAI and isinstance(obj, AsyncMock):
+            return True
+        return builtins.isinstance(obj, classinfo)
+
+    with patch("utils.nlp.isinstance", mock_isinstance):
+        order_id = await nlp_mod.extract_order_id_llm(
+            client=AsyncMock(),
+            message="Check order status",
+            recent_order_ids=["XYZ789"],  # Provide some context
+            model="dummy",
+            logger=logging.getLogger(__name__),
+        )
     assert order_id == expected_order_id
+
+
+@pytest.mark.asyncio
+async def test_extract_order_id_llm_invalid_client(monkeypatch):
+    """Ensure TypeError is raised when client is not AsyncOpenAI."""
+    with pytest.raises(TypeError):
+        await nlp_mod.extract_order_id_llm(
+            client=MagicMock(),
+            message="Check order",
+            recent_order_ids=["XYZ789"],
+            model="dummy",
+            logger=logging.getLogger(__name__),
+        )
 
 
 @pytest.mark.asyncio

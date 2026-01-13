@@ -1,30 +1,44 @@
-# Foundations of Agentic AI for Retail
+# Foundations of Agentic AI for Retail (Second Edition Companion Code)
 
-A modular, extensible Python framework for building, simulating, and analyzing agent-based AI architectures tailored for the retail sector. This project provides reusable agent models (BDI, OODA), coordination protocols (Contract Net, Auctions), data models, utility functions (NLP, planning, monitoring), and interactive Marimo notebooks for rapid experimentation, research, and development of autonomous retail systems.
+A modular, extensible Python framework and companion codebase for the second edition of *Foundations of Agentic AI for Retail*. It includes agent architectures, coordination protocols, production guardrails, evaluation packs, and end-to-end demos that map to the book's operating model and capstone workflow.
 
-## Featured Book: Foundations of Agentic AI for Retail
+## Featured Book: Foundations of Agentic AI for Retail — Second Edition
 
 <table>
   <tr>
     <td width="60%">
-      <a href="https://github.com/gradient-divergence/agentic-retail-foundations"><strong>Foundations of Agentic AI for Retail: Concepts, Technologies, and Architectures for Autonomous Retail Systems</strong></a> by Dr. Fatih Nayebi.
+      <a href="https://github.com/gradient-divergence/agentic-retail-foundations"><strong>Foundations of Agentic AI for Retail: Operating Models, Decision Frameworks, and Retail-Grade Architectures (Second Edition)</strong></a> by Dr. Fatih Nayebi.
       <br><br>
-      <em>Explore the future of retail powered by autonomous AI systems.</em>
+      <em>Retail is the most demanding proving ground for agentic AI: thin margins, live inventory, real customers, and constant change. This edition focuses on production-ready operating models, evaluation, and governance.</em>
       <br><br>
       <strong>Purchase on Amazon:</strong> <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">US</a> | <a href="https://www.amazon.ca/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">CA</a> | <a href="https://www.amazon.co.jp/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">JP</a> | <a href="https://www.amazon.co.uk/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">UK</a> | <a href="https://www.amazon.de/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">DE</a> | <a href="https://www.amazon.fr/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">FR</a> | <a href="https://www.amazon.in/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IN</a> | <a href="https://www.amazon.it/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IT</a> | <a href="https://www.amazon.es/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">ES</a>
       <br>
     </td>
     <td width="40%" align="center" valign="center">
       <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">
-        <img src="https://github.com/gradient-divergence/.github/blob/main/book-cover.png" alt="Book Cover: Foundations of Agentic AI for Retail" width="300"/>
+        <img src="assets/book-cover-2nd-edition.png" alt="Book Cover: Foundations of Agentic AI for Retail (Second Edition)" width="300"/>
       </a>
     </td>
   </tr>
 </table>
 
+## What's New in the Second Edition
+
+- **Retail Agent Operating Model (RAOM)** as the narrative spine across chapters and code.
+- **Capstone workflow** that accumulates across chapters (inventory risk → supplier outreach → price protection → customer messaging → audit trail).
+- **Three-plane architecture**: capability, control, and integration planes for system design.
+- **Contract-first schemas** with runnable companion code and drift controls.
+- **Evaluation pyramid + red-team packs** for safety, regression control, and release readiness.
+- **Agent learning ladder**: prompt/tool tuning → SFT/PEFT → DPO/GRPO → RLHF/RLAIF → RFT.
+- **Interoperability & standards**: MCP, agent-to-agent messaging, and emerging commerce protocols (ACP, AP2).
+- **Context engineering** as a first-class design discipline (memory, retention boundaries, policies).
+- **Expanded SOTA coverage**: offline RL, constrained RL, conformal prediction, GNNs, Mamba/SSM.
+- **Teaching assets**: case packets, notation guide, glossary, and companion resources.
+
 ## Table of Contents
 
-- [Key Features](#key-features)
+- [What's New in the Second Edition](#whats-new-in-the-second-edition)
+- [Companion Code Highlights](#companion-code-highlights)
 - [Directory Structure](#directory-structure)
 - [Setup Instructions](#setup-instructions)
 - [Usage](#usage)
@@ -33,28 +47,18 @@ A modular, extensible Python framework for building, simulating, and analyzing a
 - [Documentation Website](#documentation-website)
 - [GitHub Repository](#github-repository)
 
+## Companion Code Highlights
 
-
-## Key Features
-
-*   **Modular Agent Architectures:** Implementations of common agent paradigms like Belief-Desire-Intention (BDI) and Observe-Orient-Decide-Act (OODA), adapted for retail scenarios (e.g., `StoreAgent`, `InventoryAgent`, `LLM`-based `RetailCustomerServiceAgent`).
-*   **Coordination Protocols:** Examples of multi-agent coordination mechanisms:
-    *   **Contract Net Protocol (CNP):** For task allocation (e.g., `RetailCoordinator`, `StoreAgent` bidding).
-    *   **Auction Mechanisms:** For procurement and supplier selection (e.g., `ProcurementAuction`).
-    *   **Inventory Sharing:** Collaborative inventory management across locations (`InventoryCollaborationNetwork`).
-*   **Retail-Specific Data Models:** Pydantic models for core retail concepts like `Product`, `InventoryPosition`, `PurchaseOrder`, `Task`, `AgentMessage`, `Store`, `Supplier`, etc. located in the `models/` directory.
-*   **Utility Functions:** Helpers for common tasks:
-    *   **NLP:** Intent classification, entity extraction (order ID, product ID), sentiment analysis using LLMs (`utils/nlp.py`).
-    *   **Planning:** Fulfillment planning, timeline calculation (`utils/planning.py`).
-    *   **Monitoring:** Agent metric tracking and alerting (`utils/monitoring.py`).
-    *   **OpenAI Integration:** Safe and robust wrappers for interacting with OpenAI APIs (`utils/openai_utils.py`).
-    *   **Event Bus:** Simple pub/sub mechanism for inter-agent communication (`utils/event_bus.py`).
-    *   **CRDTs:** Example Conflict-free Replicated Data Type (PN-Counter) for distributed state (`utils/crdt.py`).
-*   **Interactive Notebooks:** Marimo notebooks (`notebooks/`) demonstrating concepts, agent interactions, and framework usage.
-*   **Demo Scripts:** Standalone Python scripts (`demos/`) showcasing specific agent workflows and protocol examples (e.g., task allocation, procurement auction, inventory sharing).
-*   **Testing Framework:** Unit and integration tests using `pytest` (`tests/`).
-*   **Documentation:** Project documentation using MkDocs (`docs/`).
-*   **Standardized Tooling:** Uses `ruff` for formatting/linting and `mypy` for type checking, configured via `pyproject.toml`. Dependency management via `uv`.
+*   **Retail Agent Operating Model (RAOM):** Minimal RAOM implementation and examples (`agents/raom_minimal.py`).
+*   **Capstone Workflow:** End-to-end orchestration scaffolding with schemas, policies, tools, and tracing (`capstone/`).
+*   **Agent Architectures:** BDI, OODA, Q-learning, Bayesian, causal, and LLM-based agents (`agents/`).
+*   **Coordination Protocols:** Contract Net, auctions, and inventory sharing (`agents/protocols/`).
+*   **Interoperability & Standards:** MCP tooling contracts and commerce protocols (ACP/AP2) via demos and manifests (`demos/`).
+*   **Evaluation & Red Teaming:** Scenario packs and scoring rubrics (`evals/`, `redteam/`).
+*   **Retail Data Models:** Pydantic models for core retail concepts (`models/`).
+*   **Utilities & Observability:** Monitoring, event bus, planning, CRDTs, and NLP helpers (`utils/`).
+*   **Notebooks & Demos:** Marimo notebooks and runnable demos aligned to the book (`notebooks/`, `demos/`).
+*   **Testing & Tooling:** Pytest suite, Ruff, MyPy, and Makefile automation (`tests/`, `Makefile`).
 
 ## Directory Structure
 
@@ -63,31 +67,29 @@ agentic-retail-foundations/
 ├── agents/               # Core agent logic, protocols, and specific agent types
 │   ├── coordinators/     # Coordinator agent implementations
 │   ├── cross_functional/ # Agents spanning multiple business functions
-│   ├── protocols/        # Implementations of coordination protocols (CNP, Auction)
-│   ├── __init__.py
-│   └── ...               # Specific agent files (bdi.py, llm.py, ooda.py, store.py etc.)
-├── connectors/           # Interfaces to external systems (databases, APIs) - currently mocks
-├── demos/                # Standalone demo scripts for specific workflows
+│   ├── protocols/        # Coordination protocols (CNP, Auction, Inventory Sharing)
+│   └── ...
+├── assets/               # Diagrams and static assets (book cover, figures)
+├── capstone/             # End-to-end capstone workflow scaffolding
+├── config/               # Configuration helpers
+├── connectors/           # Interfaces to external systems (mocked connectors)
+├── demos/                # Standalone demo scripts and protocol examples
 ├── docs/                 # MkDocs documentation source files
 ├── environments/         # Simulation environments (e.g., MDP for RL)
+├── evals/                # Evaluation scenarios and scoring rubrics
 ├── models/               # Pydantic data models for retail concepts
-├── notebooks/            # Marimo interactive notebooks for exploration and visualization
-├── tests/                # Unit and integration tests (using pytest)
-│   ├── agents/
-│   ├── __init__.py       # Makes 'tests' a package
-│   └── mocks.py          # Mock objects for testing dependencies
-├── utils/                # Common utility functions (NLP, planning, monitoring, etc.)
+├── notebooks/            # Marimo notebooks for exploration and visualization
+├── redteam/              # Red-team scenarios for safety testing
+├── tests/                # Unit and integration tests (pytest)
+├── utils/                # Utilities (monitoring, planning, NLP, event bus, etc.)
 ├── .env.example          # Example environment variables template
-├── .env                  # Local environment variables (GITIGNORED - add your secrets here)
 ├── .gitignore
-├── .pre-commit-config.yaml # Configuration for pre-commit hooks
-├── LICENSE               # Project License (e.g., MIT, Apache 2.0) - Needs to be added
-├── Makefile.mk           # Makefile for common development tasks
-├── PROJECT_PLAN.md       # Phased development plan and task tracking
-├── README.md             # This file
-├── mkdocs.yml            # MkDocs configuration
-├── pyproject.toml        # Project metadata, dependencies, and tool configurations (ruff, mypy, etc.)
-└── requirements.txt      # (Optional) For compatibility or specific deployment needs
+├── .pre-commit-config.yaml
+├── LICENSE
+├── Makefile
+├── mkdocs.yml
+├── pyproject.toml
+└── README.md
 ```
 
 ## Setup Instructions
@@ -107,26 +109,24 @@ agentic-retail-foundations/
     Follow the official instructions: https://github.com/astral-sh/uv
 
 4.  **Create Virtual Environment & Install Dependencies:**
-    This command uses `uv` to create a virtual environment named `.venv` in the project root and install all dependencies listed in `pyproject.toml`.
     ```sh
     make install
-    # or: uv venv && uv sync
+    # or: make venv
     ```
 
 5.  **Activate the Virtual Environment:**
-    You need to activate the environment to use the installed packages and tools directly in your shell.
     ```sh
     source .venv/bin/activate
     ```
-    Your shell prompt should now indicate the active environment (e.g., `(.venv) ...`). Alternatively, use `make shell` to start a new sub-shell with the environment automatically activated.
+    Alternatively, use `make shell` to start a sub-shell with the environment activated.
 
 6.  **Set up Environment Variables:**
     *   Copy the example environment file:
         ```sh
         cp .env.example .env
         ```
-    *   Edit the `.env` file and add your necessary API keys or configuration secrets (e.g., `OPENAI_API_KEY`).
-    *   **Important:** The `.env` file is listed in `.gitignore` and should **never** be committed to version control.
+    *   Edit `.env` and add your necessary API keys or configuration secrets (e.g., `OPENAI_API_KEY`).
+    *   **Important:** `.env` is listed in `.gitignore` and should **never** be committed.
 
 7.  **Optional: OpenAI Agents SDK demos**
     *   Install the SDK dependencies:
@@ -145,20 +145,17 @@ agentic-retail-foundations/
     *   ACP is treated as a spec-only protocol reference (no SDK dependency).
 
 9.  **Install Pre-commit Hooks (Recommended):**
-    This ensures code quality checks (like formatting and linting) run automatically before each commit.
     ```sh
-    # Ensure your virtual environment is active
     make precommit
     # or: pre-commit install
     ```
 
 ## Usage
 
-Common development tasks are streamlined using the `Makefile.mk`. Ensure your virtual environment is active (`source .venv/bin/activate` or `make shell`) when running Python scripts or tools like `marimo` directly.
+Common development tasks are streamlined using the `Makefile`. Ensure your virtual environment is active (`source .venv/bin/activate` or `make shell`) when running Python scripts or tools like `marimo` directly.
 
 *   **Run Marimo Notebooks:**
     ```sh
-    # Make sure venv is active!
     marimo edit notebooks/<notebook_name>.py
     # e.g., marimo edit notebooks/multi-agent-systems-in-retail.py
     ```
@@ -166,7 +163,6 @@ Common development tasks are streamlined using the `Makefile.mk`. Ensure your vi
 
 *   **Run Demo Scripts:**
     ```sh
-    # Make sure venv is active!
     python demos/<demo_name>.py
     # e.g., python demos/task_allocation_cnp_demo.py
     ```
@@ -183,7 +179,7 @@ Common development tasks are streamlined using the `Makefile.mk`. Ensure your vi
     ```sh
     make test          # Run pytest test suite
     make coverage      # Run tests and generate coverage report
-    make ci            # Run format-check, lint, type-check, and test (CI pipeline simulation)
+    make ci            # Run format-check, type-check, tests, coverage, docs build
     ```
 
 *   **Build / Serve Documentation:**
@@ -208,22 +204,20 @@ Common development tasks are streamlined using the `Makefile.mk`. Ensure your vi
 
 ## Development Best Practices
 
-*   **Modularity:** Keep agent logic, data models, utility functions, and connectors in their respective directories. Avoid complex logic directly within notebooks; use them primarily for demonstration, visualization, and orchestration of underlying modules.
-*   **Configuration:** Use environment variables (`.env` file loaded via `python-dotenv`) for secrets and environment-specific settings. Avoid hardcoding API keys or sensitive paths.
+*   **Modularity:** Keep agent logic, data models, utilities, and connectors in their respective directories.
+*   **Configuration:** Use environment variables (`.env` file loaded via `python-dotenv`) for secrets and environment-specific settings.
 *   **Typing:** Use Python type hints extensively. Run `make type-check` (`mypy`) regularly.
-*   **Linting & Formatting:** Adhere to the styles enforced by `ruff`. Run `make format` and `make lint` frequently. Use pre-commit hooks (`make precommit`).
-*   **Testing:** Write unit tests (`pytest`) for individual functions/classes and integration tests for components working together. Aim for reasonable test coverage. Run tests via `make test`.
-*   **Documentation:** Write clear docstrings for public APIs (functions, classes, methods). Maintain project documentation in the `docs/` directory using MkDocs. Keep the README up-to-date.
-*   **Git:** Use feature branches for development. Write clear, concise commit messages. Ensure `make ci` passes before merging/pushing.
-*   **Project Planning:** Refer to `PROJECT_PLAN.md` for the development roadmap and task tracking.
+*   **Linting & Formatting:** Adhere to styles enforced by `ruff`. Run `make format` and `make lint` frequently.
+*   **Testing:** Write unit tests (`pytest`) for individual functions/classes and integration tests for components working together.
+*   **Documentation:** Maintain docs in `docs/` and keep this README in sync with the book and code.
 
 ## Contribution Guidelines
 
-Please refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to contribute to this project. General expectations include following the development best practices outlined above, ensuring tests pass, and documenting changes.
+Please refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to contribute to this project.
 
 ## Documentation Website
 
-The full project documentation, generated using MkDocs, is available at: [Placeholder - Link to be added once deployed]
+The MkDocs site is published at: https://gradient-divergence.github.io/agentic-retail-foundations
 
 You can also build and serve the documentation locally using `make docs-serve`.
 

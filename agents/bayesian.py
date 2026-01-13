@@ -2,9 +2,10 @@
 Bayesian recommendation agent for product recommendations in retail.
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import beta
-import matplotlib.pyplot as plt
+
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -20,30 +21,23 @@ class BayesianRecommendationAgent:
     these distributions as new interaction data arrives.
     """
 
-    def __init__(
-        self, product_catalog: dict[str, dict], exploration_weight: float = 0.3
-    ):
+    def __init__(self, product_catalog: dict[str, dict], exploration_weight: float = 0.3) -> None:
         self.product_catalog = product_catalog
         self.exploration_weight = exploration_weight
         self.customer_preferences: dict[str, dict[str, dict]] = {}
         self.category_affinity: dict[str, dict[str, float]] = {}
         logger.info(
-            f"Bayesian Recommendation Agent initialized with {len(product_catalog)} products"
+            "Bayesian Recommendation Agent initialized with %s products",
+            len(product_catalog),
         )
 
-    def get_product_prior(
-        self, customer_id: str, product_id: str
-    ) -> tuple[float, float]:
+    def get_product_prior(self, customer_id: str, product_id: str) -> tuple[float, float]:
         if product_id not in self.product_catalog:
-            logger.warning(
-                f"Product {product_id} not in catalog, using default prior (1,1)."
-            )
+            logger.warning(f"Product {product_id} not in catalog, using default prior (1,1).")
             return (1.0, 1.0)
         category = self.product_catalog[product_id].get("category")
         if not category:
-            logger.warning(
-                f"Product {product_id} missing category, using default prior (1,1)."
-            )
+            logger.warning(f"Product {product_id} missing category, using default prior (1,1).")
             return (1.0, 1.0)
         if (
             hasattr(self, "category_affinity")
@@ -53,13 +47,19 @@ class BayesianRecommendationAgent:
             and category in self.category_affinity[customer_id]
         ):
             affinity = self.category_affinity[customer_id][category]
-            if not isinstance(affinity, (int, float)):
+            if not isinstance(affinity, int | float):
                 logger.warning(
-                    f"Invalid affinity type ({type(affinity)}) for C:{customer_id}, Cat:{category}. Using default prior."
+                    "Invalid affinity type (%s) for C:%s, Cat:%s. Using default prior.",
+                    type(affinity),
+                    customer_id,
+                    category,
                 )
                 return (1.0, 1.0)
             logger.debug(
-                f"Using category affinity {affinity:.2f} for C:{customer_id}, Cat:{category}"
+                "Using category affinity %.2f for C:%s, Cat:%s",
+                affinity,
+                customer_id,
+                category,
             )
             if affinity > 0.7:
                 prior = (4.0, 1.0)
@@ -69,11 +69,13 @@ class BayesianRecommendationAgent:
                 prior = (1.0, 4.0)
             return prior
         logger.debug(
-            f"No specific category affinity found for C:{customer_id}, Cat:{category}. Using default prior (1,1)."
+            "No specific category affinity found for C:%s, Cat:%s. Using default prior (1,1).",
+            customer_id,
+            category,
         )
         return (1.0, 1.0)
 
-    def update_preference(self, customer_id: str, product_id: str, interaction: bool):
+    def update_preference(self, customer_id: str, product_id: str, interaction: bool) -> None:
         if customer_id not in self.customer_preferences:
             self.customer_preferences[customer_id] = {}
         if product_id not in self.customer_preferences[customer_id]:
@@ -87,12 +89,18 @@ class BayesianRecommendationAgent:
         if interaction:
             pref["alpha"] += 1
             logger.debug(
-                f"Updated C:{customer_id}, P:{product_id}: alpha -> {pref['alpha']} (Positive Interaction)"
+                "Updated C:%s, P:%s: alpha -> %s (Positive Interaction)",
+                customer_id,
+                product_id,
+                pref["alpha"],
             )
         else:
             pref["beta"] += 1
             logger.debug(
-                f"Updated C:{customer_id}, P:{product_id}: beta -> {pref['beta']} (Negative Interaction)"
+                "Updated C:%s, P:%s: beta -> %s (Negative Interaction)",
+                customer_id,
+                product_id,
+                pref["beta"],
             )
         pref["interactions"] += 1
 
@@ -104,15 +112,11 @@ class BayesianRecommendationAgent:
     ) -> list[str]:
         if customer_id not in self.customer_preferences:
             self.customer_preferences[customer_id] = {}
-            logger.info(
-                f"New customer {customer_id} encountered. Initializing preferences."
-            )
+            logger.info("New customer %s encountered. Initializing preferences.", customer_id)
         product_scores = []
         for product_id in candidate_products:
             if product_id not in self.product_catalog:
-                logger.warning(
-                    f"Skipping candidate product {product_id}: Not in catalog."
-                )
+                logger.warning("Skipping candidate product %s: Not in catalog.", product_id)
                 continue
             if product_id not in self.customer_preferences[customer_id]:
                 alpha, beta_val = self.get_product_prior(customer_id, product_id)
@@ -122,7 +126,11 @@ class BayesianRecommendationAgent:
                     "interactions": 0,
                 }
                 logger.debug(
-                    f"Initialized prior for C:{customer_id}, P:{product_id}: Alpha={alpha}, Beta={beta_val}"
+                    "Initialized prior for C:%s, P:%s: Alpha=%s, Beta=%s",
+                    customer_id,
+                    product_id,
+                    alpha,
+                    beta_val,
                 )
             pref = self.customer_preferences[customer_id][product_id]
             alpha, beta_val = pref["alpha"], pref["beta"]
@@ -133,7 +141,12 @@ class BayesianRecommendationAgent:
                 preference_sample = np.random.beta(safe_alpha, safe_beta)
             except ValueError as e:
                 logger.error(
-                    f"Error sampling Beta({safe_alpha}, {safe_beta}) for C:{customer_id}, P:{product_id}: {e}"
+                    "Error sampling Beta(%s, %s) for C:%s, P:%s: %s",
+                    safe_alpha,
+                    safe_beta,
+                    customer_id,
+                    product_id,
+                    e,
                 )
                 preference_sample = 0.5
             denominator = (safe_alpha + safe_beta) ** 2 * (safe_alpha + safe_beta + 1)
@@ -144,14 +157,20 @@ class BayesianRecommendationAgent:
             exploration_bonus = self.exploration_weight * uncertainty
             score = preference_sample + exploration_bonus
             logger.debug(
-                f"Scoring C:{customer_id}, P:{product_id}: Sample={preference_sample:.3f}, Uncertainty={uncertainty:.3f}, Bonus={exploration_bonus:.3f}, Score={score:.3f}"
+                "Scoring C:%s, P:%s: Sample=%.3f, Uncertainty=%.3f, Bonus=%.3f, Score=%.3f",
+                customer_id,
+                product_id,
+                preference_sample,
+                uncertainty,
+                exploration_bonus,
+                score,
             )
             product_scores.append((product_id, score))
         product_scores.sort(key=lambda x: x[1], reverse=True)
         recommended_products = [p[0] for p in product_scores[:num_recommendations]]
         return recommended_products
 
-    def explain_recommendation(self, customer_id: str, product_id: str) -> dict:
+    def explain_recommendation(self, customer_id: str, product_id: str) -> dict[str, object]:
         if (
             customer_id not in self.customer_preferences
             or product_id not in self.customer_preferences[customer_id]
@@ -163,12 +182,8 @@ class BayesianRecommendationAgent:
                     and customer_id in self.category_affinity
                     and category in self.category_affinity[customer_id]
                 ):
-                    return {
-                        "explanation": "This product aligns with categories you've shown interest in."
-                    }
-            return {
-                "explanation": "This might be a good match based on general trends."
-            }
+                    return {"explanation": "This product aligns with categories you've shown interest in."}
+            return {"explanation": "This might be a good match based on general trends."}
         pref = self.customer_preferences[customer_id][product_id]
         alpha, beta_val = pref["alpha"], pref["beta"]
         if alpha + beta_val > 0:
@@ -192,9 +207,7 @@ class BayesianRecommendationAgent:
         elif expected_preference > 0.6:
             reason = "You've had mostly positive reactions to products like this."
         elif certainty < 2:
-            reason = (
-                "We are exploring this recommendation to learn more about your tastes."
-            )
+            reason = "We are exploring this recommendation to learn more about your tastes."
         else:
             reason = "This item appears to match your preferences."
         normalized_confidence = min(1.0, certainty / 20.0)
@@ -205,11 +218,10 @@ class BayesianRecommendationAgent:
             "interactions": pref["interactions"],
         }
 
-    def visualize_customer_preferences(self, customer_id: str, top_n: int = 10):
+    def visualize_customer_preferences(self, customer_id: str, top_n: int = 10) -> plt.Figure | None:
         if customer_id not in self.customer_preferences:
             logger.warning(f"No preference data for customer {customer_id}")
-            print(f"No preference data for customer {customer_id}")
-            return
+            return None
         prefs = self.customer_preferences[customer_id]
         products = [
             (pid, p["interactions"], p["alpha"], p["beta"])
@@ -220,14 +232,11 @@ class BayesianRecommendationAgent:
         top_products = products[:top_n]
         if not top_products:
             logger.info(f"No product interactions recorded for customer {customer_id}")
-            print(f"No product interactions for customer {customer_id}")
-            return
+            return None
         num_plots = len(top_products)
         ncols = 2
         nrows = (num_plots + ncols - 1) // ncols
-        fig, axes = plt.subplots(
-            nrows=nrows, ncols=ncols, figsize=(12, nrows * 3.5), squeeze=False
-        )
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(12, nrows * 3.5), squeeze=False)
         axes = axes.flatten()
         plot_index = 0
         for pid, interactions, alpha, beta_val in top_products:

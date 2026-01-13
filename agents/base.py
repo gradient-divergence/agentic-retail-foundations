@@ -2,14 +2,14 @@
 Base class for retail agents.
 """
 
+# region book:order-orchestration-base-agent
 import logging
 from typing import Any
 
-# Import necessary models and utilities
 from models.enums import AgentType, OrderStatus
 from models.events import RetailEvent
-from models.fulfillment import Order  # Assuming Order is used by handle_exception
-from utils.event_bus import EventBus  # Assuming EventBus is used
+from models.fulfillment import Order
+from utils.event_bus import EventBus
 
 logger_base = logging.getLogger(__name__)  # Use a specific logger
 
@@ -35,9 +35,7 @@ class BaseAgent:
             logger_base.error(f"Agent {self.agent_id} has no event bus to publish to.")
             return
 
-        event = RetailEvent(
-            event_type=event_type, payload=payload, source=self.agent_type
-        )
+        event = RetailEvent(event_type=event_type, payload=payload, source=self.agent_type)
         await self.event_bus.publish(event)
 
     # Generic exception handler - can be overridden by subclasses
@@ -55,26 +53,28 @@ class BaseAgent:
             "agent_id": self.agent_id,
         }
         logger_base.error(
-            f"Exception in {self.agent_type.value} agent ({self.agent_id}): {str(exception)}",
+            "Exception in %s agent (%s): %s",
+            self.agent_type.value,
+            self.agent_id,
+            str(exception),
             exc_info=True,  # Include traceback in log
         )
 
         # Update order status if an order object is provided
-        if (
-            order is not None
-            and hasattr(order, "update_status")
-            and hasattr(order, "order_id")
-        ):
+        if order is not None and hasattr(order, "update_status") and hasattr(order, "order_id"):
             try:
-                order.update_status(
-                    OrderStatus.EXCEPTION, self.agent_type, error_details
-                )
+                order.update_status(OrderStatus.EXCEPTION, self.agent_type, error_details)
                 error_details["order_id"] = order.order_id  # Add order_id if updated
             except Exception as update_err:
                 logger_base.error(
-                    f"Failed to update order status during exception handling for order {getattr(order, 'order_id', 'N/A')}: {update_err}"
+                    "Failed to update order status during exception handling for order %s: %s",
+                    getattr(order, "order_id", "N/A"),
+                    update_err,
                 )
 
         # Publish exception event
         # Ensure payload keys match expected structure if defined elsewhere
         await self.publish_event("system.exception", {"error_details": error_details})
+
+
+# endregion book:order-orchestration-base-agent

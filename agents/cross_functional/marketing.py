@@ -2,10 +2,13 @@
 MarketingAgent for creating launch campaigns and marketing remediation in retail MAS.
 """
 
+import asyncio
+import logging
+import random
 from datetime import datetime, timedelta
 from typing import Any
-import asyncio
-import random
+
+logger = logging.getLogger(__name__)
 
 
 class MarketingAgent:
@@ -13,8 +16,8 @@ class MarketingAgent:
     Agent responsible for creating launch campaigns and suggesting marketing remediation.
     """
 
-    def __init__(self):
-        print("MarketingAgent initialized")
+    def __init__(self) -> None:
+        logger.info("MarketingAgent initialized")
 
     async def create_launch_campaign(
         self,
@@ -28,7 +31,7 @@ class MarketingAgent:
         """
         Create a marketing campaign for a product launch.
         """
-        print(f"Marketing: Creating campaign for {product_id}")
+        logger.info("Marketing: Creating campaign for %s", product_id)
         await asyncio.sleep(0.7)
         selected_channels = []
         if "millennials" in target_segments:
@@ -39,17 +42,16 @@ class MarketingAgent:
             selected_channels.append("tv")
         return {
             "status": "ready" if len(selected_channels) > 0 else "delayed",
-            "summary": f"Campaign developed for {len(target_segments)} segments via {len(selected_channels)} channels",
+            "summary": (
+                f"Campaign developed for {len(target_segments)} segments "
+                f"via {len(selected_channels)} channels"
+            ),
             "channels": selected_channels,
             "start_date": launch_date - timedelta(days=14),
-            "key_messages": [
-                f"Featuring {feature}" for feature in product_features[:2]
-            ],
+            "key_messages": [f"Featuring {feature}" for feature in product_features[:2]],
         }
 
-    async def suggest_remediation(
-        self, product_id: str, current_status: str
-    ) -> dict[str, Any]:
+    async def suggest_remediation(self, product_id: str, current_status: str) -> dict[str, Any]:
         """
         Suggest remediation steps for marketing issues.
         """
@@ -62,15 +64,17 @@ class MarketingAgent:
             ],
         }
 
-    async def plan_launch_campaign(self, product_data: dict[str, Any]):
+    async def plan_launch_campaign(self, product_data: dict[str, Any]) -> dict[str, Any]:
         """Placeholder: Plan the marketing campaign based on product data."""
         target_segments = product_data.get("target_segments", ["general"])
         messaging = product_data.get("messaging_guidelines", {})
-        print(
-            f"Marketing: Planning campaign for segments: {target_segments} with message '{messaging.get('primary_message')}'..."
+        logger.info(
+            "Marketing: Planning campaign for segments %s with message %s...",
+            target_segments,
+            messaging.get("primary_message"),
         )
         await asyncio.sleep(0.2)  # Simulate planning time
-        print("Marketing: Launch campaign plan drafted.")
+        logger.info("Marketing: Launch campaign plan drafted.")
         return {
             "status": "campaign_planned",
             "channels": ["social", "email", "in_store"],
@@ -80,10 +84,8 @@ class MarketingAgent:
         """Simulate checking if marketing materials and plans are ready."""
         agent_name = self.__class__.__name__
         product_id = product_data.get("id", "Unknown Product")
-        planned_launch_date = product_data.get(
-            "planned_launch_date", datetime.now() + timedelta(days=30)
-        )
-        print(f"Marketing: Checking readiness for {product_id}")
+        planned_launch_date = product_data.get("planned_launch_date", datetime.now() + timedelta(days=30))
+        logger.info("Marketing: Checking readiness for %s", product_id)
         await asyncio.sleep(random.uniform(0.1, 0.25))
 
         # Check for required data
@@ -100,9 +102,7 @@ class MarketingAgent:
         readiness_date = None
 
         if missing_data:
-            details = (
-                f"Blocked: Missing required product data - {', '.join(missing_data)}."
-            )
+            details = f"Blocked: Missing required product data - {', '.join(missing_data)}."
             readiness_date = None  # Cannot proceed without data
         else:
             # Simulate creative/approval delays
@@ -116,18 +116,18 @@ class MarketingAgent:
             elif delay_chance < 0.85:  # 25% chance of minor delay
                 status = "blocked"
                 details = "Minor delay: Awaiting final approval on ad copy."
-                readiness_date = planned_launch_date + timedelta(
-                    days=random.randint(1, 4)
-                )
+                readiness_date = planned_launch_date + timedelta(days=random.randint(1, 4))
             else:  # 15% chance of major delay
                 status = "blocked"
                 details = "Major delay: Key visual assets require significant rework."
-                readiness_date = planned_launch_date + timedelta(
-                    days=random.randint(7, 14)
-                )
+                readiness_date = planned_launch_date + timedelta(days=random.randint(7, 14))
 
-        print(
-            f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}"
+        logger.info(
+            "%s: %s (%s) - Est. Ready Date: %s",
+            agent_name,
+            status,
+            details,
+            readiness_date.strftime("%Y-%m-%d") if isinstance(readiness_date, datetime) else "N/A",
         )
         return {
             "agent": agent_name,

@@ -2,10 +2,11 @@
 Data model for retail store entities.
 """
 
+# region book:inventory-sharing-store-models
 from dataclasses import dataclass, field
-from typing import Any
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from models.inventory import InventoryPosition, InventoryStatus
 
@@ -79,7 +80,7 @@ class Store:
     transfer_history: list[dict[str, Any]] = field(default_factory=list)
     cooperation_score: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Set cooperation_score to initial value
         self.cooperation_score = self.initial_cooperation_score
 
@@ -89,7 +90,7 @@ class Store:
         current_stock: int,
         target_stock: int,
         sales_rate_per_day: float,
-    ):
+    ) -> None:
         """
         Add a product to the store's inventory or update if exists.
 
@@ -106,7 +107,7 @@ class Store:
             daily_sales_rate=sales_rate_per_day,
         )
 
-    def update_sales_rate(self, product_id: str, new_rate: float):
+    def update_sales_rate(self, product_id: str, new_rate: float) -> None:
         """
         Update the sales rate for a product.
 
@@ -191,9 +192,7 @@ class Store:
         )
         return True
 
-    def calculate_transfer_value(
-        self, product_id: str, quantity: int, is_sending: bool
-    ) -> float:
+    def calculate_transfer_value(self, product_id: str, quantity: int, is_sending: bool) -> float:
         """
         Calculate the value/benefit of transferring a product.
         Positive values indicate beneficial transfers, negative values indicate harmful ones.
@@ -233,3 +232,6 @@ class Store:
 
     def __str__(self) -> str:
         return f"Store(id={self.store_id}, name={self.name}, location={self.location})"
+
+
+# endregion book:inventory-sharing-store-models

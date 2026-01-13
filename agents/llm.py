@@ -4,22 +4,23 @@ Module: agents.llm
 Contains the RetailCustomerServiceAgent class for LLM-powered customer service in retail.
 """
 
-from typing import Any, Dict, List, Set, Optional
-from datetime import datetime
-import logging
 import asyncio
+import logging
 import os
 import re
 from collections import defaultdict, deque
+from datetime import datetime
+from typing import Any, cast
 
-from openai import AsyncOpenAI, OpenAI
-from utils.openai_utils import safe_chat_completion
-
-# NLP helpers
-from utils import nlp
+from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletion
 
 # Utils
 from agents.response_builder import build_response_prompt, extract_actions
+
+# NLP helpers
+from utils import nlp
+from utils.openai_utils import safe_chat_completion
 
 
 class RetailCustomerServiceAgent:
@@ -32,25 +33,25 @@ class RetailCustomerServiceAgent:
     - Simple exponential back‑off retry wrapper for all OpenAI chat completions.
     - Per‑customer `asyncio.Lock` to avoid race conditions when multiple async
       requests arrive for the same customer concurrently.
-    - Response and utility model names are now configurable (default: gpt‑4o and gpt‑4o‑mini).
+    - Response and utility model names are now configurable (default: gpt-5.2 and gpt-5-mini).
     """
 
-    client: Optional[AsyncOpenAI] = None
+    client: AsyncOpenAI | None = None
 
     def __init__(
         self,
-        product_database,
-        order_management_system,
-        customer_database,
-        policy_guidelines,
+        product_database: Any,
+        order_management_system: Any,
+        customer_database: Any,
+        policy_guidelines: Any,
         api_key: str | None = None,
         *,
         max_history_per_user: int = 50,
         retry_attempts: int = 3,
         retry_backoff: float = 1.0,
-        response_model: str = "gpt-4o",
-        utility_model: str = "gpt-4o-mini",
-    ):
+        response_model: str = "gpt-5.2",
+        utility_model: str = "gpt-5-mini",
+    ) -> None:
         """Initializes the RetailCustomerServiceAgent."""
         self.product_db = product_database
         self.order_system = order_management_system
@@ -73,42 +74,46 @@ class RetailCustomerServiceAgent:
             except Exception as e:
                 self.logger.error("Failed to initialize OpenAI client: %s", e)
         else:
-            self.logger.warning(
-                "OpenAI API key missing or placeholder. LLM features will be disabled."
-            )
+            self.logger.warning("OpenAI API key missing or placeholder. LLM features will be disabled.")
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    async def process_customer_inquiry(
+    async def process_customer_inquiry(  # noqa: C901
         self, customer_id: str, message: str
     ) -> dict[str, Any]:
         """Process a customer inquiry and generate an appropriate response."""
         if not self.client:
             self.logger.error("OpenAI client not initialized. Cannot process inquiry.")
             return {
-                "message": "I apologize, our AI assistance system is currently unavailable. Please contact support directly.",
+                "message": (
+                    "I apologize, our AI assistance system is currently unavailable. "
+                    "Please contact support directly."
+                ),
                 "intent": "error",
                 "actions": [],
                 "error": "LLM client not available",
             }
         self.logger.info(
-            f"Processing inquiry for customer {customer_id}: '{message[:50]}...'"
+            "Processing inquiry for customer %s: '%s...'",
+            customer_id,
+            message[:50],
         )
         customer_info = None
         recent_orders = []
         try:
             customer_info = await self.customer_db.get_customer(customer_id)
-            recent_orders_raw = await self.order_system.get_recent_orders(
-                customer_id, limit=3
-            )
-            recent_orders = (
-                recent_orders_raw if isinstance(recent_orders_raw, list) else []
-            )
+            recent_orders_raw = await self.order_system.get_recent_orders(customer_id, limit=3)
+            recent_orders = recent_orders_raw if isinstance(recent_orders_raw, list) else []
+            recent_order_ids = [o.get("order_id", "N/A") for o in recent_orders]
             self.logger.debug(
-                f"Retrieved context for customer {customer_id}. Recent orders: {[o.get('order_id', 'N/A') for o in recent_orders]}"
+                "Retrieved context for customer %s. Recent orders: %s",
+                customer_id,
+                recent_order_ids,
             )
         except Exception as e:
             self.logger.error(
-                f"Error retrieving customer context for {customer_id}: {e}"
+                "Error retrieving customer context for %s: %s",
+                customer_id,
+                e,
             )
             if customer_info is None:
                 customer_info = {
@@ -118,7 +123,8 @@ class RetailCustomerServiceAgent:
         if customer_id not in self.conversation_history:
             # defaultdict handles initialization
             self.logger.debug(
-                f"Initialized conversation history for customer {customer_id}."
+                "Initialized conversation history for customer %s.",
+                customer_id,
             )
         async with self._locks[customer_id]:
             self.conversation_history[customer_id].append(
@@ -135,18 +141,12 @@ class RetailCustomerServiceAgent:
             if intent == "order_status":
                 order_id = await self._extract_order_id(message, recent_orders)
                 if order_id:
-                    self.logger.debug(
-                        f"Extracted order ID: {order_id} for order_status intent."
-                    )
-                    context_data["order_details"] = (
-                        await self.order_system.get_order_details(order_id)
-                    )
+                    self.logger.debug(f"Extracted order ID: {order_id} for order_status intent.")
+                    context_data["order_details"] = await self.order_system.get_order_details(order_id)
                     if context_data["order_details"]:
                         self.logger.debug(f"Retrieved order details for {order_id}.")
                     else:
-                        self.logger.warning(
-                            f"Failed to retrieve details for extracted order ID {order_id}."
-                        )
+                        self.logger.warning(f"Failed to retrieve details for extracted order ID {order_id}.")
                         context_data.pop("order_details", None)
                 else:
                     self.logger.warning(
@@ -155,23 +155,13 @@ class RetailCustomerServiceAgent:
             elif intent == "product_question":
                 product_identifier = await self._extract_product_identifier(message)
                 if product_identifier:
-                    self.logger.debug(
-                        f"Extracted product identifier: {product_identifier}"
-                    )
-                    product_id = await self.product_db.resolve_product_id(
-                        product_identifier
-                    )
+                    self.logger.debug(f"Extracted product identifier: {product_identifier}")
+                    product_id = await self.product_db.resolve_product_id(product_identifier)
                     if product_id:
-                        context_data["product_details"] = (
-                            await self.product_db.get_product(product_id)
-                        )
-                        context_data["inventory"] = await self.product_db.get_inventory(
-                            product_id
-                        )
+                        context_data["product_details"] = await self.product_db.get_product(product_id)
+                        context_data["inventory"] = await self.product_db.get_inventory(product_id)
                         if context_data["product_details"]:
-                            self.logger.debug(
-                                f"Retrieved product details and inventory for {product_id}."
-                            )
+                            self.logger.debug(f"Retrieved product details and inventory for {product_id}.")
                         else:
                             self.logger.warning(
                                 f"Failed to retrieve details for resolved product ID {product_id}."
@@ -183,40 +173,36 @@ class RetailCustomerServiceAgent:
                             f"Could not resolve product identifier '{product_identifier}' to a product ID."
                         )
                 else:
-                    self.logger.warning(
-                        "Could not extract product identifier for product_question intent."
-                    )
+                    self.logger.warning("Could not extract product identifier for product_question intent.")
             elif intent == "return_request":
                 order_id = await self._extract_order_id(message, recent_orders)
                 if order_id:
-                    self.logger.debug(
-                        f"Extracted order ID: {order_id} for return_request intent."
-                    )
-                    context_data["order_details"] = (
-                        await self.order_system.get_order_details(order_id)
-                    )
-                    context_data["return_eligibility"] = (
-                        await self.order_system.check_return_eligibility(order_id)
+                    self.logger.debug(f"Extracted order ID: {order_id} for return_request intent.")
+                    context_data["order_details"] = await self.order_system.get_order_details(order_id)
+                    context_data["return_eligibility"] = await self.order_system.check_return_eligibility(
+                        order_id
                     )
                     context_data["return_policy"] = self.policies.get("returns", {})
-                    if (
-                        context_data["order_details"]
-                        and context_data["return_eligibility"]
-                    ):
+                    if context_data["order_details"] and context_data["return_eligibility"]:
                         self.logger.debug(
-                            f"Retrieved order details and return eligibility for {order_id}."
+                            "Retrieved order details and return eligibility for %s.",
+                            order_id,
                         )
                     else:
                         self.logger.warning(
-                            f"Failed to retrieve full context for return request for order ID {order_id}."
+                            "Failed to retrieve full context for return request for order ID %s.",
+                            order_id,
                         )
                 else:
                     self.logger.warning(
-                        f"Could not extract valid order ID for return_request intent from message: '{message}'"
+                        "Could not extract valid order ID for return_request intent from message: '%s'",
+                        message,
                     )
         except Exception as e:
             self.logger.error(
-                f"Error retrieving context data for intent '{intent}': {e}",
+                "Error retrieving context data for intent '%s': %s",
+                intent,
+                e,
                 exc_info=True,
             )
         recent_history = list(self.conversation_history[customer_id])[-5:]
@@ -227,8 +213,12 @@ class RetailCustomerServiceAgent:
             context_data=context_data,
             conversation_history=recent_history,
         )
+        response_preview = response.get("message", "")[:50]
         self.logger.info(
-            f"Generated response for customer {customer_id}. Intent: {intent}. Response: '{response.get('message', '')[:50]}...'"
+            "Generated response for customer %s. Intent: %s. Response: '%s...'",
+            customer_id,
+            intent,
+            response_preview,
         )
         if "message" in response and "error" not in response:
             async with self._locks[customer_id]:
@@ -241,13 +231,15 @@ class RetailCustomerServiceAgent:
                 )
         try:
             await self._log_interaction(customer_id, intent, message, response)
-            self.logger.debug(f"Logged interaction for customer {customer_id}.")
+            self.logger.debug("Logged interaction for customer %s.", customer_id)
         except Exception as e:
-            self.logger.error(f"Failed to log interaction: {e}")
+            self.logger.error("Failed to log interaction: %s", e)
         return response
 
-    async def _safe_response_create(self, **kwargs):
+    async def _safe_response_create(self, **kwargs: Any) -> ChatCompletion:
         """Thin wrapper delegating to :pyfunc:`utils.openai_utils.safe_chat_completion`."""
+        if self.client is None:
+            raise RuntimeError("OpenAI client not initialized.")
         return await safe_chat_completion(
             self.client,
             logger=self.logger,
@@ -269,13 +261,9 @@ class RetailCustomerServiceAgent:
             self.logger.error(f"LLM intent classification failed: {e}")
             return "general_inquiry"
 
-    async def _extract_order_id(
-        self, message: str, recent_orders: list[dict]
-    ) -> str | None:
+    async def _extract_order_id(self, message: str, recent_orders: list[dict[str, Any]]) -> str | None:
         """Extract order ID from message or infer from recent orders."""
-        match = re.search(
-            r"(?:#|order\s*|order number\s*)?([a-z0-9]{6,})", message, re.IGNORECASE
-        )
+        match = re.search(r"(?:#|order\s*|order number\s*)?([a-z0-9]{6,})", message, re.IGNORECASE)
         plausible_id = None
         if match:
             potential_id = match.group(1)
@@ -285,33 +273,27 @@ class RetailCustomerServiceAgent:
                 re.IGNORECASE,
             ):
                 plausible_id = potential_id.upper()
-                self.logger.debug(
-                    f"Extracted potential order ID via regex: {plausible_id}"
-                )
+                self.logger.debug(f"Extracted potential order ID via regex: {plausible_id}")
                 # Validate against recent orders only if regex found something
                 if plausible_id:
                     is_recent = False
                     for order in recent_orders:
                         order_id_val = order.get("order_id")
                         if order_id_val and order_id_val.upper() == plausible_id:
-                            self.logger.debug(
-                                f"Regex extracted ID {plausible_id} matches recent order."
-                            )
+                            self.logger.debug(f"Regex extracted ID {plausible_id} matches recent order.")
                             is_recent = True
                             # Return the correctly cased ID from the order system
-                            return order_id_val
+                            return str(order_id_val)
                     if not is_recent:
-                         self.logger.debug(f"Regex ID {plausible_id} not in recent orders.")
-                         # Keep plausible_id, LLM might confirm/deny
+                        self.logger.debug(f"Regex ID {plausible_id} not in recent orders.")
+                        # Keep plausible_id, LLM might confirm/deny
 
-        if not self.client: # Should be AsyncOpenAI if initialized
+        if not self.client:  # Should be AsyncOpenAI if initialized
             self.logger.warning("LLM client not available for order ID extraction.")
             return plausible_id
 
         # Ensure recent_order_ids is explicitly list[str]
-        recent_order_ids: list[str] = [
-            o_id for o in recent_orders if (o_id := o.get("order_id")) is not None
-        ]
+        recent_order_ids: list[str] = [o_id for o in recent_orders if (o_id := o.get("order_id")) is not None]
         if not recent_order_ids:
             self.logger.debug("No recent orders available for LLM inference.")
             return plausible_id
@@ -321,7 +303,7 @@ class RetailCustomerServiceAgent:
             result = await nlp.extract_order_id_llm(
                 client=self.client,
                 message=message,
-                recent_order_ids=recent_order_ids, # Pass the extracted list
+                recent_order_ids=recent_order_ids,  # Pass the extracted list
                 model=self.utility_model,
                 logger=self.logger,
                 retry_attempts=self.retry_attempts,
@@ -330,7 +312,7 @@ class RetailCustomerServiceAgent:
             self.logger.debug(f"LLM order ID extraction result: '{result}'")
             # If LLM returns an ID, use it. If it returns None (due to ambiguity, etc.),
             # rely on the plausible_id from regex (which might also be None).
-            return result if result else plausible_id
+            return cast(str | None, result) if result else plausible_id
         except Exception as e:
             self.logger.error(f"LLM order ID extraction failed via helper: {e}")
             return plausible_id
@@ -349,10 +331,13 @@ class RetailCustomerServiceAgent:
                 retry_attempts=self.retry_attempts,
                 retry_backoff=self.retry_backoff,
             )
-            self.logger.debug(f"LLM product identifier extraction result: '{result}'")
+            self.logger.debug(
+                "LLM product identifier extraction result: '%s'",
+                result,
+            )
             return result
         except Exception as e:
-            self.logger.error(f"LLM product identifier extraction failed: {e}")
+            self.logger.error("LLM product identifier extraction failed: %s", e)
             return None
 
     async def _generate_response(
@@ -366,7 +351,9 @@ class RetailCustomerServiceAgent:
         """Generate a response using the LLM based on intent and context."""
         if not self.client:
             return {
-                "message": "I apologize, our AI assistance is currently unavailable. Can I help with anything else?",
+                "message": (
+                    "I apologize, our AI assistance is currently unavailable. Can I help with anything else?"
+                ),
                 "intent": intent,
                 "actions": [],
                 "error": "LLM client not available",
@@ -384,7 +371,7 @@ class RetailCustomerServiceAgent:
             completion = await safe_chat_completion(
                 self.client,
                 model=self.response_model,
-                messages=[{"role": "system", "content": final_system_prompt}], # Use messages
+                messages=[{"role": "system", "content": final_system_prompt}],  # Use messages
                 logger=self.logger,
                 retry_attempts=self.retry_attempts,
                 retry_backoff=self.retry_backoff,
@@ -393,9 +380,11 @@ class RetailCustomerServiceAgent:
                 stop=None,
             )
             # Use choices[0].message.content
-            generated_message = completion.choices[0].message.content.strip() if completion.choices[0].message.content else ""
+            generated_message = (
+                completion.choices[0].message.content.strip() if completion.choices[0].message.content else ""
+            )
             self.logger.debug(f"LLM generated response: '{generated_message[:100]}...'")
-            
+
             actions = await extract_actions(
                 self.client,
                 intent=intent,
@@ -406,7 +395,7 @@ class RetailCustomerServiceAgent:
                 retry_attempts=self.retry_attempts,
                 retry_backoff=self.retry_backoff,
             )
-            self.logger.debug(f"Extracted actions: {actions}")
+            self.logger.debug("Extracted actions: %s", actions)
             customer_sentiment = await self._analyze_sentiment(message)
             return {
                 "message": generated_message,
@@ -415,9 +404,13 @@ class RetailCustomerServiceAgent:
                 "customer_sentiment": customer_sentiment,
             }
         except Exception as e:
-            self.logger.error(f"LLM response generation failed: {e}", exc_info=True)
+            self.logger.error("LLM response generation failed: %s", e, exc_info=True)
             return {
-                "message": "I apologize, but I'm having technical difficulties and can't generate a full response right now. Could you please rephrase your request, or contact our support team directly?",
+                "message": (
+                    "I apologize, but I'm having technical difficulties and can't "
+                    "generate a full response right now. Could you please rephrase "
+                    "your request, or contact our support team directly?"
+                ),
                 "intent": intent,
                 "actions": [],
                 "error": str(e),
@@ -437,15 +430,15 @@ class RetailCustomerServiceAgent:
                 retry_attempts=self.retry_attempts,
                 retry_backoff=self.retry_backoff,
             )
-            self.logger.debug(f"Analyzed sentiment as: {sentiment}")
+            self.logger.debug("Analyzed sentiment as: %s", sentiment)
             return sentiment
         except Exception as e:
-            self.logger.error(f"LLM sentiment analysis failed: {e}")
+            self.logger.error("LLM sentiment analysis failed: %s", e)
             return "neutral"
 
     async def _log_interaction(
-        self, customer_id: str, intent: str, message: str, response: dict
-    ):
+        self, customer_id: str, intent: str, message: str, response: dict[str, Any]
+    ) -> None:
         """Log the interaction details."""
         log_entry = {
             "timestamp": datetime.now().isoformat(),
@@ -457,8 +450,13 @@ class RetailCustomerServiceAgent:
             "error": response.get("error"),
             "customer_sentiment": response.get("customer_sentiment"),
         }
+        has_error = log_entry["error"] is not None
         self.logger.info(
-            f"Interaction logged: C:{customer_id}, Intent:{intent}, Actions:{len(log_entry['actions_taken'])}, Error:{log_entry['error'] is not None}"
+            "Interaction logged: C:%s, Intent:%s, Actions:%s, Error:%s",
+            customer_id,
+            intent,
+            len(log_entry["actions_taken"]),
+            has_error,
         )
         # Extend this method to persist logs to a database or analytics system as needed.
         pass

@@ -1,26 +1,31 @@
 """
 Sensor agent module for processing multi-source sensor data in retail environments.
 
-Contains the SensorDataProcessor class, which ingests, processes, and manages sensor data streams for real-time inventory and environment monitoring.
+Contains the SensorDataProcessor class, which ingests, processes, and manages
+sensor data streams for real-time inventory and environment monitoring.
 """
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timedelta
 from typing import Any
+
 from fastapi import FastAPI, WebSocket
 
 # Note: inventory_system and alert_system must be provided by the user of this class.
+
+logger = logging.getLogger(__name__)
 
 
 class SensorDataProcessor:
     def __init__(
         self,
         store_id: str,
-        inventory_system,
-        alert_system,
+        inventory_system: Any,
+        alert_system: Any,
         confidence_thresholds: dict[str, float] | None = None,
-    ):
+    ) -> None:
         """
         Initialize the sensor data processor for a given store.
         Args:
@@ -37,24 +42,18 @@ class SensorDataProcessor:
             "smart_shelf": 0.75,
             "computer_vision": 0.80,
         }
-        self.recent_readings: dict[
-            str, list[dict[str, Any]]
-        ] = {}  # Raw recent sensor readings
-        self.product_state: dict[
-            str, dict[str, Any]
-        ] = {}  # Current believed state of products
-        self.discrepancies: dict[
-            str, dict[str, Any]
-        ] = {}  # Tracking inventory discrepancies
+        self.recent_readings: dict[str, list[dict[str, Any]]] = {}  # Raw recent sensor readings
+        self.product_state: dict[str, dict[str, Any]] = {}  # Current believed state of products
+        self.discrepancies: dict[str, dict[str, Any]] = {}  # Tracking inventory discrepancies
         self.app = FastAPI()
         self.setup_routes()
         self.active_connections: set[WebSocket] = set()
 
-    def setup_routes(self):
+    def setup_routes(self) -> None:
         """Configure API endpoints for sensor data ingestion."""
 
         @self.app.websocket("/sensor-stream")
-        async def sensor_stream_endpoint(websocket: WebSocket):
+        async def sensor_stream_endpoint(websocket: WebSocket) -> None:
             await websocket.accept()
             self.active_connections.add(websocket)
             try:
@@ -67,21 +66,19 @@ class SensorDataProcessor:
                 self.active_connections.remove(websocket)
 
         @self.app.post("/sensor-batch")
-        async def sensor_batch_endpoint(data: dict[str, Any]):
+        async def sensor_batch_endpoint(data: dict[str, Any]) -> dict[str, Any]:
             """Endpoint for batch uploads of sensor data."""
             for reading in data.get("readings", []):
                 await self.process_sensor_message(reading)
             return {"status": "processed", "count": len(data.get("readings", []))}
 
-    async def process_sensor_message(self, message: dict[str, Any]):
+    async def process_sensor_message(self, message: dict[str, Any]) -> None:
         """Process an incoming sensor reading."""
         sensor_id = message.get("sensor_id")
         sensor_type = message.get("sensor_type")
         if not isinstance(sensor_id, str):
-            print(f"Warning: Invalid or missing sensor_id in message: {message}")
+            logger.warning("Invalid or missing sensor_id in message: %s", message)
             return
-        location = message.get("location", {})
-        timestamp = message.get("timestamp")
         if sensor_id not in self.recent_readings:
             self.recent_readings[sensor_id] = []
         self.recent_readings[sensor_id].append(message)
@@ -100,7 +97,7 @@ class SensorDataProcessor:
         elif sensor_type == "digital_price_tag":
             await self._process_price_tag_reading(message)
 
-    async def _process_rfid_reading(self, message: dict[str, Any]):
+    async def _process_rfid_reading(self, message: dict[str, Any]) -> None:
         """Process RFID reader data."""
         reader_location = message.get("location", {})
         confidence = message.get("confidence", 1.0)
@@ -108,17 +105,11 @@ class SensorDataProcessor:
             return
         detected_products = message.get("detected_products", [])
         detected_ids = set(item.get("product_id") for item in detected_products)
-        expected_location = (
-            f"{reader_location.get('zone')}.{reader_location.get('section')}"
-        )
-        expected_ids = await self.inventory_system.get_expected_products(
-            self.store_id, expected_location
-        )
+        expected_location = f"{reader_location.get('zone')}.{reader_location.get('section')}"
+        expected_ids = await self.inventory_system.get_expected_products(self.store_id, expected_location)
         missing_ids = expected_ids - detected_ids
         if missing_ids:
-            await self._handle_inventory_discrepancy(
-                expected_location, list(missing_ids), "missing", "rfid"
-            )
+            await self._handle_inventory_discrepancy(expected_location, list(missing_ids), "missing", "rfid")
         unexpected_ids = detected_ids - expected_ids
         if unexpected_ids:
             await self._handle_inventory_discrepancy(
@@ -137,7 +128,7 @@ class SensorDataProcessor:
             ],
         )
 
-    async def _process_smart_shelf_reading(self, message: dict[str, Any]):
+    async def _process_smart_shelf_reading(self, message: dict[str, Any]) -> None:
         """Process weight-sensing shelf data."""
         shelf_id = message.get("shelf_id")
         location = message.get("location", {})
@@ -146,14 +137,10 @@ class SensorDataProcessor:
         product_info = message.get("product_info", {})
 
         # Check if weights are valid numbers before comparing
-        if isinstance(current_weight, (int, float)) and isinstance(
-            expected_weight, (int, float)
-        ):
+        if isinstance(current_weight, int | float) and isinstance(expected_weight, int | float):
             weight_diff = abs(current_weight - expected_weight)
-            unit_weight = product_info.get(
-                "unit_weight_grams", 1
-            )  # Default to 1 to avoid division by zero
-            if not isinstance(unit_weight, (int, float)) or unit_weight <= 0:
+            unit_weight = product_info.get("unit_weight_grams", 1)  # Default to 1 to avoid division by zero
+            if not isinstance(unit_weight, int | float) or unit_weight <= 0:
                 unit_weight = 1  # Ensure unit_weight is a positive number
 
             weight_threshold = unit_weight * 0.5
@@ -161,9 +148,7 @@ class SensorDataProcessor:
                 estimated_units = max(0, round(current_weight / unit_weight))
                 expected_units = max(0, round(expected_weight / unit_weight))
                 if estimated_units < expected_units:
-                    discrepancy_type = (
-                        "low_stock" if estimated_units > 0 else "out_of_stock"
-                    )
+                    discrepancy_type = "low_stock" if estimated_units > 0 else "out_of_stock"
                     await self._handle_inventory_discrepancy(
                         f"{location.get('zone')}.{location.get('section')}.{shelf_id}",
                         [product_info.get("product_id")],
@@ -184,11 +169,14 @@ class SensorDataProcessor:
                     source="smart_shelf",
                 )
         else:
-            print(
-                f"Warning: Invalid weight values for smart shelf {shelf_id}: current={current_weight}, expected={expected_weight}"
+            logger.warning(
+                "Invalid weight values for smart shelf %s: current=%s, expected=%s",
+                shelf_id,
+                current_weight,
+                expected_weight,
             )
 
-    async def _process_environmental_reading(self, message: dict[str, Any]):
+    async def _process_environmental_reading(self, message: dict[str, Any]) -> None:
         """Process environmental sensor data."""
         sensor_type = message.get("environmental_type")
         value = message.get("value")
@@ -198,7 +186,7 @@ class SensorDataProcessor:
         alert_priority = "info"
 
         # Check if value is a valid number before comparing
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             if sensor_type == "temperature":
                 zone_type = location.get("zone_type", "ambient")
                 if zone_type == "refrigerated" and value > 5:
@@ -208,14 +196,14 @@ class SensorDataProcessor:
                     threshold_exceeded = True
                     alert_priority = "high" if value > -10 else "medium"
             elif sensor_type == "humidity":
-                if location.get("zone_type") == "produce" and (
-                    value < 80 or value > 95
-                ):
+                if location.get("zone_type") == "produce" and (value < 80 or value > 95):
                     threshold_exceeded = True
                     alert_priority = "medium"
         else:
-            print(
-                f"Warning: Invalid or missing numeric value for environmental sensor {message.get('sensor_id')}: {value}"
+            logger.warning(
+                "Invalid or missing numeric value for environmental sensor %s: %s",
+                message.get("sensor_id"),
+                value,
             )
 
         if threshold_exceeded:
@@ -242,7 +230,7 @@ class SensorDataProcessor:
                     timestamp=message.get("timestamp"),
                 )
 
-    async def _process_price_tag_reading(self, message: dict[str, Any]):
+    async def _process_price_tag_reading(self, message: dict[str, Any]) -> None:
         """Process digital price tag status updates."""
         tag_id = message.get("tag_id")
         product_id = message.get("product_id")
@@ -261,12 +249,8 @@ class SensorDataProcessor:
                     "product_id": product_id,
                 },
             )
-        expected_price = await self.inventory_system.get_current_price(
-            self.store_id, product_id
-        )
-        if isinstance(price_displayed, (int, float)) and isinstance(
-            expected_price, (int, float)
-        ):
+        expected_price = await self.inventory_system.get_current_price(self.store_id, product_id)
+        if isinstance(price_displayed, int | float) and isinstance(expected_price, int | float):
             if price_displayed != expected_price:
                 await self.alert_system.send_alert(
                     alert_type="price_discrepancy",
@@ -280,16 +264,19 @@ class SensorDataProcessor:
                     },
                 )
                 if isinstance(tag_id, str) and isinstance(product_id, str):
-                    await self._request_price_tag_update(
-                        tag_id, product_id, expected_price
-                    )
+                    await self._request_price_tag_update(tag_id, product_id, expected_price)
                 else:
-                    print(
-                        f"Warning: Invalid tag_id ({tag_id}) or product_id ({product_id}) for price update."
+                    logger.warning(
+                        "Invalid tag_id (%s) or product_id (%s) for price update.",
+                        tag_id,
+                        product_id,
                     )
         elif expected_price is not None:
-            print(
-                f"Warning: Could not compare prices for tag {tag_id}. Displayed: {price_displayed}, Expected: {expected_price}"
+            logger.warning(
+                "Could not compare prices for tag %s. Displayed: %s, Expected: %s",
+                tag_id,
+                price_displayed,
+                expected_price,
             )
 
     async def _handle_inventory_discrepancy(
@@ -299,7 +286,7 @@ class SensorDataProcessor:
         discrepancy_type: str,
         source: str,
         details: dict[str, Any] | None = None,
-    ):
+    ) -> None:
         """Handle detected inventory discrepancies."""
         timestamp = datetime.now().isoformat()
         for product_id in product_ids:
@@ -347,9 +334,7 @@ class SensorDataProcessor:
                             },
                         )
 
-    def _calculate_discrepancy_confidence(
-        self, discrepancy_record: dict[str, Any]
-    ) -> float:
+    def _calculate_discrepancy_confidence(self, discrepancy_record: dict[str, Any]) -> float:
         """Calculate confidence score for a discrepancy based on sources and frequency."""
         confidence = 0.5
         source_count = len(discrepancy_record["sources"])
@@ -367,28 +352,26 @@ class SensorDataProcessor:
             confidence += (source_confidence - 0.7) * 0.5
         return min(0.99, confidence)
 
-    async def _request_price_tag_update(
-        self, tag_id: str, product_id: str, price: float
-    ):
+    async def _request_price_tag_update(self, tag_id: str, product_id: str, price: float) -> None:
         """Request update for a digital price tag."""
         # Implementation would depend on your ESL system
         pass
 
-    async def run(self):
+    async def run(self) -> None:
         """Run the main processing loop."""
-        maintenance_task = asyncio.create_task(self._run_maintenance_loop())
+        _maintenance_task = asyncio.create_task(self._run_maintenance_loop())
         import uvicorn
 
-        await uvicorn.run(self.app, host="0.0.0.0", port=8080)
+        await asyncio.to_thread(uvicorn.run, self.app, host="0.0.0.0", port=8080)
 
-    async def _run_maintenance_loop(self):
+    async def _run_maintenance_loop(self) -> None:
         """Run periodic maintenance tasks."""
         while True:
             await self._clean_old_discrepancies()
             await self._cross_validate_sources()
             await asyncio.sleep(300)
 
-    async def _clean_old_discrepancies(self):
+    async def _clean_old_discrepancies(self) -> None:
         """Remove old resolved discrepancies."""
         now = datetime.now()
         to_remove = []
@@ -399,7 +382,7 @@ class SensorDataProcessor:
         for key in to_remove:
             del self.discrepancies[key]
 
-    async def _cross_validate_sources(self):
+    async def _cross_validate_sources(self) -> None:
         """Cross-validate data between different sensor sources."""
         # Implement logic to compare insights from different sensor types
         pass

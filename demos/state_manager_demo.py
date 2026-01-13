@@ -8,19 +8,16 @@ Run with: uvicorn demos.state_manager_demo:app --reload
 
 import json
 import logging
-from typing import Any
 
-from fastapi import FastAPI, HTTPException
 import redis.asyncio as redis
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 # Import models and utilities
 from utils.crdt import PNCounter  # Use the extracted CRDT
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("state-manager")
 
 # Initialize FastAPI app
@@ -47,7 +44,7 @@ class InventoryStateResponse(BaseModel):
     product_id: str
     location_id: str
     current_value: int
-    state: dict[str, Any]  # Show the raw CRDT state
+    state: dict[str, dict[str, int]]  # Show the raw CRDT state
 
 
 # --- Redis Connection Management ---
@@ -57,12 +54,8 @@ class InventoryStateResponse(BaseModel):
 async def startup_event():
     global event_redis, state_redis
     try:
-        event_redis = redis.Redis(
-            host="localhost", port=6379, db=2, decode_responses=True
-        )
-        state_redis = redis.Redis(
-            host="localhost", port=6379, db=3, decode_responses=True
-        )
+        event_redis = redis.Redis(host="localhost", port=6379, db=2, decode_responses=True)
+        state_redis = redis.Redis(host="localhost", port=6379, db=3, decode_responses=True)
         await event_redis.ping()
         await state_redis.ping()
         logger.info("Connected to Redis databases (DB2 for events, DB3 for state).")
@@ -162,20 +155,26 @@ async def update_inventory(update: InventoryUpdate):
         if update.increment is not None and update.increment > 0:
             counter.increment(update.node_id, update.increment)
             logger.info(
-                f"Applied INCREMENT from {update.node_id} ({update.increment}) to {counter.product_id}:{counter.location_id}"
+                "Applied INCREMENT from %s (%s) to %s:%s",
+                update.node_id,
+                update.increment,
+                counter.product_id,
+                counter.location_id,
             )
         elif update.decrement is not None and update.decrement > 0:
             counter.decrement(update.node_id, update.decrement)
             logger.info(
-                f"Applied DECREMENT from {update.node_id} ({update.decrement}) to {counter.product_id}:{counter.location_id}"
+                "Applied DECREMENT from %s (%s) to %s:%s",
+                update.node_id,
+                update.decrement,
+                counter.product_id,
+                counter.location_id,
             )
         else:
-            raise HTTPException(
-                400, "Update must contain a positive increment or decrement."
-            )
+            raise HTTPException(400, "Update must contain a positive increment or decrement.")
 
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
     # Save the updated state
     await save_crdt_state(counter)
@@ -191,9 +190,7 @@ async def update_inventory(update: InventoryUpdate):
     )
 
 
-@app.get(
-    "/inventory/state/{location_id}/{product_id}", response_model=InventoryStateResponse
-)
+@app.get("/inventory/state/{location_id}/{product_id}", response_model=InventoryStateResponse)
 async def get_inventory_state(location_id: str, product_id: str):
     """Get the current merged value and raw state of the CRDT counter."""
     if not state_redis:
@@ -227,7 +224,9 @@ async def get_inventory_state(location_id: str, product_id: str):
 #                         update_event_data = json.loads(message_data['data'])
 #                         update_event = InventoryUpdate(**update_event_data)
 #                         # Get local CRDT state
-#                         local_counter = await get_crdt_state(update_event.product_id, update_event.location_id)
+#                         local_counter = await get_crdt_state(
+#                             update_event.product_id, update_event.location_id
+#                         )
 #                         # Apply the received update (conceptually merging)
 #                         if update_event.increment:
 #                             local_counter.increment(update_event.node_id, update_event.increment)

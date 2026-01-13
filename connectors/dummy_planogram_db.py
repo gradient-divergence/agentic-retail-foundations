@@ -4,8 +4,8 @@ Module: connectors.dummy_planogram_db
 Provides a dummy in-memory planogram database for testing shelf monitoring agents.
 """
 
-from typing import Any
 import asyncio
+from typing import Any
 
 
 class DummyPlanogramDB:
@@ -56,9 +56,7 @@ class DummyPlanogramDB:
         key = f"{location_id}-{section_id}"
         return self._cams.get(key)
 
-    async def get_section_planogram(
-        self, location_id: str, section_id: str
-    ) -> dict[str, Any] | None:
+    async def get_section_planogram(self, location_id: str, section_id: str) -> dict[str, Any] | None:
         """Get the planogram for a given location and section."""
         await asyncio.sleep(0.01)
         key = f"{location_id}-{section_id}"

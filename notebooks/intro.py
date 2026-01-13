@@ -1,35 +1,41 @@
 import marimo
 
-__generated_with = "0.13.2"
+__generated_with = "0.18.4"
 app = marimo.App()
 
 
 @app.cell
 def _():
     import marimo as mo
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
 
     return (mo,)
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        # Chapter 1: Introduction
+    mo.md(r"""
+    # Chapter 1: Introduction
 
-        In this chapter, we explore what makes AI "agentic," transitioning from traditional methods to autonomous decision-making systems. 
+    In this chapter, we explore what makes AI "agentic," transitioning from traditional methods to autonomous decision-making systems.
 
-        We'll discuss foundational concepts, the AI lifecycle, and the essential building blocks that position agentic AI as a transformative force in retail. 
+    We'll discuss foundational concepts, the AI lifecycle, and the essential building blocks that position agentic AI as a transformative force in retail.
 
-        Readers will gain clarity on how proactive intelligence reshapes inventory management, pricing, and customer experiences, setting the stage for deeper exploration in subsequent chapters​.
-        """
-    )
+    Readers will gain clarity on how proactive intelligence reshapes inventory management, pricing, and customer experiences, setting the stage for deeper exploration in subsequent chapters​.
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""## Imports""")
+    mo.md(r"""
+    ## Imports
+    """)
     return
 
 
@@ -37,13 +43,14 @@ def _(mo):
 def _():
     # Import InventoryAgent from the agents module (modularized)
     from agents.inventory import InventoryAgent
-
     return (InventoryAgent,)
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""## Example: Simulation of agent in an environment loop""")
+    mo.md(r"""
+    ## Example: Simulation of agent in an environment loop
+    """)
     return
 
 
@@ -68,13 +75,11 @@ def _(InventoryAgent):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        **Explanation:** This agent checks a product's stock each day and autonomously decides to place a reorder when stock falls below a threshold. 
+    mo.md(r"""
+    **Explanation:** This agent checks a product's stock each day and autonomously decides to place a reorder when stock falls below a threshold.
 
-        After acting, it updates its internal stock state. (In a real scenario, learning could be implemented to adjust the reorder threshold or predict optimal order quantities over time.)
-        """
-    )
+    After acting, it updates its internal stock state. (In a real scenario, learning could be implemented to adjust the reorder threshold or predict optimal order quantities over time.)
+    """)
     return
 
 

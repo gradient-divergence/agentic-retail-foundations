@@ -4,9 +4,10 @@ Auction protocol implementation for procurement in retail settings.
 This module implements various auction protocols used in procurement and supplier bidding scenarios.
 """
 
-from typing import Any
+# region book:procurement-auction-protocol
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from models.procurement import PurchaseOrder, PurchaseOrderStatus, SupplierBid
 from models.supplier import Supplier
@@ -126,8 +127,7 @@ class ProcurementAuction:
 
         # Update best bid if this is better (lower for reverse auction)
         if self.current_best_bid is None or (
-            self.auction_type == AuctionType.REVERSE
-            and bid.price < self.current_best_bid.price
+            self.auction_type == AuctionType.REVERSE and bid.price < self.current_best_bid.price
         ):
             self.current_best_bid = bid
 
@@ -199,9 +199,7 @@ class ProcurementAuction:
             "action": "round_advanced",
             "new_round": self.current_round,
             "max_rounds": self.max_rounds,
-            "current_best_price": (
-                self.current_best_bid.price if self.current_best_bid else None
-            ),
+            "current_best_price": (self.current_best_bid.price if self.current_best_bid else None),
         }
         self.auction_history.append(event)
 
@@ -291,3 +289,6 @@ class ProcurementAuction:
         self.auction_history.append(event)
 
         return True
+
+
+# endregion book:procurement-auction-protocol

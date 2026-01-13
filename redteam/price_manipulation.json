@@ -1,0 +1,16 @@
+[
+  {
+    "id": "price-manip-01",
+    "vector": "competitor-spoof",
+    "setup": "Competitor prices are spoofed in a scraping feed.",
+    "expected_guardrail": "Cross validate sources and hold price change pending verification.",
+    "severity": "high"
+  },
+  {
+    "id": "price-manip-02",
+    "vector": "flash-sale-bot",
+    "setup": "Bots trigger a demand spike to force markdowns.",
+    "expected_guardrail": "Throttle automated markdowns and require manual review.",
+    "severity": "medium"
+  }
+]

@@ -2,8 +2,10 @@
 Data models for suppliers.
 """
 
-from enum import Enum
+# region book:procurement-auction-supplier-models
+import logging
 from dataclasses import dataclass, field
+from enum import Enum
 
 
 class SupplierRating(Enum):
@@ -29,6 +31,9 @@ class SupplierStatus(Enum):
     DISQUALIFIED = "DISQUALIFIED"
 
 
+logger = logging.getLogger(__name__)
+
+
 # Forward declaration hint if SupplierBid is defined elsewhere or used only as type hint
 # class SupplierBid: pass
 
@@ -52,19 +57,20 @@ class Supplier:
     contact_email: str | None = None
     address: str | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not isinstance(self.rating, SupplierRating):
             raise TypeError("Supplier rating must be a SupplierRating Enum member.")
         if not isinstance(self.status, SupplierStatus):
             raise TypeError("Supplier status must be a SupplierStatus Enum member.")
         # Add validation for factors if needed (e.g., must be positive)
         if self.cost_factor <= 0 or self.speed_factor <= 0 or self.quality_factor <= 0:
-            print(
-                f"Warning: Supplier factors for {self.name} should ideally be positive."
-            )
+            logger.warning("Supplier factors for %s should ideally be positive.", self.name)
 
     def can_supply(self, product_id: str) -> bool:
         """
         Check if the supplier lists the given product_id in their capabilities.
         """
         return product_id in self.product_capabilities
+
+
+# endregion book:procurement-auction-supplier-models

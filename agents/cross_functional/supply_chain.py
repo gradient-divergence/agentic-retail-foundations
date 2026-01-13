@@ -2,10 +2,13 @@
 SupplyChainAgent for planning initial distribution and supply chain remediation in retail MAS.
 """
 
+import asyncio
+import logging
+import random
 from datetime import datetime, timedelta
 from typing import Any
-import asyncio
-import random
+
+logger = logging.getLogger(__name__)
 
 
 class SupplyChainAgent:
@@ -13,18 +16,20 @@ class SupplyChainAgent:
     Agent responsible for planning initial distribution and suggesting supply chain remediation.
     """
 
-    def __init__(self):
-        print("SupplyChainAgent initialized")
+    def __init__(self) -> None:
+        logger.info("SupplyChainAgent initialized")
 
-    async def plan_inventory(self, product_data: dict[str, Any]):
+    async def plan_inventory(self, product_data: dict[str, Any]) -> dict[str, Any]:
         """Placeholder: Plan initial inventory based on forecast."""
         forecast = product_data.get("first_month_forecast", 0)
         lead_time = product_data.get("lead_time_days", 30)
-        print(
-            f"SupplyChain: Planning inventory for {forecast} units (lead time: {lead_time} days)..."
+        logger.info(
+            "SupplyChain: Planning inventory for %s units (lead time: %s days)...",
+            forecast,
+            lead_time,
         )
         await asyncio.sleep(0.3)  # Simulate planning time
-        print("SupplyChain: Initial inventory plan complete.")
+        logger.info("SupplyChain: Initial inventory plan complete.")
         return {"status": "inventory_planned", "initial_order_placed": True}
 
     async def check_readiness(self, product_data: dict[str, Any]) -> dict[str, Any]:
@@ -32,10 +37,8 @@ class SupplyChainAgent:
         agent_name = self.__class__.__name__
         product_id = product_data.get("id", "Unknown Product")
         planned_launch_date = product_data.get("planned_launch_date")
-        lead_time = product_data.get(
-            "lead_time_days", 30
-        )  # Default lead time if not specified
-        print(f"SupplyChain: Checking readiness for {product_id}...")
+        lead_time = product_data.get("lead_time_days", 30)  # Default lead time if not specified
+        logger.info("SupplyChain: Checking readiness for %s...", product_id)
         await asyncio.sleep(random.uniform(0.1, 0.3))
 
         status = "blocked"
@@ -58,15 +61,25 @@ class SupplyChainAgent:
 
             if estimated_arrival_date <= planned_launch_date:
                 status = "ready"
-                details = f"Initial inventory order confirmed. Estimated arrival: {estimated_arrival_date.strftime('%Y-%m-%d')}."
+                details = (
+                    "Initial inventory order confirmed. Estimated arrival: "
+                    f"{estimated_arrival_date.strftime('%Y-%m-%d')}."
+                )
                 readiness_date = estimated_arrival_date
             else:
                 status = "blocked"
-                details = f"Potential supply delay. Estimated arrival {estimated_arrival_date.strftime('%Y-%m-%d')} is after launch date."
+                details = (
+                    "Potential supply delay. Estimated arrival "
+                    f"{estimated_arrival_date.strftime('%Y-%m-%d')} is after launch date."
+                )
                 readiness_date = estimated_arrival_date
 
-        print(
-            f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}"
+        logger.info(
+            "%s: %s (%s) - Est. Ready Date: %s",
+            agent_name,
+            status,
+            details,
+            readiness_date.strftime("%Y-%m-%d") if isinstance(readiness_date, datetime) else "N/A",
         )
         return {
             "agent": agent_name,
@@ -85,20 +98,22 @@ class SupplyChainAgent:
         """
         Plan initial distribution of product to stores.
         """
-        print(
-            f"Supply Chain: Planning distribution for {product_id}, {forecast_units} units"
+        logger.info(
+            "Supply Chain: Planning distribution for %s, %s units",
+            product_id,
+            forecast_units,
         )
         await asyncio.sleep(0.5)
         return {
             "status": "ready",
-            "summary": f"Distribution plan ready for {forecast_units} units across {len(store_allocation)} stores",
+            "summary": (
+                f"Distribution plan ready for {forecast_units} units across {len(store_allocation)} stores"
+            ),
             "allocation_by_store": store_allocation,
             "completion_date": datetime.now() + timedelta(days=3),
         }
 
-    async def suggest_remediation(
-        self, product_id: str, current_status: str
-    ) -> dict[str, Any]:
+    async def suggest_remediation(self, product_id: str, current_status: str) -> dict[str, Any]:
         """
         Suggest remediation steps for supply chain issues.
         """

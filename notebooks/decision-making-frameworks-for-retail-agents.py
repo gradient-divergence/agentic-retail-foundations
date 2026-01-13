@@ -1,13 +1,21 @@
 import marimo
 
-__generated_with = "0.13.2"
+__generated_with = "0.18.4"
 app = marimo.App(width="medium")
 
 
 @app.cell
 def _():
-    import marimo as mo
     import logging
+
+    import marimo as mo
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
 
     # Configure logging once at the start
     logging.basicConfig(
@@ -15,33 +23,31 @@ def _():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     logger = logging.getLogger("AgentFrameworks")  # Main logger for the notebook
-
-    return logger, mo
+    return (mo,)
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""# Decision-making Frameworks for Retail Agents""")
+    mo.md(r"""
+    # Decision-making Frameworks for Retail Agents
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ## Chapter 3: Decision-Making Frameworks - Statistical & Causal
+    mo.md(r"""
+    ## Chapter 3: Decision-Making Frameworks - Statistical & Causal
 
-        ### BayesianRecommendationAgent
-        See the agent's code in `agents/bayesian.py` for full implementation details.
-        """
-    )
+    ### BayesianRecommendationAgent
+    See the agent's code in `agents/bayesian.py` for full implementation details.
+    """)
     return
 
 
 @app.cell
 def _():
     from demos.recommendation import demo_bayesian_recommendations
-
     return (demo_bayesian_recommendations,)
 
 
@@ -89,7 +95,6 @@ def _(demo_bayesian_recommendations):
                 ),
             ]
         )
-
     return (demonstrate_bayesian_recommendations,)
 
 
@@ -107,45 +112,78 @@ def _(demonstration_output):
 
 
 @app.cell
-def _(mo):
-    mo.md(r"""## Chapter 4: Decision-Making Frameworks - Sequential""")
-    return
+def _(demo_bayesian_recommendations):
+    import numpy as _np
+    import pandas as _pd
 
+    # Deterministic, notebook-friendly scenario for regression-style review
+    _np.random.seed(7)
+    recommendations, agent, _, catalog = demo_bayesian_recommendations()
 
-@app.cell
-def _(mo):
-    mo.md(
-        r"""
-        ### MDP/Q-Learning Dynamic Pricing Demo
-
-        Configure the environment and agent hyperparameters below, then click 
-        **Run Simulation** to train a Q-learning agent for dynamic pricing.
-        Results will include a learning curve and a sample of the learned policy.
-
-        - For `DynamicPricingMDP`:
-            ```python
-                from environments.mdp import DynamicPricingMDP
-            ```
-        - For `QLearningAgent` :
-            ```python
-                from agents.qlearning import QLearningAgent
-            ```
-        - For Configurations:
-            ```python
-              from config.config import DynamicPricingMDPConfig, QLearningAgentConfig
-            ```
-        - For Demo (`demonstrate_mdp_dynamic_pricing`):
-            ```python
-                from demos.dynamic_pricing import demonstrate_mdp_dynamic_pricing
-            ```
-        """
+    rows = []
+    for product_id in recommendations:
+        item = catalog[product_id]
+        rows.append(
+            {
+                "product_id": product_id,
+                "name": item["name"],
+                "category": item["category"],
+                "price": item["price"],
+            }
+        )
+    rec_df = _pd.DataFrame(rows)
+    metrics_df = _pd.DataFrame(
+        [
+            {"metric": "recommendations", "value": len(recommendations)},
+            {"metric": "avg_price", "value": round(rec_df["price"].mean(), 2)},
+            {"metric": "unique_categories", "value": rec_df["category"].nunique()},
+        ]
     )
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""### Environment hyperparameters""")
+    mo.md(r"""
+    ## Chapter 4: Decision-Making Frameworks - Sequential
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### MDP/Q-Learning Dynamic Pricing Demo
+
+    Configure the environment and agent hyperparameters below, then click
+    **Run Simulation** to train a Q-learning agent for dynamic pricing.
+    Results will include a learning curve and a sample of the learned policy.
+
+    - For `DynamicPricingMDP`:
+        ```python
+            from environments.mdp import DynamicPricingMDP
+        ```
+    - For `QLearningAgent` :
+        ```python
+            from agents.qlearning import QLearningAgent
+        ```
+    - For Configurations:
+        ```python
+          from config.config import DynamicPricingMDPConfig, QLearningAgentConfig
+        ```
+    - For Demo (`demonstrate_mdp_dynamic_pricing`):
+        ```python
+            from demos.dynamic_pricing import demonstrate_mdp_dynamic_pricing
+        ```
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Environment hyperparameters
+    """)
     return
 
 
@@ -190,7 +228,6 @@ def _(mo):
         100, 20000, value=5000, step=100, label="Training Episodes"
     )
     run_button = mo.ui.run_button(label="Run Simulation")
-
     return (
         available_discounts,
         base_demand,
@@ -243,7 +280,6 @@ def _(
         {run_button}
         """
     )
-
     return
 
 
@@ -251,7 +287,6 @@ def _(
 def _():
     from config.config import DynamicPricingMDPConfig, QLearningAgentConfig
     from demos.dynamic_pricing import demonstrate_mdp_dynamic_pricing
-
     return (
         DynamicPricingMDPConfig,
         QLearningAgentConfig,
@@ -307,7 +342,6 @@ def _(
     # Run the demonstration
 
     # Run simulation and return results
-    # Make sure demonstrate_mdp_dynamic_pricing returns the dict as shown before
     results = demonstrate_mdp_dynamic_pricing(
         env_config=env_config,
         agent_config=agent_config,
@@ -316,13 +350,12 @@ def _(
     )
 
     # Return the raw results needed for visualization
-    # Ensure results dict contains 'episode_returns', 'policy', 'env', 'agent'
     return agent_config, results
 
 
 @app.cell
 def _(mo, results):
-    env = results.get("env")
+    env = results.env
 
     # --- Define UI elements for visualization control ---
     week_slider = mo.ui.slider(
@@ -346,7 +379,6 @@ def _(mo, results):
     q_disc = mo.ui.slider(
         0, len(env.available_discounts) - 1, value=0, label="Q-Explorer: Discount Index"
     )
-
     return env, q_disc, q_inv, q_week, week_slider
 
 
@@ -362,10 +394,10 @@ def _(mo, q_disc, q_inv, q_week, week_slider):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""### Check if UI elements were created 
-        (handles case where Cell 3 returned None)"""
-    )
+    mo.md(r"""
+    ### Check if UI elements were created
+    (handles case where Cell 3 returned None)
+    """)
     return
 
 
@@ -375,21 +407,22 @@ def _(mo, week_slider):
         mo.md("**Waiting for simulation results...**")
 
     import altair as alt
-
     return (alt,)
 
 
 @app.cell
 def _(results):
-    episode_returns = results.get("episode_returns", [])
-    policy = results.get("policy", {})
-    pricing_agent = results.get("agent")
+    episode_returns = results.episode_returns
+    policy = results.policy
+    pricing_agent = results.agent
     return episode_returns, policy, pricing_agent
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""### Check if results are valid before proceeding""")
+    mo.md(r"""
+    ### Check if results are valid before proceeding
+    """)
     return
 
 
@@ -403,16 +436,17 @@ def _(env, episode_returns, mo, policy, pricing_agent):
 
 @app.cell
 def _(mo):
-    mo.md("""### 1. Learning Curve""")
+    mo.md("""
+    ### 1. Learning Curve
+    """)
     return
 
 
 @app.cell
 def _():
     import matplotlib.pyplot as plt
-    import pandas as pd
     import numpy as np
-
+    import pandas as pd
     return np, pd, plt
 
 
@@ -441,7 +475,9 @@ def _(episode_returns, num_training_episodes_val, pd, plt):
 
 @app.cell
 def _(mo):
-    mo.md(r"""### 2. Exploration Rate Over Time""")
+    mo.md(r"""
+    ### 2. Exploration Rate Over Time
+    """)
     return
 
 
@@ -474,7 +510,9 @@ def _(agent_config, num_training_episodes_val, plt):
 
 @app.cell
 def _(mo):
-    mo.md(r"""### 3. Episode Reward Histogram""")
+    mo.md(r"""
+    ### 3. Episode Reward Histogram
+    """)
     return
 
 
@@ -494,7 +532,9 @@ def _(episode_returns, plt):
 
 @app.cell
 def _(mo):
-    mo.md(r"""#### 4. Policy Heatmap""")
+    mo.md(r"""
+    #### 4. Policy Heatmap
+    """)
     return
 
 
@@ -541,7 +581,9 @@ def _(alt, env, mo, pd, policy, week_slider):
 
 @app.cell
 def _(mo):
-    mo.md(r"""### 5. Q-Value Explorer""")
+    mo.md(r"""
+    ### 5. Q-Value Explorer
+    """)
     return
 
 
@@ -588,7 +630,9 @@ def _(env, mo, np, pd, pricing_agent, q_disc, q_inv, q_week):
 
 @app.cell
 def _(mo):
-    mo.md(r"""### 6. Policy Table Sample""")
+    mo.md(r"""
+    ### 6. Policy Table Sample
+    """)
     return
 
 
@@ -631,7 +675,9 @@ def _(env, mo, policy, pricing_agent):
 
 @app.cell
 def _(mo):
-    mo.md(r"""### 7. Q-table sample""")
+    mo.md(r"""
+    ### 7. Q-table sample
+    """)
     return
 
 
@@ -667,7 +713,9 @@ def _(mo, q_table_df):
 
 @app.cell
 def _(mo):
-    mo.md(r"""### Organize all visualizations in tabs""")
+    mo.md(r"""
+    ### Organize all visualizations in tabs
+    """)
     return
 
 
@@ -720,36 +768,33 @@ def _():
 
         # Or simply run final checks or summaries.
         mo.md("All decision-making framework demonstrations are complete.")
-
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ## Chapter 5: Decision-Making - RL & Planning
+    mo.md(r"""
+    ## Chapter 5: Decision-Making - RL & Planning
 
-        ### Store Fulfillment Optimization Demonstration
+    ### Store Fulfillment Optimization Demonstration
 
-        This demonstrates the planning algorithms for optimizing in-store order 
-        fulfillment, including order batching, associate assignment, and 
-        path optimization.
-        
-        - For Models (`Item`, `Order`, `Associate`):
-            ```python
-                from models.fulfillment import Item, Order, Associate
-            ```
-        - For Planning (`StoreLayout`, `FulfillmentPlanner`):
-            ```python
-                from utils.planning import StoreLayout, FulfillmentPlanner
-            ```
-        - For Demo (`demo_fulfillment_system`):
-             ```python
-                from demos.fulfillment_planning_demo import demo_fulfillment_system
-            ```
-        """
-    )
+    This demonstrates the planning algorithms for optimizing in-store order
+    fulfillment, including order batching, associate assignment, and
+    path optimization.
+
+    - For Models (`Item`, `Order`, `Associate`):
+        ```python
+            from models.fulfillment import Item, Order, Associate
+        ```
+    - For Planning (`StoreLayout`, `FulfillmentPlanner`):
+        ```python
+            from utils.planning import StoreLayout, FulfillmentPlanner
+        ```
+    - For Demo (`demo_fulfillment_system`):
+         ```python
+            from demos.fulfillment_planning_demo import demo_fulfillment_system
+        ```
+    """)
     return
 
 
@@ -762,7 +807,7 @@ def _(mo):
     fulfillment_output = demo_fulfillment_system(mo)
 
     # Display the output returned by the demo function
-    return fulfillment_output
+    return
 
 
 if __name__ == "__main__":

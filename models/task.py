@@ -2,11 +2,13 @@
 Data models related to tasks and bidding in coordination protocols like Contract Net.
 """
 
-from enum import Enum
-from dataclasses import dataclass, field
-import uuid
-from typing import Any
+# region book:task-allocation-task-models
+import logging
 import time
+import uuid
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 
 class TaskStatus(Enum):
@@ -38,6 +40,9 @@ class TaskType(Enum):
     # Add more specific retail task types as needed
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class Task:
     """
@@ -57,7 +62,7 @@ class Task:
     creation_time: float = field(default_factory=time.time)
     data: dict[str, Any] | None = None  # For additional task-specific data
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Basic validation
         if not isinstance(self.type, TaskType):
             raise TypeError("Task type must be a TaskType Enum member.")
@@ -65,8 +70,10 @@ class Task:
             raise TypeError("Task status must be a TaskStatus Enum member.")
         if not (1 <= self.urgency <= 10):
             # Consider logging a warning instead of raising error for flexibility
-            print(
-                f"Warning: Task urgency ({self.urgency}) outside typical range 1-10 for task {self.id}"
+            logger.warning(
+                "Task urgency (%s) outside typical range 1-10 for task %s",
+                self.urgency,
+                self.id,
             )
             # raise ValueError("Urgency must be between 1 and 10.")
 
@@ -84,14 +91,18 @@ class Bid:
     # Optional fields providing more context for bid evaluation:
     estimated_completion_time: float | None = None
     agent_capacity_available: int | None = None
-    confidence_score: float | None = (
-        None  # Agent's confidence in completing the task
-    )
+    confidence_score: float | None = None  # Agent's confidence in completing the task
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.bid_value < 0:
             # Depending on bid semantics, negative might be invalid
-            print(
-                f"Warning: Bid value ({self.bid_value}) is negative for task {self.task_id} by agent {self.agent_id}"
+            logger.warning(
+                "Bid value (%s) is negative for task %s by agent %s",
+                self.bid_value,
+                self.task_id,
+                self.agent_id,
             )
             # raise ValueError("Bid value cannot be negative.")
+
+
+# endregion book:task-allocation-task-models

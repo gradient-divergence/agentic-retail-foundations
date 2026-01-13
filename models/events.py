@@ -2,9 +2,13 @@
 Data models for events within the agent system.
 """
 
+from __future__ import annotations
+
+# region book:order-orchestration-retail-event
 import uuid
 from datetime import datetime
 from typing import Any
+
 from pydantic import BaseModel, Field  # Use Pydantic as in notebook
 
 # Import relevant Enums
@@ -24,6 +28,9 @@ class RetailEvent(BaseModel):  # Using Pydantic BaseModel
     # # Removed to_json method - Pydantic handles serialization
     # def to_json(self) -> str:
     #     ...
+
+
+# endregion book:order-orchestration-retail-event
 
 
 # Inventory Event Models (from notebook)

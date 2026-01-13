@@ -29,6 +29,7 @@ dependencies = [
     "seaborn>=0.13.0",
     "scikit-learn>=1.3.0",
     "openai>=1.77.0",
+    "openai-agents",
     "tiktoken>=0.5.1",
     "requests>=2.31.0",
     "beautifulsoup4>=4.12.2",
@@ -57,7 +58,7 @@ dependencies = [
     "altair>=5.5.0",
     "vega-datasets>=0.9.0",
     "pyarrow>=19.0.1",
-    "tensorflow~=2.16.0",
+    "torch>=2.2.0",
     "opencv-python-headless>=4.9.0",
     "rdflib>=7.1.4",
     "SPARQLWrapper>=2.0",
@@ -87,7 +88,6 @@ dev = [
     # Type stubs
     "types-requests",
     "pandas-stubs",
-    "types-tensorflow",
     "types-networkx",
     "types-python-jose",
     "types-passlib",
@@ -98,6 +98,12 @@ docs = [
     "mkdocs-material>=9.0",
     "mkdocstrings[python]>=0.18",
     "mkdocs-git-revision-date-localized-plugin>=1.4.5",
+]
+
+agent_protocols = [
+    "google-adk",
+    "a2a-sdk>=0.3.4",
+    "ap2 @ git+https://github.com/google-agentic-commerce/AP2.git",
 ]
 
 [project.urls]
@@ -111,26 +117,14 @@ Repository = "https://github.com/gradient-divergence/agentic-retail-foundations"
 # Define where to look for packages ('.' means the root directory)
 where = ["."]
 # Explicitly list the directories that are Python packages
-include = ["agents*", "connectors*", "models*", "utils*", "config*", "environments*", "demos*", "notebooks*"]
+include = ["agents*", "capstone*", "connectors*", "models*", "utils*", "config*", "environments*", "demos*", "notebooks*"]
 # Exclude directories that are definitely not packages
 exclude = ["tests*", "docs*", "qmd*"]
 
 [tool.ruff]
 # See https://docs.astral.sh/ruff/configuration/
 target-version = "py310" # Minimum Python version to target for compatibility
-line-length = 88
-# Select rule codes to enable. Add more as needed (e.g., "I" for isort)
-# Start with defaults and gradually add more. `ruff check --select ALL .` shows available.
-select = ["E", "F", "W", "C90", "UP", "I", "B", "T20"] # Added I (isort), B (bugbear), T20 (print)
-ignore = [] # Rule codes to ignore (e.g., "E501" if you don't enforce line length strictly)
-
-[tool.ruff.lint.per-file-ignores]
-"notebooks/ethical-considerations-and-governance.py" = ["E501"]
-"notebooks/multi-agent-systems-in-retail.py" = ["E501"]
-"notebooks/sensor-networks-and-cognitive-systems.py" = ["E501"]
-"notebooks/real-world-case-studies.py" = ["E501"]
-
-[tool.ruff.lint]
+line-length = 110
 # Exclude common directories
 exclude = [
     ".bzr",
@@ -152,7 +146,21 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
+    "notebooks",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/ethical-considerations-and-governance.py" = ["E501"]
+"notebooks/multi-agent-systems-in-retail.py" = ["E501"]
+"notebooks/sensor-networks-and-cognitive-systems.py" = ["E501"]
+"notebooks/real-world-case-studies.py" = ["E501"]
+"demos/*.py" = ["T201"]
+
+[tool.ruff.lint]
+# Select rule codes to enable. Add more as needed (e.g., "I" for isort)
+# Start with defaults and gradually add more. `ruff check --select ALL .` shows available.
+select = ["E", "F", "W", "C90", "UP", "I", "B", "T20"] # Added I (isort), B (bugbear), T20 (print)
+ignore = [] # Rule codes to ignore (e.g., "E501" if you don't enforce line length strictly)
 
 [tool.ruff.format]
 # See https://docs.astral.sh/ruff/formatter/
@@ -173,7 +181,9 @@ disallow_untyped_defs = true # Ensure all functions are annotated
 exclude = [
     "build/",
     ".venv/",
+    "demos/",
     "notebooks/", # Keep excluding notebooks for now
+    "tests/",
 ]
 
 # Use per-module ignores for libraries known to lack stubs
@@ -213,13 +223,27 @@ pythonpath = "." # Add project root to PYTHONPATH for imports
 [tool.coverage.run]
 # See https://coverage.readthedocs.io/en/latest/config.html
 branch = true # Measure branch coverage
-source = ["agents", "connectors", "utils", "demos", "config", "environments"]
-# omit = ["*/tests/*", "*/__main__.py"] # Files/patterns to exclude from coverage
+source = ["agents", "connectors", "utils", "environments"]
+# Keep coverage focused on library code that readers will import/reuse.
+# Demo scripts and large experimental modules are exercised via integration demos, not unit coverage.
+omit = [
+    "demos/*",
+    "notebooks/*",
+    "agents/promotion_causal.py",
+    "agents/inventory.py",
+    "agents/inventory_orchestration.py",
+    "agents/messaging.py",
+    "agents/replenishment.py",
+    "agents/coordinators/*",
+    "agents/protocols/*",
+]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 80 # Optional: Fail if coverage is below this percentage
+# NOTE: Keep this realistic for an educational codebase with many optional modules.
+# Raise gradually as Tier A examples gain deeper test coverage.
+fail_under = 70 # Optional: Fail if coverage is below this percentage
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

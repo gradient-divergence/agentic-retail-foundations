@@ -2,19 +2,18 @@
 Task allocation and contract net protocol classes for distributed task management in retail MAS.
 """
 
-from enum import Enum
-from dataclasses import dataclass
-import uuid
 import asyncio
-import random
-from typing import Optional, Any
-from collections import defaultdict
 import logging
+from collections import defaultdict
+from typing import Any
 
-# Import the data models from the models directory
-from models.task import TaskStatus, TaskType, Task, Bid
 # Import StoreAgent from its new location
 from agents.store import StoreAgent
+
+# Import the data models from the models directory
+from models.task import Bid, Task, TaskStatus, TaskType
+
+logger = logging.getLogger(__name__)
 
 
 class RetailCoordinator:
@@ -25,7 +24,7 @@ class RetailCoordinator:
     Assumes StoreAgent class is defined (or imported)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.agents: dict[str, StoreAgent] = {}
         self.tasks: dict[str, Task] = {}
 
@@ -36,9 +35,9 @@ class RetailCoordinator:
         if not isinstance(agent, StoreAgent):
             raise TypeError("Registered entity must be a StoreAgent instance.")
         if agent.agent_id in self.agents:
-            print(f"Warning: Re-registering agent {agent.agent_id}")
+            logger.warning("Re-registering agent %s", agent.agent_id)
         self.agents[agent.agent_id] = agent
-        print(f"Agent {agent.name} ({agent.agent_id}) registered with coordinator.")
+        logger.info("Agent %s (%s) registered with coordinator.", agent.name, agent.agent_id)
 
     def create_task(
         self,
@@ -46,9 +45,9 @@ class RetailCoordinator:
         description: str,
         urgency: int,
         required_capacity: int,
-        location: Optional[str] = None,
-        deadline: Optional[float] = None,
-        data: Optional[dict[str, Any]] = None,
+        location: str | None = None,
+        deadline: float | None = None,
+        data: dict[str, Any] | None = None,
     ) -> str:
         """
         Create a new task and add it to the coordinator's task list.
@@ -65,10 +64,14 @@ class RetailCoordinator:
             data=data,
         )
         self.tasks[new_task.id] = new_task
-        print(f"Coordinator created Task {new_task.id}: {description[:50]}...")
+        logger.info(
+            "Coordinator created Task %s: %s...",
+            new_task.id,
+            description[:50],
+        )
         return new_task.id
 
-    async def allocate_task(self, task_id: str) -> Optional[str]:
+    async def allocate_task(self, task_id: str) -> str | None:
         """
         Perform the CNP allocation for a specific task:
         1. Announce Task (Implicit - task is already created and ANNOUNCED)
@@ -78,28 +81,34 @@ class RetailCoordinator:
         Returns the winning agent's ID or None if no agent could be allocated.
         """
         if task_id not in self.tasks:
-            print(f"Error: Task {task_id} not found for allocation.")
+            logger.error("Task %s not found for allocation.", task_id)
             return None
 
         task = self.tasks[task_id]
         if task.status != TaskStatus.ANNOUNCED:
-            print(
-                f"Warning: Task {task_id} is not in ANNOUNCED state (current: {task.status.name}), cannot allocate."
+            logger.warning(
+                "Task %s is not in ANNOUNCED state (current: %s), cannot allocate.",
+                task_id,
+                task.status.name,
             )
             return None
 
-        print(f"\n--- Allocating Task {task_id} ({task.description[:30]}...) ---")
-        print(f"Collecting bids from {len(self.agents)} agents...")
+        logger.info(
+            "Allocating Task %s (%s...)",
+            task_id,
+            task.description[:30],
+        )
+        logger.info("Collecting bids from %s agents...", len(self.agents))
 
         bids: list[Bid] = []
-        for agent_id, agent in self.agents.items():
+        for _, agent in self.agents.items():
             bid = agent.calculate_bid(task)
             if bid:
                 bids.append(bid)
-                print(f"  Agent {agent.name} bid: {bid.bid_value:.2f}")
+                logger.info("Agent %s bid: %.2f", agent.name, bid.bid_value)
 
         if not bids:
-            print(f"--> No bids received for task {task_id}. Allocation failed.")
+            logger.warning("No bids received for task %s. Allocation failed.", task_id)
             task.status = TaskStatus.FAILED
             return None
 
@@ -113,13 +122,15 @@ class RetailCoordinator:
         task.winning_bid = best_bid.bid_value
         winner_agent.assigned_tasks.append(task)
 
-        print(
-            f"--> Task {task_id} awarded to {winner_agent.name} (Bid: {best_bid.bid_value:.2f})"
+        logger.info(
+            "Task %s awarded to %s (Bid: %.2f)",
+            task_id,
+            winner_agent.name,
+            best_bid.bid_value,
         )
-        print("----------------------------------------------------")
         return winner_id
 
-    async def execute_allocated_tasks(self):
+    async def execute_allocated_tasks(self) -> None:
         """
         Trigger the execution of all tasks currently in the ALLOCATED state.
         Uses asyncio.gather to run task executions concurrently.
@@ -127,7 +138,7 @@ class RetailCoordinator:
         tasks_to_execute = []
         agent_task_map = defaultdict(list)
 
-        print("\n--- Triggering Execution of Allocated Tasks ---")
+        logger.info("Triggering execution of allocated tasks.")
         for task_id, task in self.tasks.items():
             if task.status == TaskStatus.ALLOCATED and task.assigned_agent_id:
                 agent_id = task.assigned_agent_id
@@ -136,28 +147,35 @@ class RetailCoordinator:
                     tasks_to_execute.append(agent.execute_task(task))
                     agent_task_map[agent_id].append(task_id)
                 else:
-                    logging.error(
-                        f"Agent {agent_id} assigned to task {task_id} not found during execution phase."
+                    logger.error(
+                        "Agent %s assigned to task %s not found during execution phase.",
+                        agent_id,
+                        task_id,
                     )
                     task.status = TaskStatus.FAILED
 
         if not tasks_to_execute:
-            print("No tasks currently allocated for execution.")
+            logger.info("No tasks currently allocated for execution.")
             return
 
-        print(
-            f"Starting execution for {len(tasks_to_execute)} tasks across {len(agent_task_map)} agents..."
+        logger.info(
+            "Starting execution for %s tasks across %s agents...",
+            len(tasks_to_execute),
+            len(agent_task_map),
         )
         results = await asyncio.gather(*tasks_to_execute, return_exceptions=True)
-        print("--- Task Execution Cycle Complete ---")
+        logger.info("Task execution cycle complete.")
 
         i = 0
         for agent_id, task_ids in agent_task_map.items():
             for task_id in task_ids:
                 result = results[i]
                 if isinstance(result, Exception):
-                    logging.error(
-                        f"Error during execution of task {task_id} by agent {agent_id}: {result}"
+                    logger.error(
+                        "Error during execution of task %s by agent %s: %s",
+                        task_id,
+                        agent_id,
+                        result,
                     )
                     if task_id in self.tasks:
                         self.tasks[task_id].status = TaskStatus.FAILED

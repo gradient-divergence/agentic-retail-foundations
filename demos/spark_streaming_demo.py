@@ -11,13 +11,13 @@ import logging
 # Attempt to import PySpark modules - will fail if Spark is not installed
 try:
     from pyspark.sql import SparkSession
-    from pyspark.sql.functions import from_json, col, window, avg, sum, count
+    from pyspark.sql.functions import avg, col, count, from_json, sum, window
     from pyspark.sql.types import (
-        StructType,
-        StructField,
-        StringType,
-        TimestampType,
         DoubleType,
+        StringType,
+        StructField,
+        StructType,
+        TimestampType,
     )
 
     SPARK_AVAILABLE = True
@@ -61,28 +61,32 @@ except ImportError:
     def from_json(c, s):
         return c
 
-    StructType = lambda fields: None
-    StructField = lambda name, type, null: None
-    StringType = lambda: None
-    TimestampType = lambda: None
-    DoubleType = lambda: None
+    def StructType(fields):
+        return None
+
+    def StructField(name, type, null):
+        return None
+
+    def StringType():
+        return None
+
+    def TimestampType():
+        return None
+
+    def DoubleType():
+        return None
+
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("spark-streaming-demo")
 
 
 def run_spark_streaming_job():
     """Runs the Spark Streaming job for sales velocity calculation."""
     if not SPARK_AVAILABLE:
-        logger.error(
-            "PySpark is not installed or available. Cannot run Spark Streaming job."
-        )
-        print(
-            "Error: PySpark not found. Please install pyspark and ensure Spark environment is configured."
-        )
+        logger.error("PySpark is not installed or available. Cannot run Spark Streaming job.")
+        print("Error: PySpark not found. Please install pyspark and ensure Spark environment is configured.")
         return
 
     logger.info("Initializing Spark Session...")
@@ -113,7 +117,8 @@ def run_spark_streaming_job():
     KAFKA_BROKERS = "localhost:9092"  # Replace with actual Kafka brokers
     INPUT_TOPIC = "sales-transactions"
     OUTPUT_TOPIC = "sales-velocity-metrics"
-    CHECKPOINT_LOCATION = "/tmp/spark-checkpoints/sales-velocity"  # Use HDFS or reliable storage in production
+    # Use HDFS or reliable storage in production
+    CHECKPOINT_LOCATION = "/tmp/spark-checkpoints/sales-velocity"
 
     logger.info(f"Reading from Kafka topic: {INPUT_TOPIC} at {KAFKA_BROKERS}")
     # Read from Kafka stream

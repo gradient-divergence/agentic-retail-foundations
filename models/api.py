@@ -2,8 +2,9 @@
 Data models specific to API interactions (e.g., Gateway, Services).
 """
 
-from pydantic import BaseModel
 from datetime import datetime
+
+from pydantic import BaseModel
 
 
 # Authentication and request models (from notebook)

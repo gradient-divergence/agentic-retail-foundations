@@ -1,0 +1,43 @@
+[
+  {
+    "id": "inv-risk-high",
+    "description": "High risk inventory position triggers reorder and supplier outreach.",
+    "inputs": {
+      "inventory_on_hand": 18,
+      "risk_score": 0.86,
+      "promo_active": true
+    },
+    "expected_actions": ["reorder", "supplier_message"],
+    "expected_events": ["InventoryRiskDetected", "ReplenishmentProposed"],
+    "kpis": {"stockout_rate": 0.0, "margin_impact": -0.02},
+    "constraints": ["do_not_exceed_budget", "respect_min_order_qty"],
+    "failure_modes": ["over_ordering", "late_supplier_response"]
+  },
+  {
+    "id": "inv-risk-medium",
+    "description": "Moderate risk triggers price protection and customer messaging.",
+    "inputs": {
+      "inventory_on_hand": 55,
+      "risk_score": 0.55,
+      "promo_active": false
+    },
+    "expected_actions": ["price_protect", "customer_message"],
+    "expected_events": ["PriceProtectionApplied", "CustomerMessageSent"],
+    "kpis": {"price_change": -0.04, "message_open_rate": 0.35},
+    "constraints": ["price_floor_policy"],
+    "failure_modes": ["excess_discount", "message_spam"]
+  },
+  {
+    "id": "supplier-delay",
+    "description": "Supplier delay triggers escalation and approval.",
+    "inputs": {
+      "supplier_status": "delayed",
+      "risk_score": 0.72
+    },
+    "expected_actions": ["human_approval"],
+    "expected_events": ["HumanApprovalRequested"],
+    "kpis": {"escalation_rate": 1.0},
+    "constraints": ["approval_required_for_write"],
+    "failure_modes": ["approval_latency"]
+  }
+]

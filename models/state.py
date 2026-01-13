@@ -3,6 +3,7 @@ Data models for representing system state, e.g., inventory.
 """
 
 from datetime import datetime
+
 from pydantic import BaseModel, Field  # Use Pydantic as in notebook
 
 # Import relevant Enums
@@ -40,7 +41,7 @@ class ProductInventoryState(BaseModel):
     last_event_id: str | None = None  # Last event that modified this state
 
     # Add method to calculate available quantity (as done implicitly before)
-    def calculate_available(self):
+    def calculate_available(self) -> int:
         self.quantity_available = self.quantity_on_hand - self.quantity_reserved
         return self.quantity_available
 

@@ -1,0 +1,12 @@
+[
+  {
+    "case_id": "inv-risk-high",
+    "trace_id": "trace-001",
+    "tool_calls": [
+      {"name": "inventory_lookup", "args": {"product_id": "SKU-1", "location_id": "STORE-22"}},
+      {"name": "supplier_message", "args": {"supplier_id": "SUP-7", "product_id": "SKU-1", "requested_qty": 80}}
+    ],
+    "events": ["InventoryRiskDetected", "ReplenishmentProposed"],
+    "decision": "reorder"
+  }
+]

@@ -55,22 +55,14 @@ class PNCounter:
             raise TypeError("Can only merge with another PNCounter")
 
         # Merge increments (take max value for each node)
-        all_inc_keys: set[str] = set(self.increments.keys()) | set(
-            other.increments.keys()
-        )
+        all_inc_keys: set[str] = set(self.increments.keys()) | set(other.increments.keys())
         for key in all_inc_keys:
-            self.increments[key] = max(
-                self.increments.get(key, 0), other.increments.get(key, 0)
-            )
+            self.increments[key] = max(self.increments.get(key, 0), other.increments.get(key, 0))
 
         # Merge decrements (take max value for each node)
-        all_dec_keys: set[str] = set(self.decrements.keys()) | set(
-            other.decrements.keys()
-        )
+        all_dec_keys: set[str] = set(self.decrements.keys()) | set(other.decrements.keys())
         for key in all_dec_keys:
-            self.decrements[key] = max(
-                self.decrements.get(key, 0), other.decrements.get(key, 0)
-            )
+            self.decrements[key] = max(self.decrements.get(key, 0), other.decrements.get(key, 0))
 
     @property
     def state(self) -> dict[str, Any]:
@@ -89,21 +81,15 @@ class PNCounter:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PNCounter":
         """Create from dictionary representation."""
-        if not all(
-            k in data for k in ["product_id", "location_id", "increments", "decrements"]
-        ):
+        if not all(k in data for k in ["product_id", "location_id", "increments", "decrements"]):
             raise ValueError("Invalid data format for PNCounter.from_dict")
 
         counter = cls(data["product_id"], data["location_id"])
         # Ensure increments/decrements are dicts, provide default empty dict
         counter.increments = (
-            data.get("increments", {})
-            if isinstance(data.get("increments", {}), dict)
-            else {}
+            data.get("increments", {}) if isinstance(data.get("increments", {}), dict) else {}
         )
         counter.decrements = (
-            data.get("decrements", {})
-            if isinstance(data.get("decrements", {}), dict)
-            else {}
+            data.get("decrements", {}) if isinstance(data.get("decrements", {}), dict) else {}
         )
         return counter

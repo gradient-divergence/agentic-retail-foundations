@@ -15,9 +15,7 @@ class DynamicPricingMDPConfig:
     price_elasticity: float = 1.5
     holding_cost_per_unit: float = 0.5
     end_season_salvage_value: float = 15.0
-    available_discounts: list[float] = field(
-        default_factory=lambda: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
-    )
+    available_discounts: list[float] = field(default_factory=lambda: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5])
 
 
 @dataclass

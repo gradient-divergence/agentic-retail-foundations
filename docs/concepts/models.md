@@ -42,4 +42,4 @@ These models define the structure of information exchanged between agents and us
 
 -   **`api.py`:** Contains Pydantic models used specifically in API definitions (e.g., API Gateway), such as `Token`, `TokenData`, `Agent` (for auth context), and `RequestLogEntry`.
 
-Refer to the [Models API Reference](/reference/models.md) for detailed class signatures.
+Refer to the [Models API Reference](../reference/models.md) for detailed class signatures.

@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.2"
+__generated_with = "0.18.4"
 app = marimo.App(width="full")
 
 
@@ -11,36 +11,85 @@ def __cell1():
 
     matplotlib.use("Agg")
 
-    import pandas as pd
-    import numpy as np
     import pathlib
-    import marimo as mo
 
+    import marimo as mo
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+    import numpy as np
+    import pandas as pd
     return mo, np, pathlib, pd
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ## Chapter 7: Sensor Networks and Cognitive Systems
+    mo.md(r"""
+    ## Chapter 7: Sensor Networks and Cognitive Systems
 
-        Welcome to the "nervous system" of retail operations. This chapter covers 
-        how intelligent environmental monitoring, sensor data fusion, and 
-        cognitive decision-making integrate to create responsive, real-time 
-        retail environments. You'll gain the technical proficiency to deploy 
-        these powerful tools practically.
+    Welcome to the "nervous system" of retail operations. This chapter covers
+    how intelligent environmental monitoring, sensor data fusion, and
+    cognitive decision-making integrate to create responsive, real-time
+    retail environments. You'll gain the technical proficiency to deploy
+    these powerful tools practically.
 
-        The focus here is on how an agent system processes multi-source sensor 
-        data to maintain real-time inventory awareness
-        """
-    )
+    The focus here is on how an agent system processes multi-source sensor
+    data to maintain real-time inventory awareness
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""## Processing Sensor Data for Rel-Time Agent Decision""")
+    mo.md(r"""
+    ## Processing Sensor Data for Rel-Time Agent Decision
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Synthetic sensor stream (deterministic)
+
+    This small, in-memory stream shows how a sensor layer can surface
+    low-stock risk and traffic spikes before an agent takes action.
+    """)
+    return
+
+
+@app.cell
+def _(np, pd):
+    rng = np.random.default_rng(42)
+    timestamps = pd.date_range("2025-01-01", periods=24, freq="h")
+    stock_count = 120 - np.cumsum(rng.integers(0, 3, size=len(timestamps)))
+    foot_traffic = (rng.normal(40, 8, size=len(timestamps))).round().astype(int)
+
+    stock_threshold = 30
+    traffic_threshold = 60
+
+    stream_df = pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "stock_count": stock_count,
+            "foot_traffic": foot_traffic,
+        }
+    )
+    stream_df["stockout_risk"] = stream_df["stock_count"] <= stock_threshold
+    stream_df["traffic_spike"] = stream_df["foot_traffic"] >= traffic_threshold
+    stream_df["anomaly_flag"] = stream_df["stockout_risk"] | stream_df["traffic_spike"]
+
+    stream_summary_df = pd.DataFrame(
+        [
+            {"metric": "stockout_risk_flags", "value": int(stream_df["stockout_risk"].sum())},
+            {"metric": "traffic_spike_flags", "value": int(stream_df["traffic_spike"].sum())},
+            {"metric": "total_anomalies", "value": int(stream_df["anomaly_flag"].sum())},
+        ]
+    )
     return
 
 
@@ -52,29 +101,22 @@ def __cell2(mo, pathlib):
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ## Knowledge Graph for Retail Product Relationships
+    mo.md(r"""
+    ## Knowledge Graph for Retail Product Relationships
 
 
-        This implementation demonstrates key patterns for integrating sensor data in retail:
+    This implementation demonstrates key patterns for integrating sensor data in retail:
 
-        1. **Multi-source data ingestion** through both real-time (WebSockets) and batch (REST) APIs.
-        2. **Source-specific processing** that handles the unique characteristics of each sensor type.
-        3. **Confidence scoring** to account for varying reliability across sensor technologies.
-        4. **Discrepancy tracking** that accumulates evidence before triggering operational responses.
-        5. **Cross-validation** between complementary sensor inputs to increase accuracy.
+    1. **Multi-source data ingestion** through both real-time (WebSockets) and batch (REST) APIs.
+    2. **Source-specific processing** that handles the unique characteristics of each sensor type.
+    3. **Confidence scoring** to account for varying reliability across sensor technologies.
+    4. **Discrepancy tracking** that accumulates evidence before triggering operational responses.
+    5. **Cross-validation** between complementary sensor inputs to increase accuracy.
 
 
-        The following example demonstrates how to build, query, and reason with a retail knowledge graph:
-        """
-    )
+    The following example demonstrates how to build, query, and reason with a retail knowledge graph:
+    """)
     return
 
 
@@ -91,26 +133,19 @@ def _(mo, pathlib):
 
 
 @app.cell
-def __cell4():
-    return
-
-
-@app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ## Causal Inference for Promotion Effectiveness
+    mo.md(r"""
+    ## Causal Inference for Promotion Effectiveness
 
 
-        Causal inference is a critical methodology for discovering true cause-and-effect relationships in retail data. Causal frameworks elevate decision-making beyond correlation analysis, enabling retail agents to identify what truly drives consumer behavior and business outcomes. 
+    Causal inference is a critical methodology for discovering true cause-and-effect relationships in retail data. Causal frameworks elevate decision-making beyond correlation analysis, enabling retail agents to identify what truly drives consumer behavior and business outcomes.
 
-        In modern retail environments, sophisticated decision-making requires moving beyond merely identifying patterns and correlations in data. Retail agents must delve deeper to understand the reasons behind certain outcomes—why specific events occur, what directly influences customer behaviors, and how different actions might impact future performance. 
+    In modern retail environments, sophisticated decision-making requires moving beyond merely identifying patterns and correlations in data. Retail agents must delve deeper to understand the reasons behind certain outcomes—why specific events occur, what directly influences customer behaviors, and how different actions might impact future performance.
 
-        This advanced capability, known as causal reasoning and counterfactual analysis, enables retail organizations to implement proactive strategies rather than reactive responses, significantly enhancing decision quality and business outcomes.
+    This advanced capability, known as causal reasoning and counterfactual analysis, enables retail organizations to implement proactive strategies rather than reactive responses, significantly enhancing decision quality and business outcomes.
 
-        The following example demonstrates how to apply causal inference techniques to measure true promotion effectiveness:
-        """
-    )
+    The following example demonstrates how to apply causal inference techniques to measure true promotion effectiveness:
+    """)
     return
 
 
@@ -126,13 +161,14 @@ def _(mo, pathlib):
 @app.cell
 def __cell6():
     from agents.promotion_causal import PromotionCausalAnalyzer
-
     return (PromotionCausalAnalyzer,)
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""### Configuration""")
+    mo.md(r"""
+    ### Configuration
+    """)
     return
 
 
@@ -173,7 +209,9 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md(r"""### Helper Functions""")
+    mo.md(r"""
+    ### Helper Functions
+    """)
     return
 
 
@@ -226,7 +264,6 @@ def _(mo):
         # Optionally display captured stdout
         # mo.md(f"<details><summary>Analysis Logs</summary>```\n{captured_stdout.getvalue()}\n```</details>")
         return results
-
     return (run_and_summarize_analyses,)
 
 
@@ -322,26 +359,28 @@ def _(mo, np, pd):
             cf_results["General Error"] = {"error": str(cf_e)}
 
         return cf_results  # Return dictionary of results
-
     return (run_and_display_counterfactuals,)
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""### Causal Analysis Demonstration""")
+    mo.md(r"""
+    ### Causal Analysis Demonstration
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""#### Generating Sample Data for Causal Analysis...""")
+    mo.md(r"""
+    #### Generating Sample Data for Causal Analysis...
+    """)
     return
 
 
 @app.cell
 def _():
     from utils.data_generation import generate_synthetic_retail_data
-
     return (generate_synthetic_retail_data,)
 
 
@@ -364,15 +403,23 @@ def _(
             num_stores=NUM_STORES,
             num_products=NUM_PRODUCTS,
             seed=RANDOM_SEED,
-            # Add other parameters here to override defaults if necessary
+            promo_base_prob=0.08,
+            promo_weekend_add_prob=0.08,
+            promo_cat2_add_prob=0.03,
+            promo_store1_add_prob=0.03,
+            true_promo_effect_multiplier=1.3,
+            noise_std_dev=0.12,
         )
 
+        numeric_cols = sales_df.select_dtypes(include="number").columns
+        sales_df[numeric_cols] = sales_df[numeric_cols].clip(lower=0)
+
         # Display sample data head
-        mo.md("Sample Data Head:")
-        mo.ui.table(sales_df.head())
+        _ = mo.md("Sample Data Head:")
+        _ = mo.ui.table(sales_df.head())
 
     except Exception as data_gen_e:
-        mo.md(f"**Error generating sample data:** {data_gen_e}")
+        _ = mo.md(f"**Error generating sample data:** {data_gen_e}")
         # Define empty dataframes to prevent downstream errors in demo
         sales_df = pd.DataFrame()
         product_df = pd.DataFrame()
@@ -382,7 +429,9 @@ def _(
 
 @app.cell
 def _(mo):
-    mo.md(r"""#### Initialize and Run Analyzer""")
+    mo.md(r"""
+    #### Initialize and Run Analyzer
+    """)
     return
 
 
@@ -428,7 +477,9 @@ def _(PromotionCausalAnalyzer, mo, product_df, sales_df, store_df):
 
 @app.cell
 def _(mo):
-    mo.md(r"""#### Perform Analyses (using helper function)""")
+    mo.md(r"""
+    #### Perform Analyses (using helper function)
+    """)
     return
 
 
@@ -607,7 +658,7 @@ def _(
         cf_results_dict = run_and_display_counterfactuals(analyzer)
 
         # Assign individual results if needed downstream (optional)
-        cf_result2 = None # Only cf_result2 seems potentially used later
+        cf_result2 = None  # Only cf_result2 seems potentially used later
         for name, result in cf_results_dict.items():
             if name == "Always On Promotion":
                 cf_result2 = result
@@ -623,25 +674,21 @@ def _(
         # Ensure results variables exist but are None
         results_dict = {}
         roi_result = None
-        cf_result2 = None # Only cf_result2 seems potentially used later
+        cf_result2 = None  # Only cf_result2 seems potentially used later
 
     # Returning relevant results. Adjust as needed for notebook flow.
-    return results_dict, roi_result, cf_result2
-
-
-@app.cell
-def __cell7():
-    return
+    return (cf_result2,)
 
 
 @app.cell
 def _(cf_result2, mo):
-    # Check if cf_result2 has a value before trying to display it
     if cf_result2 is not None:
-        cf_result2
+        output = cf_result2
     else:
-        # Display a message if the result is None (analysis likely failed)
-        mo.md("Counterfactual analysis (Scenario 2) did not complete successfully.")
+        output = mo.md(
+            "Counterfactual analysis (Scenario 2) did not complete successfully."
+        )
+    output
     return
 
 

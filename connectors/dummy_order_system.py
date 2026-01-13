@@ -4,10 +4,10 @@ Module: connectors.dummy_order_system
 Provides a dummy in-memory order management system for testing agents.
 """
 
-from typing import Any
 import asyncio
-from datetime import datetime, timedelta, date
 import logging
+from datetime import date, datetime, timedelta
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ class DummyOrderSystem:
         """Get the return policy."""
         return self._return_policy
 
-    async def report_visual_audit(self, issue_summary: dict[str, Any]):
+    async def report_visual_audit(self, issue_summary: dict[str, Any]) -> None:
         """Report a visual audit issue (dummy implementation)."""
         logger.info(f"DUMMY: Received visual audit: {issue_summary.get('section_id')}")
         await asyncio.sleep(0.01)

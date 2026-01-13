@@ -128,7 +128,23 @@ agentic-retail-foundations/
     *   Edit the `.env` file and add your necessary API keys or configuration secrets (e.g., `OPENAI_API_KEY`).
     *   **Important:** The `.env` file is listed in `.gitignore` and should **never** be committed to version control.
 
-7.  **Install Pre-commit Hooks (Recommended):**
+7.  **Optional: OpenAI Agents SDK demos**
+    *   Install the SDK dependencies:
+        ```sh
+        pip install --upgrade openai openai-agents python-dotenv
+        ```
+    *   SDK-specific demos (for example, `demos/*_agents_sdk_demo.py`) import the SDK via
+        `demos/openai_agents_sdk_import.py` to avoid collisions with this repo's local
+        `agents/` package.
+
+8.  **Optional: Protocol SDKs and reference implementations**
+    *   Install protocol SDK dependencies:
+        ```sh
+        uv pip install -e ".[agent_protocols]"
+        ```
+    *   ACP is treated as a spec-only protocol reference (no SDK dependency).
+
+9.  **Install Pre-commit Hooks (Recommended):**
     This ensures code quality checks (like formatting and linting) run automatically before each commit.
     ```sh
     # Ensure your virtual environment is active

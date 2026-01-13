@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Utilities for constructing the *system* prompt used to generate the final
 customer-visible response and for extracting follow-up actions from that response.
 
@@ -7,11 +5,13 @@ By centralising this logic we keep `RetailCustomerServiceAgent` free from long
 string-building sections and make prompts easier to unit-test in isolation.
 """
 
-from typing import Any
+from __future__ import annotations
+
 import json
 import logging
+from typing import Any
 
-from openai import OpenAI, AsyncOpenAI
+from openai import AsyncOpenAI, OpenAI
 
 from agents.prompts import build_action_extraction_prompt
 from utils.openai_utils import safe_chat_completion
@@ -38,12 +38,14 @@ def build_response_prompt(
 ) -> str:
     """Return the full *system* prompt to be sent to the response model."""
     formatted_history = "\n".join(
-        f"{msg['role'].capitalize()}: {msg.get('content', '')}"
-        for msg in conversation_history
+        f"{msg['role'].capitalize()}: {msg.get('content', '')}" for msg in conversation_history
     )
 
     system_prompt_parts: list[str] = [
-        f"You are a helpful and friendly customer service agent for '{brand_name}'. Your goal is to assist the customer effectively and professionally.",
+        (
+            f"You are a helpful and friendly customer service agent for '{brand_name}'. "
+            "Your goal is to assist the customer effectively and professionally."
+        ),
         "\nCUSTOMER INFORMATION:",
         f"- Name: {customer_info.get('name', 'Valued Customer')}",
         f"- Loyalty tier: {customer_info.get('loyalty_tier', 'Standard')}",
@@ -63,9 +65,7 @@ def build_response_prompt(
 
     if intent == "order_status" and context_data.get("order_details"):
         order = context_data["order_details"]
-        items_str = ", ".join(
-            item.get("name", "Unknown Item") for item in order.get("items", [])
-        )
+        items_str = ", ".join(item.get("name", "Unknown Item") for item in order.get("items", []))
         system_prompt_parts.extend(
             [
                 f"- Order ID: {order.get('order_id', 'N/A')}",
@@ -91,13 +91,10 @@ def build_response_prompt(
         eligibility = context_data["return_eligibility"]
         policy = context_data.get("return_policy", {})
         is_eligible = eligibility.get("eligible", False)
-        system_prompt_parts.append(
-            f"- Return Eligible: {'Yes' if is_eligible else 'No'}"
-        )
+        system_prompt_parts.append(f"- Return Eligible: {'Yes' if is_eligible else 'No'}")
         if not is_eligible:
-            system_prompt_parts.append(
-                f"- Reason Not Eligible: {eligibility.get('reason', 'Policy timeframe likely exceeded or item non-returnable.')}"
-            )
+            reason = eligibility.get("reason", "Policy timeframe likely exceeded or item non-returnable.")
+            system_prompt_parts.append(f"- Reason Not Eligible: {reason}")
         system_prompt_parts.extend(
             [
                 f"- Return Window: {policy.get('return_window_days', 'N/A')} days",
@@ -107,9 +104,7 @@ def build_response_prompt(
         context_added = True
 
     if not context_added:
-        system_prompt_parts.append(
-            "- No specific order or product context retrieved for this query."
-        )
+        system_prompt_parts.append("- No specific order or product context retrieved for this query.")
 
     # ------------------------ Instructions section ------------------------
     customer_name = customer_info.get("name", "Valued Customer")
@@ -121,14 +116,29 @@ def build_response_prompt(
             "1. Be courteous, empathetic, and professional.",
             f"2. Address the customer as {customer_name}.",
             (
-                f"3. If the customer is a loyalty member (not 'Standard' tier), acknowledge their status positively (e.g., 'As a valued {loyalty_tier} member...')."
+                "3. If the customer is a loyalty member (not 'Standard' tier), "
+                f"acknowledge their status positively (e.g., 'As a valued {loyalty_tier} member...')."
             ),
             "4. Directly answer the customer's query using the RELEVANT CONTEXT provided above.",
-            "5. If context is missing or insufficient to answer fully, politely state what you can/cannot confirm and offer to find out more or suggest alternatives (do NOT invent details).",
-            "6. For returns, if eligible, explain the next steps clearly (e.g., 'You can start your return at acmeretail.com/returns'). If not eligible, explain why based on the context.",
-            "7. Keep responses concise, clear, and easy to understand (approx 2-4 sentences unless detail is required).",
+            (
+                "5. If context is missing or insufficient to answer fully, politely state "
+                "what you can/cannot confirm and offer to find out more or suggest alternatives "
+                "(do NOT invent details)."
+            ),
+            (
+                "6. For returns, if eligible, explain the next steps clearly (e.g., "
+                "'You can start your return at acmeretail.com/returns'). If not eligible, "
+                "explain why based on the context."
+            ),
+            (
+                "7. Keep responses concise, clear, and easy to understand (approx 2-4 sentences "
+                "unless detail is required)."
+            ),
             "8. Maintain a warm, helpful tone consistent with the ACME Retail brand.",
-            "9. Do NOT mention the 'internal use only' context sections or the conversation history in your response to the customer.",
+            (
+                "9. Do NOT mention the 'internal use only' context sections or the "
+                "conversation history in your response to the customer."
+            ),
             "\nAgent Response:",
         ]
     )
@@ -141,7 +151,7 @@ def build_response_prompt(
 # ---------------------------------------------------------------------------
 
 
-async def extract_actions(
+async def extract_actions(  # noqa: C901
     client: AsyncOpenAI | OpenAI,
     *,
     intent: str,
@@ -157,14 +167,10 @@ async def extract_actions(
     actions: list[dict[str, Any]] = []
 
     # Deterministic, rule-based actions first
-    if intent == "return_request" and context_data.get("return_eligibility", {}).get(
-        "eligible", False
-    ):
+    if intent == "return_request" and context_data.get("return_eligibility", {}).get("eligible", False):
         order_id = context_data.get("order_details", {}).get("order_id")
         if order_id:
-            actions.append(
-                {"type": "provide_return_instructions", "order_id": order_id}
-            )
+            actions.append({"type": "provide_return_instructions", "order_id": order_id})
     elif intent == "order_status" and context_data.get("order_details"):
         order_id = context_data["order_details"].get("order_id")
         status = context_data["order_details"].get("status", "").lower()
@@ -184,7 +190,10 @@ async def extract_actions(
         messages = [
             {
                 "role": "system",
-                "content": "You extract explicitly mentioned actions from agent text. Output ONLY a valid JSON array of strings.",
+                "content": (
+                    "You extract explicitly mentioned actions from agent text. "
+                    "Output ONLY a valid JSON array of strings."
+                ),
             },
             {"role": "user", "content": prompt},
         ]
@@ -202,9 +211,7 @@ async def extract_actions(
         )
         # Use choices[0].message.content
         extracted_text = (
-            completion.choices[0].message.content.strip()
-            if completion.choices[0].message.content
-            else "[]"
+            completion.choices[0].message.content.strip() if completion.choices[0].message.content else "[]"
         )
         try:
             parsed_data = json.loads(extracted_text)
@@ -229,9 +236,7 @@ async def extract_actions(
                     extracted_text,
                 )
         except json.JSONDecodeError:
-            logger.warning(
-                "LLM action extraction returned invalid JSON: %s", extracted_text
-            )
+            logger.warning("LLM action extraction returned invalid JSON: %s", extracted_text)
     except Exception as exc:  # noqa: BLE001
         logger.error("LLM action extraction failed: %s", exc)
 

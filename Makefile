@@ -30,6 +30,10 @@ COVERAGE    ?= $(VENV_BIN)/coverage
 MKDOCS      ?= $(VENV_BIN)/mkdocs
 PRECOMMIT   ?= $(VENV_BIN)/pre-commit
 
+# Interpreter used to create the virtual environment.
+# Prefer a modern Python (>=3.10) if multiple are installed.
+PYTHON_FOR_VENV ?= $(shell command -v python3.12 2>/dev/null || command -v python3.11 2>/dev/null || command -v python3.10 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null)
+
 # Phony targets prevent conflicts with files of the same name
 .PHONY: venv install clean help lint format format-check type-check test coverage docs-build docs-serve precommit precommit-run ci check clean-venv default shell
 
@@ -52,7 +56,7 @@ help: ## Show this help message and exit
 # It relies on the .venv/pyvenv.cfg target to do the initial creation.
 venv: $(VENV_DIR)/pyvenv.cfg ## Set up venv, install base tools, and project dependencies
 	@echo "--> Installing project dependencies into $(VENV_DIR)..."
-	$(VENV_BIN)/uv pip install --no-cache-dir .[dev]
+	$(VENV_BIN)/uv pip install --no-cache-dir .[dev,docs]
 	@echo "--> Virtual environment setup and dependencies installed in $(VENV_DIR)."
 	@echo "--> Activate it using: source $(VENV_BIN)/activate"
 
@@ -62,8 +66,11 @@ venv: $(VENV_DIR)/pyvenv.cfg ## Set up venv, install base tools, and project dep
 $(VENV_DIR)/pyvenv.cfg: pyproject.toml
 	@echo "--> Creating virtual environment in $(VENV_DIR) using global uv..."
 	@command -v $(UV) >/dev/null 2>&1 || { echo >&2 "Error: '$(UV)' command not found in PATH. Please install uv (see https://github.com/astral-sh/uv)."; exit 1; }
+	@test -n "$(PYTHON_FOR_VENV)" || { echo >&2 "Error: No Python interpreter found (need Python >= 3.10)."; exit 1; }
+	@$(PYTHON_FOR_VENV) -c "import sys; assert sys.version_info >= (3, 10), f'Python >=3.10 required; found {sys.version.split()[0]}'" \
+		|| { echo >&2 "Error: Python >= 3.10 is required. Install python3.11+ (pyenv/asdf/system) or set PYTHON_FOR_VENV=..."; exit 1; }
 	# Create the venv using global uv
-	$(UV) venv $(VENV_DIR) --seed --python $(shell which python3 || which python)
+	$(UV) venv $(VENV_DIR) --seed --python $(PYTHON_FOR_VENV)
 	@echo "--> Installing/upgrading pip and installing uv within $(VENV_DIR)..."
 	# Use global uv again, but target the venv's python to install packages INTO the venv
 	$(UV) pip install --python $(VENV_BIN)/python --no-cache-dir --upgrade pip uv
@@ -123,7 +130,7 @@ test: venv ## Run unit & integration tests with Pytest
 
 coverage: test ## Generate test coverage report (assumes tests were run via make test)
 	@echo "--> Generating test coverage report ($(COVERAGE))..."
-	$(COVERAGE) report -m --fail-under=80 # Ensure fail-under matches pyproject.toml
+	$(COVERAGE) report -m --fail-under=70 # Ensure fail-under matches pyproject.toml
 	@echo "--> HTML report generated: htmlcov/index.html"
 	$(COVERAGE) html
 

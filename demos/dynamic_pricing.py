@@ -3,12 +3,28 @@ Demonstration and training logic for dynamic pricing MDP and Q-learning agent.
 """
 
 import numpy as np
-from environments.mdp import DynamicPricingMDP
+from pydantic import BaseModel, ConfigDict
+
 from agents.qlearning import QLearningAgent
 from config.config import DynamicPricingMDPConfig, QLearningAgentConfig
+from environments.mdp import DynamicPricingMDP
 from utils.logger import get_logger
 
 logger = get_logger("demos.dynamic_pricing")
+
+
+class TrainingResult(BaseModel):
+    episode_returns: list[float]
+    policy: dict[tuple[int, int, int], int]
+
+
+class DemoResult(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    episode_returns: list[float]
+    policy: dict[tuple[int, int, int], int]
+    env: DynamicPricingMDP
+    agent: QLearningAgent
 
 
 def train_agent(
@@ -16,7 +32,7 @@ def train_agent(
     agent: QLearningAgent,
     num_episodes: int = 5000,
     verbose: bool = False,
-) -> tuple[list[float], dict[tuple[int, int, int], int]]:
+) -> TrainingResult:
     """
     Train a Q-learning agent on the Dynamic Pricing MDP.
     Returns:
@@ -60,35 +76,34 @@ def train_agent(
     logger.info("Training complete.")
     policy: dict[tuple[int, int, int], int] = agent.get_policy()
     logger.info(f"Learned policy has {len(policy)} state entries.")
-    return episode_returns, policy
+    return TrainingResult(episode_returns=episode_returns, policy=policy)
 
 
 def demonstrate_mdp_dynamic_pricing(
-    env_config: DynamicPricingMDPConfig = DynamicPricingMDPConfig(),
+    env_config: DynamicPricingMDPConfig | None = None,
     agent_config: QLearningAgentConfig | None = None,
     num_training_episodes: int = 10000,
     verbose: bool = True,
-) -> dict:
+) -> DemoResult:
     """
     Demonstrate the MDP for dynamic pricing with Q-learning.
     Returns a dictionary with results and artifacts for further use or display.
     """
     logger.info("--- Starting MDP Dynamic Pricing Demonstration ---")
+    if env_config is None:
+        env_config = DynamicPricingMDPConfig()
+
     if agent_config is None:
-        agent_config = QLearningAgentConfig(
-            action_space_size=len(env_config.available_discounts)
-        )
+        agent_config = QLearningAgentConfig(action_space_size=len(env_config.available_discounts))
     env = DynamicPricingMDP(env_config)
     agent = QLearningAgent(agent_config)
-    episode_returns, policy = train_agent(
-        env, agent, num_episodes=num_training_episodes, verbose=verbose
-    )
+    training = train_agent(env, agent, num_episodes=num_training_episodes, verbose=verbose)
     # Learning curve data
-    results = {
-        "episode_returns": episode_returns,
-        "policy": policy,
-        "env": env,
-        "agent": agent,
-    }
+    results = DemoResult(
+        episode_returns=training.episode_returns,
+        policy=training.policy,
+        env=env,
+        agent=agent,
+    )
     logger.info("--- MDP Dynamic Pricing Demonstration Complete ---")
     return results

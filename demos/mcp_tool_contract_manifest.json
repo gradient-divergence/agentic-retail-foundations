@@ -1,0 +1,26 @@
+{
+  "tool_contracts": [
+    {
+      "name": "get_return_policy",
+      "description": "Fetch the current return policy summary for a product category.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "category": {"type": "string"}
+        },
+        "required": ["category"]
+      }
+    },
+    {
+      "name": "check_inventory",
+      "description": "Return current on-hand inventory for a SKU.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "sku": {"type": "string"}
+        },
+        "required": ["sku"]
+      }
+    }
+  ]
+}

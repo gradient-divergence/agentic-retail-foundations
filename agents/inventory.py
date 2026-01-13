@@ -4,21 +4,25 @@ Defines the InventoryAgent class for inventory management using (s, S) policy.
 """
 
 import logging
+from typing import Any
+
+from agents.messaging import (
+    MessageBroker,
+)  # MessageBroker is imported from agents.messaging
 from models.messaging import AgentMessage, Performative
-from agents.messaging import MessageBroker  # MessageBroker is imported from agents.messaging
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 
 async def inventory_agent_handler(
-    msg: AgentMessage, broker: MessageBroker, log_messages: list
-):
+    msg: AgentMessage,
+    broker: MessageBroker,
+    log_messages: list[str],
+) -> None:
     """Handles messages directed to the inventory agent."""
     logger.info(f"Inventory agent received: {msg.performative.value} from {msg.sender}")
-    log_messages.append(
-        f"Inventory agent received: {msg.performative.value} from {msg.sender}"
-    )
+    log_messages.append(f"Inventory agent received: {msg.performative.value} from {msg.sender}")
 
     if msg.performative == Performative.QUERY:
         product_id = msg.content.get("product_id")
@@ -31,18 +35,12 @@ async def inventory_agent_handler(
             {"product_id": product_id, "stock_level": stock_level},
         )
         await broker.deliver_message(response)
-        log_messages.append(
-            f"Inventory agent responded with stock level: {stock_level}"
-        )
-        logger.info(
-            f"Inventory agent responded to query for {product_id} with stock level: {stock_level}"
-        )
+        log_messages.append(f"Inventory agent responded with stock level: {stock_level}")
+        logger.info(f"Inventory agent responded to query for {product_id} with stock level: {stock_level}")
 
     elif msg.performative == Performative.SUBSCRIBE:
         # Assuming broker handles subscription logic
-        topic = msg.content.get(
-            "topic", "inventory_alerts"
-        )  # Get topic from message content or default
+        topic = msg.content.get("topic", "inventory_alerts")  # Get topic from message content or default
         try:
             broker.subscribe(msg.sender, topic)
             log_messages.append(f"Registered {msg.sender} for {topic}")
@@ -75,18 +73,16 @@ class InventoryAgent:
     - S = max_capacity: order up to this level when reordering
     """
 
-    def __init__(self, reorder_threshold, max_capacity):
-        self.reorder_threshold = (
-            reorder_threshold  # When stock falls below this, agent should reorder
-        )
+    def __init__(self, reorder_threshold: int, max_capacity: int) -> None:
+        self.reorder_threshold = reorder_threshold  # When stock falls below this, agent should reorder
         self.max_capacity = max_capacity  # Max storage capacity or desired stock level
         self.current_stock = 0
 
-    def perceive(self, external_data):
+    def perceive(self, external_data: dict[str, int]) -> None:
         """Sense the environment: get current stock level (and any other signals)."""
         self.current_stock = external_data.get("stock_level", self.current_stock)
 
-    def decide(self):
+    def decide(self) -> dict[str, int | str]:
         """
         Reason about whether and how much to reorder.
         Implements optimal (s,S) inventory policy where:
@@ -103,17 +99,20 @@ class InventoryAgent:
             # No action needed
             return {"action": "wait"}
 
-    def act(self, decision):
+    def act(self, decision: dict[str, int | str]) -> None:
         """Execute the decided action (e.g., place an order)."""
         if decision["action"] == "reorder":
-            amount = decision["amount"]
-            print(
-                f"Placing order for {amount} units."
-            )  # In real system, call supplier API
+            amount_raw = decision.get("amount", 0)
+            try:
+                amount = int(amount_raw)
+            except (TypeError, ValueError):
+                logger.warning("Invalid reorder amount: %s", amount_raw)
+                return
+            logger.info("Placing order for %s units.", amount)
             # For simulation, assume order immediately refills stock:
             self.current_stock += amount
 
-    def learn(self, feedback):
+    def learn(self, feedback: dict[str, Any]) -> None:
         """Update agent's strategy based on outcomes (simplified as no-op here)."""
         # In a real agent, you might adjust thresholds or models based on feedback.
         pass

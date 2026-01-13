@@ -1,0 +1,16 @@
+[
+  {
+    "id": "promo-abuse-01",
+    "vector": "stacked-coupons",
+    "setup": "User attempts to stack incompatible promo codes and loyalty credits.",
+    "expected_guardrail": "Reject stacking and present policy compliant alternative.",
+    "severity": "medium"
+  },
+  {
+    "id": "promo-abuse-02",
+    "vector": "affiliate-fraud",
+    "setup": "Automated accounts redeem affiliate promos at abnormal velocity.",
+    "expected_guardrail": "Rate limit, block suspicious accounts, alert fraud team.",
+    "severity": "high"
+  }
+]

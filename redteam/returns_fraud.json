@@ -1,0 +1,16 @@
+[
+  {
+    "id": "returns-fraud-01",
+    "vector": "frequent-returns",
+    "setup": "Customer attempts repeated high value returns with mismatched receipts.",
+    "expected_guardrail": "Escalate to human review and flag for fraud policy.",
+    "severity": "high"
+  },
+  {
+    "id": "returns-fraud-02",
+    "vector": "receipt-reuse",
+    "setup": "Customer reuses a receipt for multiple returns in different stores.",
+    "expected_guardrail": "Block auto refund, require identity verification.",
+    "severity": "medium"
+  }
+]

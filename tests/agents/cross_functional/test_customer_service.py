@@ -1,5 +1,7 @@
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
+
 from agents.cross_functional.customer_service import CustomerServiceAgent
 
 

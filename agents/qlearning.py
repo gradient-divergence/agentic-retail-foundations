@@ -3,10 +3,12 @@ Q-learning agent for dynamic pricing MDP.
 Refactored for modular use in agentic-retail-foundations.
 """
 
-from collections import defaultdict
-import numpy as np
 import pickle
+from collections import defaultdict
+
+import numpy as np
 import pandas as pd
+
 from config.config import QLearningAgentConfig
 from utils.logger import get_logger
 
@@ -20,7 +22,7 @@ class QLearningAgent:
     for each state-action pair.
     """
 
-    def __init__(self, config: QLearningAgentConfig):
+    def __init__(self, config: QLearningAgentConfig) -> None:
         self.config = config
         self.logger = get_logger(self.__class__.__name__)
         self.q_table: dict[tuple[int, int, int], np.ndarray] = defaultdict(
@@ -33,12 +35,13 @@ class QLearningAgent:
         self.exploration_decay = config.exploration_decay
         self.action_space_size = config.action_space_size
         self.logger.info(
-            f"QLearningAgent initialized: LR={self.learning_rate}, Gamma={self.discount_factor}, Epsilon={self.exploration_rate}"
+            "QLearningAgent initialized: LR=%s, Gamma=%s, Epsilon=%s",
+            self.learning_rate,
+            self.discount_factor,
+            self.exploration_rate,
         )
 
-    def choose_action(
-        self, state: tuple, available_actions: list[int] | None = None
-    ) -> int:
+    def choose_action(self, state: tuple, available_actions: list[int] | None = None) -> int:
         if available_actions is None:
             available_actions = list(range(self.action_space_size))
         if not available_actions:
@@ -49,44 +52,39 @@ class QLearningAgent:
             self.logger.debug(f"Action chosen (Explore): {action} from state {state}")
             return action
         state_q_values = self.q_table[state]
-        available_q_values = {
-            action: state_q_values[action] for action in available_actions
-        }
+        available_q_values = {action: state_q_values[action] for action in available_actions}
         max_q = -np.inf
         if available_q_values:
             max_q = max(available_q_values.values())
-        best_actions = [
-            action for action, q in available_q_values.items() if q == max_q
-        ]
+        best_actions = [action for action, q in available_q_values.items() if q == max_q]
         action_choice = (
-            np.random.choice(best_actions)
-            if best_actions
-            else np.random.choice(available_actions)
+            np.random.choice(best_actions) if best_actions else np.random.choice(available_actions)
         )
         action = int(action_choice)
-        self.logger.debug(
-            f"Action chosen (Exploit): {action} (Q={max_q:.3f}) from state {state}"
-        )
+        self.logger.debug(f"Action chosen (Exploit): {action} (Q={max_q:.3f}) from state {state}")
         return action  # type: ignore[no-any-return]
 
-    def update(
-        self, state: tuple, action: int, reward: float, next_state: tuple, done: bool
-    ):
+    def update(self, state: tuple, action: int, reward: float, next_state: tuple, done: bool) -> None:
         next_state_q_values = self.q_table[next_state]
         max_next_q = np.max(next_state_q_values) if not done else 0.0
         td_target = reward + self.discount_factor * max_next_q
         td_error = td_target - self.q_table[state][action]
         self.q_table[state][action] += self.learning_rate * td_error
         self.logger.debug(
-            f"Q-update: State={state}, Action={action}, Reward={reward:.2f}, NextState={next_state}, Done={done}, TD_Error={td_error:.3f}, New Q={self.q_table[state][action]:.3f}"
+            "Q-update: State=%s, Action=%s, Reward=%.2f, NextState=%s, Done=%s, TD_Error=%.3f, New Q=%.3f",
+            state,
+            action,
+            reward,
+            next_state,
+            done,
+            td_error,
+            self.q_table[state][action],
         )
 
-    def decay_exploration(self):
+    def decay_exploration(self) -> None:
         if self.exploration_rate > self.min_exploration_rate:
             self.exploration_rate *= self.exploration_decay
-            self.exploration_rate = max(
-                self.min_exploration_rate, self.exploration_rate
-            )
+            self.exploration_rate = max(self.min_exploration_rate, self.exploration_rate)
 
     def get_policy(self) -> dict[tuple, int]:
         policy = {}
@@ -118,7 +116,7 @@ class QLearningAgent:
         )
         return df.reset_index(drop=True)
 
-    def save(self, filepath: str):
+    def save(self, filepath: str) -> None:
         """Serialize the agent state and Q-table to a file."""
         with open(filepath, "wb") as f:
             pickle.dump(
@@ -135,13 +133,11 @@ class QLearningAgent:
             )
         self.logger.info(f"Agent state saved to {filepath}")
 
-    def load(self, filepath: str):
+    def load(self, filepath: str) -> None:
         """Load the agent state and Q-table from a file."""
         with open(filepath, "rb") as f:
             state = pickle.load(f)
-            self.q_table = defaultdict(
-                lambda: np.zeros(state["action_space_size"]), state["q_table"]
-            )
+            self.q_table = defaultdict(lambda: np.zeros(state["action_space_size"]), state["q_table"])
             self.learning_rate = state["learning_rate"]
             self.discount_factor = state["discount_factor"]
             self.exploration_rate = state["exploration_rate"]

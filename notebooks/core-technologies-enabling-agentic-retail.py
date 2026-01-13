@@ -1,40 +1,48 @@
 import marimo
 
-__generated_with = "0.13.0"
+__generated_with = "0.18.4"
 app = marimo.App()
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        # Chapter 6: Foundation Models and Visual Intelligence
+    mo.md(r"""
+    # Chapter 6: Foundation Models and Visual Intelligence
 
-        This chapter explores how Foundation Models, powered by large language models and advanced visual intelligence, redefine responsiveness and adaptability in retail environments. 
+    This chapter explores how Foundation Models, powered by large language models and advanced visual intelligence, redefine responsiveness and adaptability in retail environments.
 
-        You'll discover how integrating these powerful AI capabilities can enable real-time shelf monitoring, improved customer interactions, and intelligent product recognition. Additionally, the chapter dives into Knowledge Graphs and Semantic Reasoning, illustrating how structured knowledge and ontologies significantly enhance decision accuracy, personalization, and overall retail intelligence. 
+    You'll discover how integrating these powerful AI capabilities can enable real-time shelf monitoring, improved customer interactions, and intelligent product recognition. Additionally, the chapter dives into Knowledge Graphs and Semantic Reasoning, illustrating how structured knowledge and ontologies significantly enhance decision accuracy, personalization, and overall retail intelligence.
 
-        By combining these critical technologies, you'll be equipped to build sophisticated AI-driven retail experiences that seamlessly blend perception, language, and reasoning.
-        """
-    )
+    By combining these critical technologies, you'll be equipped to build sophisticated AI-driven retail experiences that seamlessly blend perception, language, and reasoning.
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""## Imports and logger setup""")
+    mo.md(r"""
+    ## Imports and logger setup
+    """)
     return
 
 
 @app.cell
 def _():
-    import os
     import asyncio
-    import pandas as pd
-    import marimo as mo
 
     # Setup basic logging
     import logging
+    import os
+
+    import marimo as mo
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+    import pandas as pd
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -47,16 +55,14 @@ def _():
         logger.addHandler(handler)
 
     # Import DummyDB and DummyOrderSystem from connectors
+    # Import ShelfMonitoringAgent
+    from agents.cv import ShelfMonitoringAgent
     from connectors.dummy_db import DummyDB
+    from connectors.dummy_inventory_system import DummyInventorySystem
     from connectors.dummy_order_system import DummyOrderSystem
 
     # Import DummyPlanogramDB and DummyInventorySystem from connectors
     from connectors.dummy_planogram_db import DummyPlanogramDB
-    from connectors.dummy_inventory_system import DummyInventorySystem
-
-    # Import ShelfMonitoringAgent
-    from agents.cv import ShelfMonitoringAgent
-
     return (
         DummyDB,
         DummyInventorySystem,
@@ -73,32 +79,29 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ### Vision Language Models (VLMs)
+    mo.md(r"""
+    ### Vision Language Models (VLMs)
 
-        VLMs bridge the gap between visual perception and language understanding.
-        These models, combining architectures like large language models and advanced
-        visual intelligence, redefine responsiveness and adaptability in retail
-        environments.
+    VLMs bridge the gap between visual perception and language understanding.
+    These models, combining architectures like large language models and advanced
+    visual intelligence, redefine responsiveness and adaptability in retail
+    environments.
 
-        They can enable real-time shelf monitoring, improved customer interactions,
-        and intelligent product recognition. Additionally, the chapter dives into
-        Knowledge Graphs and Semantic Reasoning, illustrating how structured knowledge
-        and ontologies significantly enhance decision accuracy, personalization,
-        and overall retail intelligence.
+    They can enable real-time shelf monitoring, improved customer interactions,
+    and intelligent product recognition. Additionally, the chapter dives into
+    Knowledge Graphs and Semantic Reasoning, illustrating how structured knowledge
+    and ontologies significantly enhance decision accuracy, personalization,
+    and overall retail intelligence.
 
-        These technologies combine to build sophisticated AI-driven retail
-        experiences that seamlessly blend perception, language, and reasoning.
-        """
-    )
+    These technologies combine to build sophisticated AI-driven retail
+    experiences that seamlessly blend perception, language, and reasoning.
+    """)
     return
 
 
 @app.cell
 def _():
     from agents.llm import RetailCustomerServiceAgent
-
     return (RetailCustomerServiceAgent,)
 
 
@@ -153,7 +156,6 @@ def _(customer_service_agent, mo):
             responses_md.append("---")
 
         return mo.vstack(responses_md)
-
     return (run_customer_interaction_demo,)
 
 
@@ -176,7 +178,9 @@ async def _(logger, mo, run_customer_interaction_demo):
 
 @app.cell
 def _(mo):
-    mo.md(r"""## Shelf Monitoring Agent""")
+    mo.md(r"""
+    ## Shelf Monitoring Agent
+    """)
     return
 
 
@@ -185,7 +189,7 @@ def _(DummyInventorySystem, DummyPlanogramDB, ShelfMonitoringAgent):
     # Instantiation
     model_path = "models/dummy_detection_model/"  # <<<--- UPDATED to dummy model path
     # Remove camera 0 to prevent OpenCV error if no camera is present
-    cam_urls = {"CAM02": "1"} # Removed CAM01: "0"
+    cam_urls = {"CAM02": "1"}  # Removed CAM01: "0"
 
     shelf_agent = ShelfMonitoringAgent(
         model_path,
@@ -195,7 +199,6 @@ def _(DummyInventorySystem, DummyPlanogramDB, ShelfMonitoringAgent):
         confidence_threshold=0.5,
         check_frequency_seconds=15,
     )
-
     return (shelf_agent,)
 
 
@@ -289,27 +292,25 @@ async def _(logger, mo, run_shelf_monitoring_demo):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ### Integration with Other Agent Systems
+    mo.md(r"""
+    ### Integration with Other Agent Systems
 
-        Computer vision systems are most valuable when integrated with other retail
-        agent capabilities:
+    Computer vision systems are most valuable when integrated with other retail
+    agent capabilities:
 
-        1. **Computer Vision + LLMs**: Enable natural language queries about visual
-           store conditions, such as "Show me all sections with more than 20%
-           out-of-stocks" or "Which endcaps need to be reset for the new promotion?"
-        2. **Computer Vision + IoT**: Correlate visual data with shelf weight
-           sensors to distinguish between similar-looking products or verify that
-           observed changes match weight changes.
-        3. **Computer Vision + Knowledge Graphs**: Augment visual perception with
-           semantic relationships, allowing agents to understand not just what
-           they see but what it means in the retail context.
-        4. **Computer Vision + Robotics**: Guide robots to respond to detected
-           issues, such as cleaning spills, retrieving products, or scanning
-           barcodes to verify inventory.
-        """
-    )
+    1. **Computer Vision + LLMs**: Enable natural language queries about visual
+       store conditions, such as "Show me all sections with more than 20%
+       out-of-stocks" or "Which endcaps need to be reset for the new promotion?"
+    2. **Computer Vision + IoT**: Correlate visual data with shelf weight
+       sensors to distinguish between similar-looking products or verify that
+       observed changes match weight changes.
+    3. **Computer Vision + Knowledge Graphs**: Augment visual perception with
+       semantic relationships, allowing agents to understand not just what
+       they see but what it means in the retail context.
+    4. **Computer Vision + Robotics**: Guide robots to respond to detected
+       issues, such as cleaning spills, retrieving products, or scanning
+       barcodes to verify inventory.
+    """)
     return
 
 

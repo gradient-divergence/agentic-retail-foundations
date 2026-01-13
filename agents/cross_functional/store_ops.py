@@ -2,10 +2,13 @@
 StoreOpsAgent for preparing stores for launch and store ops remediation in retail MAS.
 """
 
+import asyncio
+import logging
+import random
 from datetime import datetime, timedelta
 from typing import Any
-import asyncio
-import random
+
+logger = logging.getLogger(__name__)
 
 
 class StoreOpsAgent:
@@ -13,8 +16,8 @@ class StoreOpsAgent:
     Agent responsible for preparing stores for launch and suggesting store ops remediation.
     """
 
-    def __init__(self):
-        print("StoreOpsAgent initialized")
+    def __init__(self) -> None:
+        logger.info("StoreOpsAgent initialized")
 
     async def prepare_for_launch(
         self,
@@ -27,23 +30,20 @@ class StoreOpsAgent:
         """
         Prepare store operations for a product launch.
         """
-        print(f"Store Ops: Preparing for launch of {product_id}")
+        logger.info("Store Ops: Preparing for launch of %s", product_id)
         await asyncio.sleep(0.4)
-        training_ready = (
-            "product_overview" in staff_training
-            and "sales_techniques" in staff_training
-        )
+        training_ready = "product_overview" in staff_training and "sales_techniques" in staff_training
         return {
             "status": "ready" if training_ready else "delayed",
-            "summary": f"Store ops preparation {'complete' if training_ready else 'incomplete - training needed'}",
+            "summary": (
+                f"Store ops preparation {'complete' if training_ready else 'incomplete - training needed'}"
+            ),
             "planogram_updated": True,
             "staff_trained": training_ready,
             "displays_ready": "standard_display" in display_requirements,
         }
 
-    async def suggest_remediation(
-        self, product_id: str, current_status: str
-    ) -> dict[str, Any]:
+    async def suggest_remediation(self, product_id: str, current_status: str) -> dict[str, Any]:
         """
         Suggest remediation steps for store operations issues.
         """
@@ -56,22 +56,23 @@ class StoreOpsAgent:
             ],
         }
 
-    async def prepare_store_layout(self, product_data: dict[str, Any]):
+    async def prepare_store_layout(self, product_data: dict[str, Any]) -> dict[str, Any]:
         """Placeholder: Plan store layout changes based on planogram."""
         planogram = product_data.get("planogram", {})
-        print(f"StoreOps: Preparing layout for {planogram.get('location')}...")
+        logger.info(
+            "StoreOps: Preparing layout for %s...",
+            planogram.get("location"),
+        )
         await asyncio.sleep(0.25)  # Simulate layout planning
-        print("StoreOps: Store layout adjustments planned.")
+        logger.info("StoreOps: Store layout adjustments planned.")
         return {"status": "layout_planned"}
 
     async def check_readiness(self, product_data: dict[str, Any]) -> dict[str, Any]:
         """Simulate checking if stores are ready (layout, staff trained)."""
         agent_name = self.__class__.__name__
         product_id = product_data.get("id", "Unknown Product")
-        planned_launch_date = product_data.get(
-            "planned_launch_date", datetime.now() + timedelta(days=30)
-        )
-        print(f"StoreOps: Checking readiness for {product_id}")
+        planned_launch_date = product_data.get("planned_launch_date", datetime.now() + timedelta(days=30))
+        logger.info("StoreOps: Checking readiness for %s", product_id)
         await asyncio.sleep(random.uniform(0.15, 0.35))
 
         # Check for required data
@@ -88,9 +89,7 @@ class StoreOpsAgent:
         readiness_date = None
 
         if missing_data:
-            details = (
-                f"Blocked: Missing required launch data - {', '.join(missing_data)}."
-            )
+            details = f"Blocked: Missing required launch data - {', '.join(missing_data)}."
             readiness_date = None  # Cannot proceed
         else:
             # Simulate potential delays in training rollout or display setup
@@ -104,18 +103,18 @@ class StoreOpsAgent:
             elif delay_chance < 0.9:  # 20% minor delay
                 status = "blocked"
                 details = "Minor delay: Staff training sessions behind schedule in some regions."
-                readiness_date = planned_launch_date + timedelta(
-                    days=random.randint(1, 3)
-                )
+                readiness_date = planned_launch_date + timedelta(days=random.randint(1, 3))
             else:  # 10% major delay
                 status = "blocked"
                 details = "Major delay: Delivery of new display units postponed."
-                readiness_date = planned_launch_date + timedelta(
-                    days=random.randint(5, 10)
-                )
+                readiness_date = planned_launch_date + timedelta(days=random.randint(5, 10))
 
-        print(
-            f"  - {agent_name}: {status} ({details}) - Est. Ready Date: {readiness_date.strftime('%Y-%m-%d') if isinstance(readiness_date, datetime) else 'N/A'}"
+        logger.info(
+            "%s: %s (%s) - Est. Ready Date: %s",
+            agent_name,
+            status,
+            details,
+            readiness_date.strftime("%Y-%m-%d") if isinstance(readiness_date, datetime) else "N/A",
         )
         return {
             "agent": agent_name,

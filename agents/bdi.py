@@ -2,21 +2,45 @@
 BDI (Belief-Desire-Intention) agent for inventory management in agentic-retail-foundations.
 """
 
-from datetime import datetime, timedelta
-import random
+# region book:bdi-agent-imports
 import logging
-from models.inventory import ProductInfo, InventoryItem, SalesData
+import random
+from datetime import datetime, timedelta
+
+from models.inventory import InventoryItem, ProductInfo, SalesData
 
 logger = logging.getLogger("AgentFrameworks")
+# endregion book:bdi-agent-imports
 
 
+# region book:bdi-agent-class
 class InventoryBDIAgent:
     """
     A Belief-Desire-Intention agent for inventory management.
-    Implements the BDI cycle: update beliefs, deliberate, generate intentions, execute intentions.
+
+    Beliefs (state):
+    - product catalog and attributes
+    - inventory positions
+    - recent sales history
+    - current simulation or business date
+
+    Desires (goals):
+    - minimize stockouts
+    - minimize excess inventory
+    - maximize profit margin
+    - ensure freshness for perishables
+
+    Intentions (plans):
+    - reorder
+    - discount
+    - promote
+    - discount perishable items
+
+    The cycle is:
+    update beliefs -> deliberate -> generate intentions -> execute intentions
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Beliefs
         self.products: dict[str, ProductInfo] = {}
         self.inventory: dict[str, InventoryItem] = {}
@@ -36,13 +60,24 @@ class InventoryBDIAgent:
         self.active_intentions: list[dict] = []
         logger.info("Inventory BDI Agent initialized.")
 
-    def update_beliefs(
+    # endregion book:bdi-agent-class
+
+    # region book:bdi-agent-update-beliefs
+    def update_beliefs(  # noqa: C901
         self,
         new_inventory: dict[str, InventoryItem] | None = None,
         new_sales: dict[str, SalesData] | None = None,
         new_date: datetime | None = None,
         new_products: dict[str, ProductInfo] | None = None,
-    ):
+    ) -> None:
+        """
+        Update the agent's beliefs from external sources.
+
+        In production, this would typically come from tools:
+        - inventory service (current stock, pending orders)
+        - sales/analytics service (recent sales)
+        - product catalog (cost, lead time, shelf life)
+        """
         if new_products is not None:
             self.products = new_products
             for prod in self.products.values():
@@ -70,11 +105,18 @@ class InventoryBDIAgent:
             msg += f", ProductItems: {len(new_products)}"
         logger.info(msg)
 
+    # endregion book:bdi-agent-update-beliefs
+
+    # region book:bdi-agent-observe
     def observe(self, product_id: str) -> dict:
+        """
+        OBSERVE phase: gather raw signals needed for decision-making.
+
+        In production, this would call external tools for competitor prices,
+        supplier lead time, and up-to-date inventory/sales signals.
+        """
         if product_id not in self.products or product_id not in self.inventory:
-            logger.warning(
-                f"Observe: missing product or inventory data for {product_id}."
-            )
+            logger.warning(f"Observe: missing product or inventory data for {product_id}.")
             return {}
         product = self.products[product_id]
         item = self.inventory[product_id]
@@ -99,15 +141,15 @@ class InventoryBDIAgent:
         }
         return observation
 
-    def orient(self, product_id: str, observation: dict) -> dict:
-        if (
-            not observation
-            or product_id not in self.products
-            or product_id not in self.inventory
-        ):
-            logger.warning(
-                f"Orient: missing observation or product data for {product_id}."
-            )
+    # endregion book:bdi-agent-observe
+
+    # region book:bdi-agent-orient
+    def orient(self, product_id: str, observation: dict) -> dict:  # noqa: C901
+        """
+        ORIENT phase: turn raw observations into a situation classification.
+        """
+        if not observation or product_id not in self.products or product_id not in self.inventory:
+            logger.warning(f"Orient: missing observation or product data for {product_id}.")
             return {}
         product = self.products[product_id]
         item = self.inventory[product_id]
@@ -134,16 +176,12 @@ class InventoryBDIAgent:
         sales_obj = self.sales_data.get(product_id)
         trend_factor = sales_obj.trend() if sales_obj else 0.0
         projected_daily = max(0, avg_daily_7 * (1 + trend_factor))
-        days_of_supply = (
-            inventory_level / projected_daily if projected_daily > 0 else float("inf")
-        )
+        days_of_supply = inventory_level / projected_daily if projected_daily > 0 else float("inf")
         lead_time = observation.get("lead_time", product.lead_time_days)
         buffer_days = 3
         if inventory_status == "low" and days_of_supply < (lead_time + buffer_days):
             sales_assessment = "risk_of_stockout"
-        elif inventory_status == "high" and projected_daily < max(
-            1, item.reorder_point * 0.1
-        ):
+        elif inventory_status == "high" and projected_daily < max(1, item.reorder_point * 0.1):
             sales_assessment = "slow_moving"
         elif avg_daily_7 <= 0.1 and inventory_level > 0:
             sales_assessment = "stagnant"
@@ -175,21 +213,30 @@ class InventoryBDIAgent:
             "projected_daily_sales": projected_daily,
         }
         logger.info(
-            f"Oriented {product_id}: {market_situation} "
-            f"(Inv: {inventory_status}, Sales: {sales_assessment}, Price: {price_position}, DoS: {days_of_supply:.1f})"
+            "Oriented %s: %s (Inv: %s, Sales: %s, Price: %s, DoS: %.1f)",
+            product_id,
+            market_situation,
+            inventory_status,
+            sales_assessment,
+            price_position,
+            days_of_supply,
         )
         return orientation
 
+    # endregion book:bdi-agent-orient
+
+    # region book:bdi-agent-deliberate
     def deliberate(self) -> list[str]:
-        stockout_utility = (
-            self._evaluate_stockout_prevention() * self.goals["minimize_stockouts"]
-        )
-        excess_utility = (
-            self._evaluate_excess_reduction() * self.goals["minimize_excess_inventory"]
-        )
-        profit_utility = (
-            self._evaluate_profit_maximization() * self.goals["maximize_profit_margin"]
-        )
+        """
+        Convert the current situation into a prioritized goal list.
+
+        Each goal has:
+        - a utility signal (0..1-ish) produced by an evaluator
+        - a weight that reflects the retailer's strategy
+        """
+        stockout_utility = self._evaluate_stockout_prevention() * self.goals["minimize_stockouts"]
+        excess_utility = self._evaluate_excess_reduction() * self.goals["minimize_excess_inventory"]
+        profit_utility = self._evaluate_profit_maximization() * self.goals["maximize_profit_margin"]
         fresh_utility = self._evaluate_freshness() * self.goals["ensure_fresh_products"]
         utilities = {
             "minimize_stockouts": stockout_utility,
@@ -199,13 +246,16 @@ class InventoryBDIAgent:
         }
         sorted_goals = sorted(utilities.items(), key=lambda x: x[1], reverse=True)
         prioritized_goals = [g for (g, val) in sorted_goals if val > 0.01]
-        logger.info(
-            "Deliberated Goals: "
-            + str([(g, round(utilities[g], 3)) for g in prioritized_goals])
-        )
+        logger.info("Deliberated Goals: " + str([(g, round(utilities[g], 3)) for g in prioritized_goals]))
         return prioritized_goals
 
+    # endregion book:bdi-agent-deliberate
+
+    # region book:bdi-agent-generate-intentions
     def generate_intentions(self, prioritized_goals: list[str]) -> None:
+        """
+        Turn goals into concrete action plans ("intentions").
+        """
         self.active_intentions.clear()
         processed_products: set[str] = set()
         for goal in prioritized_goals:
@@ -217,11 +267,17 @@ class InventoryBDIAgent:
                 self._plan_margin_optimization(processed_products)
             elif goal == "ensure_fresh_products":
                 self._plan_freshness_management(processed_products)
-        logger.info(
-            f"Generated {len(self.active_intentions)} intentions from goals: {prioritized_goals}"
-        )
+        logger.info(f"Generated {len(self.active_intentions)} intentions from goals: {prioritized_goals}")
 
+    # endregion book:bdi-agent-generate-intentions
+
+    # region book:bdi-agent-execute-intentions
     def execute_intentions(self) -> list[dict]:
+        """
+        Execute planned actions in descending priority order.
+
+        Returns a list of successfully executed intentions.
+        """
         executed_actions = []
         sorted_intentions = sorted(
             self.active_intentions,
@@ -248,20 +304,19 @@ class InventoryBDIAgent:
                 elif action_type == "discount_perishable":
                     success = self._execute_perishable_discount(intention)
                 else:
-                    logger.warning(
-                        f"Unknown intention action type: {action_type} for {pid}"
-                    )
+                    logger.warning(f"Unknown intention action type: {action_type} for {pid}")
                 if success:
                     executed_actions.append(intention)
                     processed_products_in_execution.add(pid)
             except Exception as e:
-                logger.error(
-                    f"Error executing intention {intention}: {e}", exc_info=True
-                )
+                logger.error(f"Error executing intention {intention}: {e}", exc_info=True)
         logger.info(f"Executed {len(executed_actions)} intentions.")
         self.active_intentions.clear()
         return executed_actions
 
+    # endregion book:bdi-agent-execute-intentions
+
+    # region book:bdi-agent-evaluation
     def _evaluate_stockout_prevention(self) -> float:
         if not self.inventory:
             return 0.0
@@ -307,7 +362,34 @@ class InventoryBDIAgent:
         return total_excess / total_cost
 
     def _evaluate_profit_maximization(self) -> float:
-        return 0.1
+        """
+        Estimate profit opportunity by spotting high-margin products that are understocked.
+
+        This is a simple heuristic intended for demonstration. In production, this
+        should incorporate demand forecasts, substitution effects, and constraints
+        like shelf space and service levels.
+        """
+        if not self.products or not self.inventory:
+            return 0.0
+
+        considered = 0
+        opportunities = 0
+        for pid, product in self.products.items():
+            if pid not in self.inventory:
+                continue
+            if product.price <= 0:
+                continue
+
+            considered += 1
+            margin = (product.price - product.cost) / product.price
+            item = self.inventory[pid]
+
+            if margin > 0.4 and item.current_stock < item.optimal_stock:
+                opportunities += 1
+
+        if considered == 0:
+            return 0.0
+        return opportunities / considered
 
     def _evaluate_freshness(self) -> float:
         perishable_risk = 0.0
@@ -333,6 +415,9 @@ class InventoryBDIAgent:
             return 0.0
         return perishable_risk / total_perish_cost
 
+    # endregion book:bdi-agent-evaluation
+
+    # region book:bdi-agent-planning
     def _plan_reorders(self, processed_products: set[str]) -> None:
         for pid, item in self.inventory.items():
             if pid in processed_products:
@@ -354,9 +439,7 @@ class InventoryBDIAgent:
             lead_time = product.lead_time_days
             buffer_days = 3
             if days_of_supply <= lead_time + buffer_days:
-                needed = item.optimal_stock - (
-                    item.current_stock + item.pending_order_quantity
-                )
+                needed = item.optimal_stock - (item.current_stock + item.pending_order_quantity)
                 order_qty = int(round(max(needed, product.min_order_quantity)))
                 if order_qty > 0:
                     urgency = 1.0 - (days_of_supply / (lead_time + buffer_days))
@@ -372,7 +455,11 @@ class InventoryBDIAgent:
                     )
                     processed_products.add(pid)
                     logger.info(
-                        f"INTENTION (Reorder): {order_qty} x {pid} (DoS: {days_of_supply:.1f}, Prio: {priority:.2f})"
+                        "INTENTION (Reorder): %s x %s (DoS: %.1f, Prio: %.2f)",
+                        order_qty,
+                        pid,
+                        days_of_supply,
+                        priority,
                     )
 
     def _plan_inventory_reduction(self, processed_products: set[str]) -> None:
@@ -383,7 +470,6 @@ class InventoryBDIAgent:
                 continue
             if any(i["product_id"] == pid for i in self.active_intentions):
                 continue
-            product = self.products[pid]
             if item.current_stock > item.optimal_stock * 1.5:
                 excess_ratio = (
                     (item.current_stock - item.optimal_stock) / item.optimal_stock
@@ -391,10 +477,7 @@ class InventoryBDIAgent:
                     else 2.0
                 )
                 discount_pct = min(max(round(excess_ratio * 10), 5), 30)
-                priority = (
-                    min(1.0, excess_ratio * 0.5)
-                    * self.goals["minimize_excess_inventory"]
-                )
+                priority = min(1.0, excess_ratio * 0.5) * self.goals["minimize_excess_inventory"]
                 self.active_intentions.append(
                     {
                         "action": "discount",
@@ -405,11 +488,40 @@ class InventoryBDIAgent:
                 )
                 processed_products.add(pid)
                 logger.info(
-                    f"INTENTION (Discount): {discount_pct}% off {pid} (Stock: {item.current_stock}/{item.optimal_stock}, Prio: {priority:.2f})"
+                    "INTENTION (Discount): %s%% off %s (Stock: %s/%s, Prio: %.2f)",
+                    discount_pct,
+                    pid,
+                    item.current_stock,
+                    item.optimal_stock,
+                    priority,
                 )
 
     def _plan_margin_optimization(self, processed_products: set[str]) -> None:
-        pass
+        for pid, product in self.products.items():
+            if pid in processed_products:
+                continue
+            if pid not in self.inventory:
+                continue
+            if product.price <= 0:
+                continue
+            if any(i.get("product_id") == pid for i in self.active_intentions):
+                continue
+
+            item = self.inventory[pid]
+            margin = (product.price - product.cost) / product.price
+
+            if margin > 0.4 and item.current_stock < item.optimal_stock * 0.8:
+                priority = min(1.0, 0.2 * margin) * self.goals["maximize_profit_margin"]
+                self.active_intentions.append(
+                    {
+                        "action": "promote",
+                        "product_id": pid,
+                        "promotion_type": "featured",
+                        "priority": priority,
+                    }
+                )
+                processed_products.add(pid)
+                logger.info(f"INTENTION (Promote): featured {pid} (Margin: {margin:.2f})")
 
     def _plan_freshness_management(self, processed_products: set[str]) -> None:
         for pid, item in self.inventory.items():
@@ -431,6 +543,9 @@ class InventoryBDIAgent:
                 processed_products.add(pid)
                 logger.info(f"INTENTION (Perishable Discount): 20% off {pid}")
 
+    # endregion book:bdi-agent-planning
+
+    # region book:bdi-agent-execution
     def _execute_reorder(self, intention: dict) -> bool:
         pid = intention["product_id"]
         qty = intention["quantity"]
@@ -443,9 +558,7 @@ class InventoryBDIAgent:
         self.inventory[pid].pending_order_quantity += qty
         self.inventory[pid].expected_delivery_date = delivery_date
         self.inventory[pid].last_reorder_date = self.current_date
-        logger.info(
-            f"EXECUTE: Reorder {qty} x {pid}. Delivery expected {delivery_date.date()}."
-        )
+        logger.info(f"EXECUTE: Reorder {qty} x {pid}. Delivery expected {delivery_date.date()}.")
         return True
 
     def _execute_discount(self, intention: dict) -> bool:
@@ -458,9 +571,7 @@ class InventoryBDIAgent:
         old_price = product.current_price
         new_price = round(old_price * (1 - disc_pct / 100), 2)
         product.current_price = new_price
-        logger.info(
-            f"EXECUTE: Discount {disc_pct}% for {pid}. Price {old_price:.2f} -> {new_price:.2f}"
-        )
+        logger.info(f"EXECUTE: Discount {disc_pct}% for {pid}. Price {old_price:.2f} -> {new_price:.2f}")
         return True
 
     def _execute_promotion(self, intention: dict) -> bool:
@@ -482,11 +593,14 @@ class InventoryBDIAgent:
         )
         return True
 
-    def run_cycle(self) -> list[dict]:
+    # endregion book:bdi-agent-execution
+
+    # region book:bdi-agent-run-cycle
+    def run_cycle(self, prioritized_goals: list[str] | None = None) -> list[dict]:
         logger.info("\n--- Starting Agent Cycle ---")
         logger.info("Step 1: Beliefs assumed current.")
-        logger.info("Step 2: Deliberating on goals...")
-        goals = self.deliberate()
+        logger.info("Step 2: Selecting goals...")
+        goals = prioritized_goals if prioritized_goals is not None else self.deliberate()
         if not goals:
             logger.info("No urgent goals. Cycle ends.")
             return []
@@ -499,6 +613,8 @@ class InventoryBDIAgent:
         actions = self.execute_intentions()
         logger.info(f"--- Cycle complete. {len(actions)} actions executed. ---")
         return actions
+
+    # endregion book:bdi-agent-run-cycle
 
     def _fetch_competitor_prices(self, product_id: str) -> dict[str, float]:
         if product_id not in self.products:

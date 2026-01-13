@@ -1,11 +1,10 @@
-import pytest
 import pandas as pd
-import numpy as np
+import pytest
 from pandas.api.types import (
-    is_datetime64_any_dtype,
-    is_integer_dtype,
-    is_float_dtype,
     is_bool_dtype,
+    is_datetime64_any_dtype,
+    is_float_dtype,
+    is_integer_dtype,
     is_object_dtype,
 )
 
@@ -14,12 +13,13 @@ from utils.data_generation import generate_synthetic_retail_data
 
 # Define common parameters for tests
 TEST_START_DATE = "2024-01-01"
-TEST_END_DATE = "2024-01-07" # 1 week
+TEST_END_DATE = "2024-01-07"  # 1 week
 TEST_NUM_STORES = 2
 TEST_NUM_PRODUCTS = 3
 TEST_SEED = 123
 
-@pytest.fixture(scope="module") # Generate data once for the module
+
+@pytest.fixture(scope="module")  # Generate data once for the module
 def generated_data():
     """Fixture to generate data once for multiple tests."""
     return generate_synthetic_retail_data(
@@ -30,12 +30,14 @@ def generated_data():
         seed=TEST_SEED,
     )
 
+
 def test_output_types(generated_data):
     """Test that the function returns three pandas DataFrames."""
     sales_df, product_df, store_df = generated_data
     assert isinstance(sales_df, pd.DataFrame)
     assert isinstance(product_df, pd.DataFrame)
     assert isinstance(store_df, pd.DataFrame)
+
 
 def test_output_dimensions(generated_data):
     """Test the dimensions of the output DataFrames."""
@@ -46,14 +48,15 @@ def test_output_dimensions(generated_data):
     assert len(product_df) == TEST_NUM_PRODUCTS
     assert len(sales_df) == num_days * TEST_NUM_STORES * TEST_NUM_PRODUCTS
 
+
 def test_sales_df_columns_and_types(generated_data):
     """Test the columns and data types in the sales DataFrame."""
     sales_df, _, _ = generated_data
     expected_cols_types = {
         "date": is_datetime64_any_dtype,
-        "store_id": is_object_dtype, # String/Object
-        "product_id": is_object_dtype, # String/Object
-        "sales_units": is_integer_dtype, # Should be integer after Poisson
+        "store_id": is_object_dtype,  # String/Object
+        "product_id": is_object_dtype,  # String/Object
+        "sales_units": is_integer_dtype,  # Should be integer after Poisson
         "price": is_float_dtype,
         "on_promotion": is_bool_dtype,
         "store_traffic": is_integer_dtype,
@@ -64,6 +67,7 @@ def test_sales_df_columns_and_types(generated_data):
     for col, type_check_func in expected_cols_types.items():
         assert type_check_func(sales_df[col]), f"Column '{col}' failed type check {type_check_func.__name__}"
 
+
 def test_product_df_columns_and_types(generated_data):
     """Test the columns and data types in the product DataFrame."""
     _, product_df, _ = generated_data
@@ -73,7 +77,10 @@ def test_product_df_columns_and_types(generated_data):
     }
     assert set(product_df.columns) == set(expected_cols_types.keys())
     for col, type_check_func in expected_cols_types.items():
-        assert type_check_func(product_df[col]), f"Column '{col}' failed type check {type_check_func.__name__}"
+        assert type_check_func(product_df[col]), (
+            f"Column '{col}' failed type check {type_check_func.__name__}"
+        )
+
 
 def test_store_df_columns_and_types(generated_data):
     """Test the columns and data types in the store DataFrame."""
@@ -85,6 +92,7 @@ def test_store_df_columns_and_types(generated_data):
     assert set(store_df.columns) == set(expected_cols_types.keys())
     for col, type_check_func in expected_cols_types.items():
         assert type_check_func(store_df[col]), f"Column '{col}' failed type check {type_check_func.__name__}"
+
 
 def test_data_relationships_and_ranges(generated_data):
     """Test relationships between tables and basic value ranges."""
@@ -107,6 +115,7 @@ def test_data_relationships_and_ranges(generated_data):
 
     merged_product = pd.merge(sales_df, product_df, on="product_id", how="left", suffixes=("", "_prod"))
     assert (merged_product["product_category"] == merged_product["product_category_prod"]).all()
+
 
 def test_reproducibility_with_seed():
     """Test that using the same seed produces identical results."""
@@ -144,5 +153,6 @@ def test_reproducibility_with_seed():
     # with pytest.raises(AssertionError):
     #     pd.testing.assert_frame_equal(store_df1, store_df3)
 
+
 # Placeholder for spot checks
-# def test_spot_check_promotion_effect(): ... 
+# def test_spot_check_promotion_effect(): ...

@@ -3,10 +3,14 @@ Data models for store fulfillment optimization.
 Includes Item and Order classes.
 """
 
+# region book:order-orchestration-fulfillment-imports
 from dataclasses import dataclass, field
-from typing import Any
 from datetime import datetime
-from .enums import FulfillmentMethod, OrderStatus, AgentType
+from typing import Any
+
+from .enums import AgentType, FulfillmentMethod, OrderStatus
+
+# endregion book:order-orchestration-fulfillment-imports
 
 
 @dataclass
@@ -24,6 +28,7 @@ class Item:
     fragility: float = 0.0  # 0.0 (not fragile) to 1.0 (very fragile)
 
 
+# region book:order-orchestration-order-models
 @dataclass
 class OrderLineItem:
     """Individual item in an order (Extracted from notebook)"""
@@ -54,9 +59,7 @@ class Order:
     metadata: dict[str, Any] = field(default_factory=dict)
     history: list[dict[str, Any]] = field(default_factory=list)
 
-    def add_event(
-        self, agent_type: AgentType, action: str, details: dict[str, Any]
-    ) -> None:
+    def add_event(self, agent_type: AgentType, action: str, details: dict[str, Any]) -> None:
         """Add an event to the order history"""
         self.history.append(
             {
@@ -83,6 +86,9 @@ class Order:
         )
 
 
+# endregion book:order-orchestration-order-models
+
+
 @dataclass
 class Associate:
     """Represents a store associate who can fulfill orders."""
@@ -90,9 +96,7 @@ class Associate:
     associate_id: str
     name: str
     efficiency: float = 1.0  # Multiplier for picking speed ( >1 faster, <1 slower)
-    authorized_zones: list[str] = field(
-        default_factory=lambda: ["ambient", "refrigerated", "frozen"]
-    )
+    authorized_zones: list[str] = field(default_factory=lambda: ["ambient", "refrigerated", "frozen"])
     current_location: tuple[int, int] = (
         0,
         0,

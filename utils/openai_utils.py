@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from typing import Any
 from collections.abc import Iterable
+from typing import Any
 
 # Use AsyncOpenAI for async operations
 from openai import AsyncOpenAI, OpenAI
@@ -13,6 +13,7 @@ from openai.types.chat import (
     # ChatCompletionSystemMessageParam,
     # ChatCompletionUserMessageParam,
 )
+
 # Define a type alias for the expected message structure
 # ChatMessage = Union[ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam]
 
@@ -27,7 +28,7 @@ async def safe_chat_completion(
     logger: logging.Logger | None = None,
     retry_attempts: int = 3,
     retry_backoff: float = 1.0,
-    **kwargs,
+    **kwargs: Any,
 ) -> ChatCompletion:
     """Safely invoke OpenAI chat completion endpoint with retries.
 
@@ -36,7 +37,7 @@ async def safe_chat_completion(
     client:
         An initialised ``openai.OpenAI`` or ``openai.AsyncOpenAI`` client instance.
     model:
-        The model name to call (e.g. ``"gpt-4o"``).
+        The model name to call (e.g. ``"gpt-5.2"``).
     messages:
         The messages for the chat completion endpoint.
     logger:
@@ -92,9 +93,7 @@ async def safe_chat_completion(
             return completion
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
-            logger.warning(
-                "OpenAI call failed (attempt %s/%s): %s", attempt, retry_attempts, exc
-            )
+            logger.warning("OpenAI call failed (attempt %s/%s): %s", attempt, retry_attempts, exc)
             # Only sleep if there are more retries left
             if attempt < retry_attempts:
                 await asyncio.sleep(retry_backoff * (2 ** (attempt - 1)))

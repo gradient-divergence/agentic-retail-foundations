@@ -1,7 +1,10 @@
 """
 RetailKnowledgeGraph: A semantic knowledge graph for retail intelligence.
 
-This module provides the RetailKnowledgeGraph class, which enables structured representation, querying, and reasoning over retail entities, relationships, and events. It supports both local RDF graphs and optional external SPARQL endpoints.
+This module provides the RetailKnowledgeGraph class, which enables structured
+representation, querying, and reasoning over retail entities, relationships,
+and events. It supports both local RDF graphs and optional external SPARQL
+endpoints.
 
 Key Capabilities:
 - Product, customer, store, and promotion modeling
@@ -13,26 +16,36 @@ Key Capabilities:
 Adapted from the in-notebook implementation in sensor-networks-and-cognitive-systems.py.
 """
 
-from typing import Any
-from datetime import datetime
-from rdflib import Graph, Literal, BNode, Namespace, RDF, URIRef
-from rdflib.namespace import RDFS, XSD
+import logging
 import random
+from datetime import datetime
+from typing import Any
+
+from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
+from rdflib.namespace import RDFS, XSD
+
+logger = logging.getLogger(__name__)
+
+_SPARQLWrapper: type[Any] | None
+_JSON: Any | None
 
 # Attempt to import SPARQLWrapper at module level
 try:
-    from SPARQLWrapper import SPARQLWrapper as _SPARQLWrapper, JSON as _JSON
+    from SPARQLWrapper import JSON as _JSON
+    from SPARQLWrapper import SPARQLWrapper as _SPARQLWrapper
 except ImportError:
     _SPARQLWrapper = None
     _JSON = None
-    print("SPARQLWrapper not installed. External SPARQL endpoint functionality will be disabled.")
+    logger.warning("SPARQLWrapper not installed. External SPARQL endpoint functionality will be disabled.")
 
 
 class RetailKnowledgeGraph:
     """
     A structured, semantic knowledge graph for retail environments.
 
-    This class enables the construction, querying, and reasoning over a retail knowledge graph, supporting both local RDF graphs and optional external SPARQL endpoints.
+    This class enables the construction, querying, and reasoning over a retail
+    knowledge graph, supporting both local RDF graphs and optional external
+    SPARQL endpoints.
 
     Core Entities:
     - Products, Customers, Stores, Categories, Promotions
@@ -46,7 +59,7 @@ class RetailKnowledgeGraph:
         substitutes = kg.find_substitutes("P123")
     """
 
-    def __init__(self, store_id: str, graph_uri: str | None = None):
+    def __init__(self, store_id: str, graph_uri: str | None = None) -> None:
         """Initialize the retail knowledge graph."""
         self.store_id = store_id
         self.graph = Graph()
@@ -66,18 +79,21 @@ class RetailKnowledgeGraph:
         self.sparql_endpoint = None  # Initialize as None
 
         # Only attempt SPARQL setup if graph_uri is provided and import succeeded
-        if graph_uri and _SPARQLWrapper and _JSON:
+        if graph_uri and _SPARQLWrapper is not None and _JSON is not None:
             try:
                 self.sparql_endpoint = _SPARQLWrapper(graph_uri)
                 self.sparql_endpoint.setReturnFormat(_JSON)
-                print(f"SPARQL endpoint configured for: {graph_uri}")
-            except Exception as e:
-                print(f"Failed to initialize SPARQLWrapper for {graph_uri}: {e}")
+                logger.info("SPARQL endpoint configured for: %s", graph_uri)
+            except Exception:
+                logger.exception("Failed to initialize SPARQLWrapper for %s", graph_uri)
                 self.sparql_endpoint = None  # Ensure it's None on failure
-        elif graph_uri and (not _SPARQLWrapper or not _JSON):
-             print(f"Cannot configure SPARQL endpoint {graph_uri}: SPARQLWrapper library not found.")
+        elif graph_uri and (_SPARQLWrapper is None or _JSON is None):
+            logger.warning(
+                "Cannot configure SPARQL endpoint %s: SPARQLWrapper library not found.",
+                graph_uri,
+            )
 
-    def _load_ontology(self):
+    def _load_ontology(self) -> None:
         """Load the retail domain ontology into the graph."""
         # Core classes
         self.graph.add((self.RETAIL.Product, RDF.type, RDFS.Class))
@@ -103,12 +119,8 @@ class RetailKnowledgeGraph:
         self.graph.add((self.RETAIL.complementsWith, RDFS.domain, self.RETAIL.Product))
         self.graph.add((self.RETAIL.complementsWith, RDFS.range, self.RETAIL.Product))
         # Symmetric and transitive properties (Restore)
-        self.graph.add(
-            (self.RETAIL.complementsWith, RDF.type, self.RETAIL.SymmetricProperty)
-        )
-        self.graph.add(
-            (self.RETAIL.hasSubcategory, RDF.type, self.RETAIL.TransitiveProperty)
-        )
+        self.graph.add((self.RETAIL.complementsWith, RDF.type, self.RETAIL.SymmetricProperty))
+        self.graph.add((self.RETAIL.hasSubcategory, RDF.type, self.RETAIL.TransitiveProperty))
 
     def add_product(
         self,
@@ -125,9 +137,7 @@ class RetailKnowledgeGraph:
         product_uri = self.PRODUCT[product_id]
         self.graph.add((product_uri, RDF.type, self.RETAIL.Product))
         self.graph.add((product_uri, self.RETAIL.name, Literal(name)))
-        self.graph.add(
-            (product_uri, self.RETAIL.price, Literal(price, datatype=XSD.decimal))
-        )
+        self.graph.add((product_uri, self.RETAIL.price, Literal(price, datatype=XSD.decimal)))
         if brand:
             self.graph.add((product_uri, self.RETAIL.hasBrand, Literal(brand)))
         if category_ids:
@@ -147,14 +157,14 @@ class RetailKnowledgeGraph:
                 self.graph.add((product_uri, attr_property, Literal(str(attr_value))))
         return product_uri
 
-    def add_product_relationship(
+    def add_product_relationship(  # noqa: C901
         self,
         source_product_id: str,
         relationship_type: str,
         target_product_id: str,
         strength: float | None = None,
         metadata: dict[str, str] | None = None,
-    ):
+    ) -> None:
         """Add a relationship between products."""
         source_uri = self.PRODUCT[source_product_id]
         target_uri = self.PRODUCT[target_product_id]
@@ -173,10 +183,8 @@ class RetailKnowledgeGraph:
         # --- Restore BNode/reification logic ---
         # Only create BNode if needed for strength or metadata
         relation_node = None
-        needs_statement_node = False
-        
+
         if strength is not None and 0.0 <= strength <= 1.0:
-            needs_statement_node = True
             relation_node = BNode()
             self.graph.add((relation_node, RDF.type, RDF.Statement))
             self.graph.add((relation_node, RDF.subject, source_uri))
@@ -189,9 +197,8 @@ class RetailKnowledgeGraph:
                     Literal(strength, datatype=XSD.decimal),
                 )
             )
-        
+
         if metadata:
-            needs_statement_node = True
             # Create BNode if not already created for strength
             if relation_node is None:
                 relation_node = BNode()
@@ -199,7 +206,7 @@ class RetailKnowledgeGraph:
                 self.graph.add((relation_node, RDF.subject, source_uri))
                 self.graph.add((relation_node, RDF.predicate, relation))
                 self.graph.add((relation_node, RDF.object, target_uri))
-        
+
             for key, value in metadata.items():
                 meta_property = self.RETAIL[key]
                 # Avoid adding RDF.type property if it already exists implicitly via schema
@@ -218,16 +225,16 @@ class RetailKnowledgeGraph:
         quantity: int = 1,
         order_id: str | None = None,
         channel: str | None = "in_store",
-    ):
+    ) -> None:
         """Record a customer purchase in the knowledge graph."""
         customer_uri = self.CUSTOMER[customer_id]
         product_uri = self.PRODUCT[product_id]
-        
+
         # Generate a unique URI for the purchase event instead of using BNode
         # Include timestamp and a random element for uniqueness
         # Replace potentially problematic characters in timestamp for URI
         ts_part = timestamp.replace(":", "-").replace("T", "_")
-        purchase_id = f"purchase_{customer_id}_{product_id}_{ts_part}_{random.randint(1000,9999)}"
+        purchase_id = f"purchase_{customer_id}_{product_id}_{ts_part}_{random.randint(1000, 9999)}"
         purchase_uri = self.RETAIL[purchase_id]
 
         # Use purchase_uri instead of purchase_node
@@ -241,28 +248,26 @@ class RetailKnowledgeGraph:
             datetime.fromisoformat(timestamp)
             self.graph.add(
                 (
-                    purchase_uri, # Use purchase_uri
+                    purchase_uri,  # Use purchase_uri
                     self.RETAIL.timestamp,
                     Literal(timestamp, datatype=XSD.dateTime),
                 )
             )
         except ValueError:
-            pass 
+            pass
         if quantity > 0:
             self.graph.add(
                 (
-                    purchase_uri, # Use purchase_uri
+                    purchase_uri,  # Use purchase_uri
                     self.RETAIL.quantity,
                     Literal(quantity, datatype=XSD.integer),
                 )
             )
         if order_id:
-            self.graph.add((purchase_uri, self.RETAIL.orderID, Literal(order_id))) # Use purchase_uri
-        self.graph.add((purchase_uri, self.RETAIL.channel, Literal(channel))) # Use purchase_uri
+            self.graph.add((purchase_uri, self.RETAIL.orderID, Literal(order_id)))  # Use purchase_uri
+        self.graph.add((purchase_uri, self.RETAIL.channel, Literal(channel)))  # Use purchase_uri
 
-    def find_substitutes(
-        self, product_id: str, max_results: int = 5
-    ) -> list[dict[str, Any]]:
+    def find_substitutes(self, product_id: str, max_results: int = 5) -> list[dict[str, Any]]:
         """Find substitute products for a given product."""
         # --- REMOVED TEMPORARY DEBUG QUERY --- #
         # --- Modified Original Query Below --- #
@@ -308,7 +313,10 @@ class RetailKnowledgeGraph:
                 product:{product_id} retail:price ?originalPrice .
                 ?substitute retail:price ?price .
                 FILTER (?substitute != product:{product_id})
-                FILTER (?price >= xsd:decimal(?originalPrice * 0.8) && ?price <= xsd:decimal(?originalPrice * 1.2))
+                FILTER (
+                    ?price >= xsd:decimal(?originalPrice * 0.8)
+                    && ?price <= xsd:decimal(?originalPrice * 1.2)
+                )
                 # Exclude if it's already found via explicit relation
                 FILTER NOT EXISTS {{ product:{product_id} retail:isSubstituteFor ?substitute . }}
                 FILTER NOT EXISTS {{ ?substitute retail:isSubstituteFor product:{product_id} . }}
@@ -336,16 +344,14 @@ class RetailKnowledgeGraph:
                         "name": str(row["name"]),
                         "price": float(row["price"]),
                         "brand": str(row["brand"]),
-                        "strength": float(row["final_strength"]), # Use the correct variable
+                        "strength": float(row["final_strength"]),  # Use the correct variable
                     }
                 )
             except (KeyError, ValueError, TypeError):
                 continue
         return substitutes
 
-    def find_complementary_products(
-        self, product_id: str, max_results: int = 5
-    ) -> list[dict[str, Any]]:
+    def find_complementary_products(self, product_id: str, max_results: int = 5) -> list[dict[str, Any]]:
         """Find products that complement a given product."""
         query = f"""
         PREFIX retail: <http://retail.example.org/ontology#>
@@ -354,7 +360,7 @@ class RetailKnowledgeGraph:
         WHERE {{
             {{ product:{product_id} retail:complementsWith ?complement .
                 BIND("complement" AS ?relation_type)
-                OPTIONAL {{ 
+                OPTIONAL {{
                     ?stmt rdf:type rdf:Statement ;
                           rdf:subject product:{product_id} ;
                           rdf:predicate retail:complementsWith ;
@@ -365,7 +371,7 @@ class RetailKnowledgeGraph:
             UNION
             {{ ?complement retail:isAccessoryFor product:{product_id} .
                 BIND("accessory" AS ?relation_type)
-                OPTIONAL {{ 
+                OPTIONAL {{
                     ?stmt rdf:type rdf:Statement ;
                           rdf:subject ?complement ;
                           rdf:predicate retail:isAccessoryFor ;
@@ -391,8 +397,8 @@ class RetailKnowledgeGraph:
             ?complement retail:price ?price .
             ?complement retail:hasBrand ?brand .
             BIND(
-                IF(?relation_type = "co_purchase", 
-                   ?count / 20, 
+                IF(?relation_type = "co_purchase",
+                   ?count / 20,
                    COALESCE(?strength, 1.0))
                 AS ?strength
             )
@@ -420,7 +426,7 @@ class RetailKnowledgeGraph:
                 continue
         return complements
 
-    def _execute_query(self, query_str: str) -> list[dict]:
+    def _execute_query(self, query_str: str) -> list[dict[str, Any]]:
         """Execute a SPARQL query against the knowledge graph."""
         if self.sparql_endpoint:
             try:
@@ -430,13 +436,16 @@ class RetailKnowledgeGraph:
                     bindings = sparql_results_raw.get("results", {}).get("bindings", [])  # type: ignore[union-attr]
                     return bindings if isinstance(bindings, list) else []
                 else:
-                    print(f"Unexpected SPARQL result type: {type(sparql_results_raw)}")
+                    logger.warning(
+                        "Unexpected SPARQL result type: %s",
+                        type(sparql_results_raw),
+                    )
                     return []
-            except Exception as e:
-                print(f"SPARQL query failed: {e}")
+            except Exception:
+                logger.exception("SPARQL query failed.")
                 return []
         else:
-            local_results: list[dict[str, Any]] = []  # type: ignore[no-redef] # Ignore potential redef if mypy confused
+            local_results: list[dict[str, Any]] = []
             try:
                 qres = self.graph.query(query_str)
                 binding_vars = [str(v) for v in getattr(qres, "vars", [])]
@@ -452,11 +461,11 @@ class RetailKnowledgeGraph:
                                 result_dict[var_name] = value
 
                     if result_dict:
-                        local_results.append(result_dict)  # type: ignore[union-attr]
+                        local_results.append(result_dict)
 
-            except Exception as e:
-                print(f"Local RDF query failed: {e}")
-            return local_results  # type: ignore[return-value]
+            except Exception:
+                logger.exception("Local RDF query failed.")
+            return local_results
 
     def generate_recommendations(
         self,
@@ -518,15 +527,15 @@ class RetailKnowledgeGraph:
                 continue
         return recommendations
 
-    def export_graph(self, file_path: str, format: str = "turtle"):
+    def export_graph(self, file_path: str, format: str = "turtle") -> None:
         """Export the knowledge graph in the specified format."""
         self.graph.serialize(destination=file_path, format=format)
 
-    def load_graph(self, source: str | bytes, format: str = "turtle"):
+    def load_graph(self, source: str | bytes, format: str = "turtle") -> None:
         """Load data into the knowledge graph."""
         self.graph.parse(data=source, format=format)
 
-    def clear_graph(self, preserve_ontology: bool = True):
+    def clear_graph(self, preserve_ontology: bool = True) -> None:
         """Clear all data from the graph except the ontology."""
         if preserve_ontology:
             ontology_triples = [

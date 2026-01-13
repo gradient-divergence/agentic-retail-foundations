@@ -4,7 +4,7 @@ This section provides standalone scripts demonstrating various capabilities of t
 
 These scripts are located in the `demos/` directory and can typically be run directly using `python demos/<script_name>.py` (unless otherwise noted). Ensure you have installed dependencies (`uv pip install -e .[dev]`) and configured any necessary environment variables (see `.env.example`).
 
-## Agent Communication & Protocols
+## Agent Communication & Protocols {#agent-communication--protocols}
 
 -   **`agent_communication_demo.py`:** 
     -   *Purpose:* Demonstrates basic FIPA-inspired messaging via `MessageBroker`.

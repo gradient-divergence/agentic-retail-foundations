@@ -3,6 +3,7 @@ Inventory-related data models for agentic-retail-foundations.
 Includes ProductInfo, InventoryItem, and SalesData dataclasses.
 """
 
+# region book:bdi-inventory-data-models
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -29,7 +30,7 @@ class ProductInfo:
     sales_last_7_days: list[int] = field(default_factory=list)
     inventory: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.current_price = self.price
 
 
@@ -73,6 +74,10 @@ class SalesData:
         return (recent_week_sales - previous_week_sales) / previous_week_sales
 
 
+# endregion book:bdi-inventory-data-models
+
+
+# region book:inventory-sharing-inventory-models
 class InventoryStatus(Enum):
     """Enumeration of inventory status levels for a product in a store."""
 
@@ -121,3 +126,6 @@ class InventoryPosition:
         if self.daily_sales_rate <= 0:
             return float("inf")
         return self.current_stock / self.daily_sales_rate
+
+
+# endregion book:inventory-sharing-inventory-models

@@ -2,14 +2,17 @@
 Cross-functional agent classes and product launch orchestration logic for retail MAS.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from agents.cross_functional.supply_chain import SupplyChainAgent
-from agents.cross_functional.pricing import PricingAgent
-from agents.cross_functional.marketing import MarketingAgent
-from agents.cross_functional.store_ops import StoreOpsAgent
 from agents.cross_functional.customer_service import CustomerServiceAgent
+from agents.cross_functional.marketing import MarketingAgent
+from agents.cross_functional.pricing import PricingAgent
+from agents.cross_functional.store_ops import StoreOpsAgent
+from agents.cross_functional.supply_chain import SupplyChainAgent
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_remediation_timeline(
@@ -34,7 +37,8 @@ def calculate_remediation_timeline(
 
 async def coordinate_product_launch(product_data: dict[str, Any]) -> dict[str, Any]:
     """
-    Orchestrate a product launch across supply chain, pricing, marketing, store operations, and customer service.
+    Orchestrate a product launch across supply chain, pricing, marketing, store operations,
+    and customer service.
     """
     agents = {
         "supply_chain": SupplyChainAgent(),
@@ -45,8 +49,10 @@ async def coordinate_product_launch(product_data: dict[str, Any]) -> dict[str, A
     }
     product_id = product_data["id"]
     launch_date = product_data["planned_launch_date"]
-    print(
-        f"\nCoordinating launch for product {product_id} planned for {launch_date.strftime('%Y-%m-%d')}\n"
+    logger.info(
+        "Coordinating launch for product %s planned for %s.",
+        product_id,
+        launch_date.strftime("%Y-%m-%d"),
     )
     inventory_plan = await agents["supply_chain"].plan_initial_distribution(
         product_id=product_id,
@@ -91,12 +97,12 @@ async def coordinate_product_launch(product_data: dict[str, Any]) -> dict[str, A
         "store_ops": store_readiness["status"],
         "customer_service": cs_readiness["status"],
     }
-    print("\nLaunch Readiness by Department:")
+    logger.info("Launch readiness by department:")
     for dept, status in statuses.items():
-        print(f"- {dept.replace('_', ' ').title()}: {status.upper()}")
+        logger.info("%s: %s", dept.replace("_", " ").title(), status.upper())
     all_ready = all(s == "ready" for s in statuses.values())
     if all_ready:
-        print("\n✅ All departments ready! Product launch is CONFIRMED.")
+        logger.info("All departments ready. Product launch is confirmed.")
         return {
             "product_id": product_id,
             "launch_status": "confirmed",
@@ -109,23 +115,27 @@ async def coordinate_product_launch(product_data: dict[str, Any]) -> dict[str, A
         }
     else:
         blockers = [domain for domain, stat in statuses.items() if stat != "ready"]
-        print(
-            f"\n⚠️ Launch DELAYED due to {len(blockers)} departments not ready: {', '.join(blockers)}"
+        logger.warning(
+            "Launch delayed: %s departments not ready (%s).",
+            len(blockers),
+            ", ".join(blockers),
         )
-        print("\nGenerating remediation plan...")
+        logger.info("Generating remediation plan...")
         remediation_plan = {}
         for blocker in blockers:
             remediation_plan[blocker] = await agents[blocker].suggest_remediation(
                 product_id=product_id, current_status=statuses[blocker]
             )
         timeline = calculate_remediation_timeline(remediation_plan)
-        print("\nRemediation Timeline:")
-        print(f"- Critical path: {' → '.join(timeline['critical_path'])}")
-        print(
-            f"- Estimated completion: {timeline['completion_date'].strftime('%Y-%m-%d')}"
+        logger.info("Remediation timeline:")
+        logger.info("Critical path: %s", " -> ".join(timeline["critical_path"]))
+        logger.info(
+            "Estimated completion: %s",
+            timeline["completion_date"].strftime("%Y-%m-%d"),
         )
-        print(
-            f"- Suggested new launch: {timeline['suggested_launch_date'].strftime('%Y-%m-%d')}"
+        logger.info(
+            "Suggested new launch: %s",
+            timeline["suggested_launch_date"].strftime("%Y-%m-%d"),
         )
         return {
             "product_id": product_id,

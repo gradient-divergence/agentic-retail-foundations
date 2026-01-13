@@ -1,4 +1,5 @@
 import pytest
+
 from agents.cross_functional.pricing import PricingAgent
 
 

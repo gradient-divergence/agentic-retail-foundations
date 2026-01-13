@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.2"
+__generated_with = "0.18.4"
 app = marimo.App(width="medium")
 
 
@@ -12,11 +12,18 @@ def _():
     - Logging setup
     - Return frequently used objects so other cells can receive them
     """
+    import logging
+    import random
     from datetime import datetime, timedelta
 
     import marimo as mo
-    import logging
-    import random
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
 
     from agents.bdi import InventoryBDIAgent
     from agents.ooda import OODAPricingAgent
@@ -42,81 +49,83 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        # Agent Architectures and Frameworks
+    mo.md(r"""
+    # Agent Architectures and Frameworks
 
-        Overview of BDI and OODA agent models for retail AI, including BDI agent structure and applications in retail.
-        """
-    )
+    Overview of BDI and OODA agent models for retail AI, including BDI agent structure and applications in retail.
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md("""BDI Agent Data Models""")
+    mo.md("""
+    BDI Agent Data Models
+    """)
     return
 
 
 @app.cell
 def _(mo):
     # --- BDI Agent Class ---
-    mo.md(
-        """
+    mo.md("""
     **InventoryBDIAgent**
 
     Belief-Desire-Intention agent for inventory management. Encapsulates the BDI cycle for retail decision-making. Imported from `agents.bdi`.
-    """
-    )
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md("""BDI Agent Simulation Controls""")
+    mo.md("""
+    BDI Agent Simulation Controls
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md("""OODA Agent Data Models""")
+    mo.md("""
+    OODA Agent Data Models
+    """)
     return
 
 
 @app.cell
 def _(mo):
     # --- OODA Agent Class ---
-    mo.md(
-        """
+    mo.md("""
     **OODAPricingAgent**
 
     OODA (Observe-Orient-Decide-Act) agent for dynamic pricing. Implements the OODA loop for retail pricing. Imported from `agents.ooda`.
-    """
-    )
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md("""OODA Agent Simulation""")
+    mo.md("""
+    OODA Agent Simulation
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md("""## Summary and Next Steps""")
+    mo.md("""
+    ## Summary and Next Steps
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-        # Agent Architectures and Frameworks
+    mo.md("""
+    # Agent Architectures and Frameworks
 
-        This chapter explores two key agent architectures—Belief-Desire-Intention (BDI) and Observe-Orient-Decide-Act (OODA)—and their applications in retail AI. You'll learn how BDI agents manage inventory and how OODA agents handle dynamic pricing, gaining insights into the practical implementation of these models.
-        """
-    )
+    This chapter explores two key agent architectures—Belief-Desire-Intention (BDI) and Observe-Orient-Decide-Act (OODA)—and their applications in retail AI. You'll learn how BDI agents manage inventory and how OODA agents handle dynamic pricing, gaining insights into the practical implementation of these models.
+    """)
     return
 
 
@@ -130,56 +139,49 @@ def _(mo):
     Core data models for inventory, product, and sales information. Used as beliefs in the BDI agent. Imported from `models.inventory`.
     """
     )
-    from models.inventory import ProductInfo, InventoryItem, SalesData
-
+    from models.inventory import InventoryItem, ProductInfo, SalesData
     return InventoryItem, ProductInfo, SalesData
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        **Explanation**:
+    mo.md(r"""
+    **Explanation**:
 
-        1. **`ProductInfo`**: Holds critical product specifications like price, cost, lead time, and supplier details. Includes `current_price` which might change dynamically.
-        2. **`InventoryItem`**: Tracks the physical stock levels, reorder thresholds, and any pending incoming orders for each product.
-        3. **`SalesData`**: Stores recent sales history and provides methods to calculate `average_daily_sales` and `trend`.
+    1. **`ProductInfo`**: Holds critical product specifications like price, cost, lead time, and supplier details. Includes `current_price` which might change dynamically.
+    2. **`InventoryItem`**: Tracks the physical stock levels, reorder thresholds, and any pending incoming orders for each product.
+    3. **`SalesData`**: Stores recent sales history and provides methods to calculate `average_daily_sales` and `trend`.
 
-        These classes form the agent's **"Beliefs"**—its internal representation of the current state of the retail environment.
-        """
-    )
+    These classes form the agent's **"Beliefs"**—its internal representation of the current state of the retail environment.
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        #### Part B: BDI Agent Class
-        Defines the main `InventoryBDIAgent` class, encapsulating its beliefs, desires, intentions, and the core BDI cycle logic.
-        """
-    )
+    mo.md(r"""
+    #### Part B: BDI Agent Class
+    Defines the main `InventoryBDIAgent` class, encapsulating its beliefs, desires, intentions, and the core BDI cycle logic.
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        **Explanation**
+    mo.md(r"""
+    **Explanation**
 
-        The `InventoryBDIAgent` class structure:
+    The `InventoryBDIAgent` class structure:
 
-        - **`__init__`**: Initializes beliefs (product, inventory, sales data), desires (goals with weights), and an empty list for intentions.
-        - **`update_beliefs`**: Method to load new data into the agent's belief state.
-        - **`observe` / `orient`**: (Code not shown here, but would be similar to the OODA example or previous BDI fragments) Gathers data and analyzes the situation for specific products or the overall market. These steps inform the deliberation.
-        - **`deliberate`**: Core BDI logic. Evaluates the current state (using beliefs) against the weighted goals (desires) to determine which goals are most important *right now*. Uses helper methods (`_evaluate_*`) to calculate urgency for each goal. Returns a prioritized list of goal names.
-        - **`generate_intentions`**: Takes the prioritized goals and creates concrete action plans (intentions). Uses helper methods (`_plan_*`) to generate specific actions like reordering or discounting. Stores these plans in `self.active_intentions`.
-        - **`execute_intentions`**: Takes the generated intentions and carries them out. Uses helper methods (`_execute_*`) to simulate the actual interaction with external systems (like placing an order or changing a price).
-        - **`run_cycle`**: Orchestrates the full Deliberate -> Generate Intentions -> Execute Intentions sequence.
-        - **Helper Methods**: Internal methods (`_evaluate_*`, `_plan_*`, `_execute_*`, `_fetch_*`) encapsulate specific logic for clarity and reusability.
-        """
-    )
+    - **`__init__`**: Initializes beliefs (product, inventory, sales data), desires (goals with weights), and an empty list for intentions.
+    - **`update_beliefs`**: Method to load new data into the agent's belief state.
+    - **`observe` / `orient`**: (Code not shown here, but would be similar to the OODA example or previous BDI fragments) Gathers data and analyzes the situation for specific products or the overall market. These steps inform the deliberation.
+    - **`deliberate`**: Core BDI logic. Evaluates the current state (using beliefs) against the weighted goals (desires) to determine which goals are most important *right now*. Uses helper methods (`_evaluate_*`) to calculate urgency for each goal. Returns a prioritized list of goal names.
+    - **`generate_intentions`**: Takes the prioritized goals and creates concrete action plans (intentions). Uses helper methods (`_plan_*`) to generate specific actions like reordering or discounting. Stores these plans in `self.active_intentions`.
+    - **`execute_intentions`**: Takes the generated intentions and carries them out. Uses helper methods (`_execute_*`) to simulate the actual interaction with external systems (like placing an order or changing a price).
+    - **`run_cycle`**: Orchestrates the full Deliberate -> Generate Intentions -> Execute Intentions sequence.
+    - **Helper Methods**: Internal methods (`_evaluate_*`, `_plan_*`, `_execute_*`, `_fetch_*`) encapsulate specific logic for clarity and reusability.
+    """)
     return
 
 
@@ -240,7 +242,6 @@ def _(mo):
         ]
     )
     controls
-
     return (
         apples_optimal,
         apples_reorder,
@@ -425,12 +426,10 @@ def _(
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        #### Part C: Demonstration Function
-        Sets up a sample scenario with products, inventory, and sales data, then runs the BDI agent through a simulated multi-day period.
-        """
-    )
+    mo.md(r"""
+    #### Part C: Demonstration Function
+    Sets up a sample scenario with products, inventory, and sales data, then runs the BDI agent through a simulated multi-day period.
+    """)
     return
 
 
@@ -586,39 +585,35 @@ def _(
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        **Explanation**
+    mo.md(r"""
+    **Explanation**
 
-                - This **demonstration** function serves as a miniature simulation:                
-                  - **Initial Setup**: We define products (apples, bread, coffee, cheddar), their initial inventory levels (some low, some high), and 30 days of sales history.
-                  - **Simulation Loop**: We run the agent for 3 simulated "days".
-                  - **Inside the Loop**:
-                    - Print the inventory status **before** the agent acts.
-                    - Call `agent.run_cycle()`. The agent internally performs deliberation, generates intentions, and executes them.
-                    - Print the actions the agent decided to take (reorder, discount, etc.).
-                    - Simulate the environment changing: check for deliveries, simulate random daily sales based on history, update inventory, and advance the date.
-                    - Update the agent's beliefs with the new state for the next day's cycle.
+            - This **demonstration** function serves as a miniature simulation:
+              - **Initial Setup**: We define products (apples, bread, coffee, cheddar), their initial inventory levels (some low, some high), and 30 days of sales history.
+              - **Simulation Loop**: We run the agent for 3 simulated "days".
+              - **Inside the Loop**:
+                - Print the inventory status **before** the agent acts.
+                - Call `agent.run_cycle()`. The agent internally performs deliberation, generates intentions, and executes them.
+                - Print the actions the agent decided to take (reorder, discount, etc.).
+                - Simulate the environment changing: check for deliveries, simulate random daily sales based on history, update inventory, and advance the date.
+                - Update the agent's beliefs with the new state for the next day's cycle.
 
-                This illustrates how the agent adapts its behavior day-to-day based on changing stock levels, sales trends (implicitly updated), and deliveries.
+            This illustrates how the agent adapts its behavior day-to-day based on changing stock levels, sales trends (implicitly updated), and deliveries.
 
-                ### BDI Summary
+            ### BDI Summary
 
-                This example highlights how a **BDI agent** can manage inventory autonomously. By modeling **Beliefs** (data classes), **Desires** (weighted goals evaluated in `deliberate`), and **Intentions** (action plans created in `generate_intentions` and executed via `execute_intentions`), we build a system that reacts rationally to its environment. The agent continuously updates its knowledge, prioritizes conflicting objectives (like avoiding stockouts vs. reducing excess), and takes actions aligned with retail strategy. Real-world integration would replace simulated data fetching and action execution with calls to actual databases and APIs.
-        """
-    )
+            This example highlights how a **BDI agent** can manage inventory autonomously. By modeling **Beliefs** (data classes), **Desires** (weighted goals evaluated in `deliberate`), and **Intentions** (action plans created in `generate_intentions` and executed via `execute_intentions`), we build a system that reacts rationally to its environment. The agent continuously updates its knowledge, prioritizes conflicting objectives (like avoiding stockouts vs. reducing excess), and takes actions aligned with retail strategy. Real-world integration would replace simulated data fetching and action execution with calls to actual databases and APIs.
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-        ## OODA: Observe-Orient-Decide-Act
+    mo.md("""
+    ## OODA: Observe-Orient-Decide-Act
 
-        The OODA (Observe-Orient-Decide-Act) loop is a decision-making framework that emphasizes rapid, iterative cycles of information processing and action. This section introduces the OODA loop and its application to retail agent decision-making, particularly in dynamic pricing.
-        """
-    )
+    The OODA (Observe-Orient-Decide-Act) loop is a decision-making framework that emphasizes rapid, iterative cycles of information processing and action. This section introduces the OODA loop and its application to retail agent decision-making, particularly in dynamic pricing.
+    """)
     return
 
 
@@ -633,41 +628,36 @@ def _(mo):
     """
     )
     from models.pricing import PricingProduct
-
     return (PricingProduct,)
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-        ## OODA Pricing Agent: Class and Demonstration
+    mo.md("""
+    ## OODA Pricing Agent: Class and Demonstration
 
-        Overview of the OODA pricing agent class and its demonstration for dynamic retail pricing.
-        """
-    )
+    Overview of the OODA pricing agent class and its demonstration for dynamic retail pricing.
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        **Explanation**
+    mo.md(r"""
+    **Explanation**
 
-        - **`__init__`**: Sets up weighting factors (how much inventory, competitors, sales influence price) and a `max_price_change_pct` to prevent excessive volatility.
-        - **`observe`**: Gathers current data (competitor prices, inventory, sales) for a product (simulated here).
-        - **`orient`**: Analyzes the observed data to classify the situation (e.g., price position, inventory status, sales assessment) and determine the overall `market_situation`.
-        - **`decide`**: Calculates the desired price change based on the `orientation`. It computes components for inventory, competitor price difference, and sales velocity, combines them using the weights, caps the change percentage, and calculates the potential `new_price`, ensuring it stays within the product's min/max bounds. It also applies psychological pricing (like ending in .99).
-        - **`act`**: Implements the `new_price` from the `decision` phase. It checks if the change is significant, simulates calling an external pricing API, updates the agent's internal belief (product's `current_price`), and logs the action.
-        - **`run_cycle_for_product`**: Orchestrates one full OODA loop for a specific product.
-        - **Helpers**: `_fetch_*` methods simulate data retrieval, and `_apply_price_psychology` adjusts the final price.
+    - **`__init__`**: Sets up weighting factors (how much inventory, competitors, sales influence price) and a `max_price_change_pct` to prevent excessive volatility.
+    - **`observe`**: Gathers current data (competitor prices, inventory, sales) for a product (simulated here).
+    - **`orient`**: Analyzes the observed data to classify the situation (e.g., price position, inventory status, sales assessment) and determine the overall `market_situation`.
+    - **`decide`**: Calculates the desired price change based on the `orientation`. It computes components for inventory, competitor price difference, and sales velocity, combines them using the weights, caps the change percentage, and calculates the potential `new_price`, ensuring it stays within the product's min/max bounds. It also applies psychological pricing (like ending in .99).
+    - **`act`**: Implements the `new_price` from the `decision` phase. It checks if the change is significant, simulates calling an external pricing API, updates the agent's internal belief (product's `current_price`), and logs the action.
+    - **`run_cycle_for_product`**: Orchestrates one full OODA loop for a specific product.
+    - **Helpers**: `_fetch_*` methods simulate data retrieval, and `_apply_price_psychology` adjusts the final price.
 
-        #### Part C: OODA Demonstration
+    #### Part C: OODA Demonstration
 
-        Sets up a scenario with a few products and runs the OODA pricing agent through several cycles to show dynamic adjustments.
-        """
-    )
+    Sets up a scenario with a few products and runs the OODA pricing agent through several cycles to show dynamic adjustments.
+    """)
     return
 
 

@@ -9,24 +9,23 @@ Run with: uvicorn demos.api_gateway_demo:app --reload
 import logging
 import time
 import uuid
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import datetime, timedelta, timezone
 
 import httpx  # For making async requests to backend services
-from fastapi import FastAPI, Request, Depends, HTTPException, status, BackgroundTasks
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import redis.asyncio as redis  # For rate limiting
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt  # For JWT handling
 from passlib.context import CryptContext  # For password hashing (mocked)
-import redis.asyncio as redis  # For rate limiting
+from pydantic import BaseModel
+from starlette.responses import Response
 
 # Import API models
-from models.api import Token, TokenData, Agent, RequestLogEntry
+from models.api import Agent, RequestLogEntry, Token, TokenData
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("api-gateway")
 
 # --- Configuration ---
@@ -102,15 +101,11 @@ async def startup_event():
     """Initialize Redis connection on startup."""
     global redis_client
     try:
-        redis_client = redis.Redis(
-            host="localhost", port=6379, db=1, decode_responses=True
-        )  # Use DB 1
+        redis_client = redis.Redis(host="localhost", port=6379, db=1, decode_responses=True)  # Use DB 1
         await redis_client.ping()
         logger.info("Connected to Redis for rate limiting.")
     except Exception as e:
-        logger.error(
-            f"Failed to connect to Redis for rate limiting: {e}. Rate limiting disabled."
-        )
+        logger.error(f"Failed to connect to Redis for rate limiting: {e}. Rate limiting disabled.")
         redis_client = None
 
 
@@ -134,9 +129,7 @@ def get_agent(agent_id: str) -> Agent | None:
     if agent_data:
         # Ensure roles is iterable
         roles_data = agent_data.get("roles", [])
-        roles_list = (
-            [str(r) for r in roles_data] if isinstance(roles_data, list) else []
-        )
+        roles_list = [str(r) for r in roles_data] if isinstance(roles_data, list) else []
         return Agent(
             agent_id=str(agent_data["agent_id"]),
             agent_name=str(agent_data["agent_name"]),
@@ -146,18 +139,25 @@ def get_agent(agent_id: str) -> Agent | None:
     return None
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
-    to_encode = data.copy()
+class AccessTokenPayload(BaseModel):
+    sub: str
+    roles: list[str]
+
+
+def create_access_token(data: AccessTokenPayload, expires_delta: timedelta | None = None) -> str:
+    to_encode = data.model_dump()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)  # Default expiry
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)  # Default expiry
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
-async def get_current_active_agent(token: str = Depends(oauth2_scheme)) -> Agent:
+async def get_current_active_agent(  # noqa: B008
+    token: str = Depends(oauth2_scheme),  # noqa: B008
+) -> Agent:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -169,8 +169,8 @@ async def get_current_active_agent(token: str = Depends(oauth2_scheme)) -> Agent
         if agent_id is None:
             raise credentials_exception
         token_data = TokenData(agent_id=agent_id, roles=payload.get("roles", []))
-    except JWTError:
-        raise credentials_exception
+    except JWTError as err:
+        raise credentials_exception from err
 
     if token_data.agent_id is None:
         raise credentials_exception
@@ -184,11 +184,11 @@ async def get_current_active_agent(token: str = Depends(oauth2_scheme)) -> Agent
 
 
 @app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(  # noqa: B008
+    form_data: OAuth2PasswordRequestForm = Depends(),  # noqa: B008
+):
     agent_data = FAKE_AGENTS_DB.get(form_data.username)  # Use .get() for safety
-    if not agent_data or not verify_password(
-        form_data.password, agent_data["hashed_password"]
-    ):
+    if not agent_data or not verify_password(form_data.password, agent_data["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect agent ID or password",
@@ -196,17 +196,18 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": agent_data["agent_id"], "roles": agent_data["roles"]},
+        data=AccessTokenPayload(sub=agent_data["agent_id"], roles=agent_data["roles"]),
         expires_delta=access_token_expires,
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return Token(access_token=access_token, token_type="bearer")
 
 
 # --- Rate Limiting (Placeholder) ---
 
 
-async def rate_limiter(
-    request: Request, agent: Agent = Depends(get_current_active_agent)
+async def rate_limiter(  # noqa: B008
+    request: Request,
+    agent: Agent = Depends(get_current_active_agent),  # noqa: B008
 ):
     """Placeholder rate limiting dependency."""
     if not redis_client:
@@ -222,9 +223,7 @@ async def rate_limiter(
             await redis_client.expire(key, 60)  # Expire key after 60 seconds
 
         # Get limit for this agent/path safely
-        agent_limits = RATE_LIMITS.get(
-            agent.agent_id, RATE_LIMITS["default"]
-        )  # Fallback to default limit
+        agent_limits = RATE_LIMITS.get(agent.agent_id, RATE_LIMITS["default"])  # Fallback to default limit
         if isinstance(agent_limits, dict):
             path_limit = agent_limits.get(
                 request.url.path, agent_limits.get("default", RATE_LIMITS["default"])
@@ -233,9 +232,7 @@ async def rate_limiter(
             path_limit = agent_limits
 
         if current_count > path_limit:
-            logger.warning(
-                f"Rate limit exceeded for agent {agent.agent_id} on {request.url.path}"
-            )
+            logger.warning(f"Rate limit exceeded for agent {agent.agent_id} on {request.url.path}")
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Rate limit exceeded",
@@ -253,21 +250,40 @@ async def rate_limiter(
 async def log_request(log_entry: RequestLogEntry):
     """Store request logs."""
     # In production: await db.request_logs.insert_one(log_entry.model_dump())
-    log_line = f"RID={log_entry.request_id} AID={log_entry.agent_id} {log_entry.method} {log_entry.service}{log_entry.path} -> {log_entry.status_code} ({log_entry.response_time_ms:.2f}ms)"
     if log_entry.error:
-        log_line += f" ERR={log_entry.error}"
-    logger.info(log_line)
+        logger.info(
+            "RID=%s AID=%s %s %s%s -> %s (%.2fms) ERR=%s",
+            log_entry.request_id,
+            log_entry.agent_id,
+            log_entry.method,
+            log_entry.service,
+            log_entry.path,
+            log_entry.status_code,
+            log_entry.response_time_ms,
+            log_entry.error,
+        )
+        return
+    logger.info(
+        "RID=%s AID=%s %s %s%s -> %s (%.2fms)",
+        log_entry.request_id,
+        log_entry.agent_id,
+        log_entry.method,
+        log_entry.service,
+        log_entry.path,
+        log_entry.status_code,
+        log_entry.response_time_ms,
+    )
 
 
 # --- Proxy Logic ---
 
 
-async def proxy_request(
+async def proxy_request(  # noqa: B008
     request: Request,
     service: str,
     path: str,
     background_tasks: BackgroundTasks,
-    agent: Agent = Depends(get_current_active_agent),
+    agent: Agent = Depends(get_current_active_agent),  # noqa: B008
     # rate_limit_passed: bool = Depends(rate_limiter) # Apply rate limiter
 ):
     """Proxy requests to backend services with tracking and logging."""
@@ -295,16 +311,8 @@ async def proxy_request(
     body = await request.body()
     query_params = request.query_params
 
-    # Add type hints to log_entry_base
-    log_entry_base: dict[str, Any] = {
-        "request_id": request_id,
-        "timestamp": datetime.now(),
-        "method": request.method,
-        "path": path,
-        "agent_id": agent.agent_id,
-        "service": service,
-        "error": None,
-    }
+    request_timestamp = datetime.now()
+    agent_id = agent.agent_id
 
     try:
         async with httpx.AsyncClient() as client:
@@ -321,60 +329,74 @@ async def proxy_request(
             request_time_ms = (time.time() - start_time) * 1000
             # Construct log entry explicitly with type checks/casts
             log_entry = RequestLogEntry(
-                request_id=str(log_entry_base["request_id"]),
-                timestamp=log_entry_base["timestamp"],
-                method=str(log_entry_base["method"]),
-                path=str(log_entry_base["path"]),
-                agent_id=str(log_entry_base["agent_id"])
-                if log_entry_base["agent_id"]
-                else None,
-                service=str(log_entry_base["service"]),
+                request_id=request_id,
+                timestamp=request_timestamp,
+                method=request.method,
+                path=path,
+                agent_id=agent_id,
+                service=service,
                 status_code=int(response.status_code),
                 response_time_ms=float(request_time_ms),
-                error=str(log_entry_base["error"]) if log_entry_base["error"] else None,
+                error=None,
             )
             background_tasks.add_task(log_request, log_entry)
 
-            # Return raw response to preserve headers, cookies etc.
-            return response
+            # Return a FastAPI-compatible response while preserving headers and body.
+            excluded_headers = {
+                "content-encoding",
+                "transfer-encoding",
+                "connection",
+                "keep-alive",
+                "proxy-authenticate",
+                "proxy-authorization",
+                "te",
+                "trailers",
+                "upgrade",
+            }
+            response_headers = {
+                key: value for key, value in response.headers.items() if key.lower() not in excluded_headers
+            }
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=response_headers,
+            )
 
     except httpx.HTTPStatusError as exc:
         request_time_ms = (time.time() - start_time) * 1000
         error_detail = f"Backend service error: {exc.response.status_code} {exc.response.text[:100]}"
         # Construct log entry explicitly with type checks/casts
         log_entry = RequestLogEntry(
-            request_id=str(log_entry_base["request_id"]),
-            timestamp=log_entry_base["timestamp"],
-            method=str(log_entry_base["method"]),
-            path=str(log_entry_base["path"]),
-            agent_id=str(log_entry_base["agent_id"])
-            if log_entry_base["agent_id"]
-            else None,
-            service=str(log_entry_base["service"]),
+            request_id=request_id,
+            timestamp=request_timestamp,
+            method=request.method,
+            path=path,
+            agent_id=agent_id,
+            service=service,
             status_code=int(exc.response.status_code),
             response_time_ms=float(request_time_ms),
             error=str(error_detail),
         )
         background_tasks.add_task(log_request, log_entry)
-        raise HTTPException(status_code=exc.response.status_code, detail=error_detail)
+        raise HTTPException(status_code=exc.response.status_code, detail=error_detail) from exc
 
     except Exception as e:
         request_time_ms = (time.time() - start_time) * 1000
         error_detail = f"Gateway or service error: {str(e)}"
         # Construct log entry explicitly
         log_entry = RequestLogEntry(
-            request_id=log_entry_base["request_id"],
-            timestamp=log_entry_base["timestamp"],
-            method=log_entry_base["method"],
-            path=log_entry_base["path"],
-            agent_id=log_entry_base["agent_id"],
-            service=log_entry_base["service"],
+            request_id=request_id,
+            timestamp=request_timestamp,
+            method=request.method,
+            path=path,
+            agent_id=agent_id,
+            service=service,
             status_code=500,
             response_time_ms=request_time_ms,
             error=error_detail,
         )
         background_tasks.add_task(log_request, log_entry)
-        raise HTTPException(status_code=500, detail=error_detail)
+        raise HTTPException(status_code=500, detail=error_detail) from e
 
 
 # --- API Routes (Example) ---
@@ -382,28 +404,24 @@ async def proxy_request(
 
 # Example: Route all /inventory/* requests to inventory-service
 @app.api_route("/inventory/{path:path}")
-async def inventory_proxy(
+async def inventory_proxy(  # noqa: B008
     request: Request,
     path: str,
     background_tasks: BackgroundTasks,
-    agent: Agent = Depends(get_current_active_agent),
+    agent: Agent = Depends(get_current_active_agent),  # noqa: B008
 ):
-    return await proxy_request(
-        request, "inventory-service", f"/{path}", background_tasks, agent
-    )
+    return await proxy_request(request, "inventory-service", f"/{path}", background_tasks, agent)
 
 
 # Example: Route all /products/* requests to product-service
 @app.api_route("/products/{path:path}")
-async def product_proxy(
+async def product_proxy(  # noqa: B008
     request: Request,
     path: str,
     background_tasks: BackgroundTasks,
-    agent: Agent = Depends(get_current_active_agent),
+    agent: Agent = Depends(get_current_active_agent),  # noqa: B008
 ):
-    return await proxy_request(
-        request, "product-service", f"/{path}", background_tasks, agent
-    )
+    return await proxy_request(request, "product-service", f"/{path}", background_tasks, agent)
 
 
 # Add routes for other services (orders, pricing, etc.)

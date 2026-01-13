@@ -2,14 +2,15 @@
 Fulfillment Agent responsible for orchestrating order fulfillment steps.
 """
 
+# region book:order-orchestration-fulfillment-agent
 import logging
 
-# Import Base Agent, Models, and Utilities
-from .base import BaseAgent
 from models.enums import AgentType, FulfillmentMethod, OrderStatus
 from models.events import RetailEvent
 from models.fulfillment import Order, OrderLineItem
 from utils.event_bus import EventBus
+
+from .base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,7 @@ class FulfillmentAgent(BaseAgent):
     def register_event_handlers(self) -> None:
         """Register for events this agent cares about."""
         self.event_bus.subscribe("order.allocated", self.handle_order_allocated)
-        self.event_bus.subscribe(
-            "order.payment_processed", self.handle_payment_processed
-        )
+        self.event_bus.subscribe("order.payment_processed", self.handle_payment_processed)
         # Add handlers for fulfillment updates (e.g., picked, packed, shipped)
         # self.event_bus.subscribe("fulfillment.picked", self.handle_fulfillment_picked)
         # self.event_bus.subscribe("fulfillment.packed", self.handle_fulfillment_packed)
@@ -81,11 +80,14 @@ class FulfillmentAgent(BaseAgent):
 
         try:
             logger.info(
-                f"Payment processed for order {order_id}. Initiating fulfillment."
+                "Payment processed for order %s. Initiating fulfillment.",
+                order_id,
             )
             fulfillment_groups = self._group_items_by_fulfillment(order)
             logger.debug(
-                f"Order {order_id} split into {len(fulfillment_groups)} fulfillment groups."
+                "Order %s split into %s fulfillment groups.",
+                order_id,
+                len(fulfillment_groups),
             )
 
             # Initiate fulfillment for each group
@@ -94,7 +96,11 @@ class FulfillmentAgent(BaseAgent):
 
             # Update order status to Picking (or appropriate starting state)
             # Ensure OrderStatus is imported or defined
-            # order.update_status(OrderStatus.PICKING, self.agent_type, {"fulfillment_groups": len(fulfillment_groups)})
+            # order.update_status(
+            #     OrderStatus.PICKING,
+            #     self.agent_type,
+            #     {"fulfillment_groups": len(fulfillment_groups)},
+            # )
             # Instead of updating directly, publish an event for the status change
             await self.publish_event(
                 "order.status_update_request",
@@ -108,9 +114,7 @@ class FulfillmentAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error initiating fulfillment for order {order_id}: {e}")
             # Pass the actual order object if available
-            await self.handle_exception(
-                exception=e, context={"stage": "fulfillment_initiation"}, order=order
-            )
+            await self.handle_exception(exception=e, context={"stage": "fulfillment_initiation"}, order=order)
 
     # --- Helper Methods ---
 
@@ -118,9 +122,7 @@ class FulfillmentAgent(BaseAgent):
         """Mock implementation to get order details."""
         # In a real implementation, this would fetch from a database/order service
         # Returning None simulates order not found
-        logger.warning(
-            f"_get_order is a mock. Returning None for order {order_id}. Implement real fetching."
-        )
+        logger.warning(f"_get_order is a mock. Returning None for order {order_id}. Implement real fetching.")
         return None
 
     def _group_items_by_fulfillment(
@@ -135,16 +137,12 @@ class FulfillmentAgent(BaseAgent):
 
         for item in order.items:
             if not isinstance(item, OrderLineItem):
-                logger.warning(
-                    f"Skipping invalid item type in order {order.order_id}: {type(item)}"
-                )
+                logger.warning(f"Skipping invalid item type in order {order.order_id}: {type(item)}")
                 continue
 
             if not item.fulfillment_method or not item.fulfillment_location_id:
                 # Log error or raise exception if fulfillment details are mandatory at this stage
-                logger.error(
-                    f"Item {item.product_id} in order {order.order_id} missing fulfillment details."
-                )
+                logger.error(f"Item {item.product_id} in order {order.order_id} missing fulfillment details.")
                 # Optionally raise ValueError or handle gracefully depending on requirements
                 continue
 
@@ -154,9 +152,7 @@ class FulfillmentAgent(BaseAgent):
             groups[key].append(item)
 
         # Ensure type hints match the return value
-        return [
-            (method, location, items) for (method, location), items in groups.items()
-        ]
+        return [(method, location, items) for (method, location), items in groups.items()]
 
     async def _initiate_fulfillment_request(
         self,
@@ -179,7 +175,9 @@ class FulfillmentAgent(BaseAgent):
         # Extend with other methods like DROPSHIP -> VENDOR_AGENT etc.
         else:
             logger.error(
-                f"Cannot determine target agent for unknown fulfillment method: {method} in order {order.order_id}"
+                "Cannot determine target agent for unknown fulfillment method: %s in order %s",
+                method,
+                order.order_id,
             )
             # Optionally raise an error or publish an exception event
             return
@@ -194,9 +192,10 @@ class FulfillmentAgent(BaseAgent):
             for item in items
         ]
 
+        fulfillment_group_id = f"{order.order_id}-{method.value}-{location}"
         payload = {
             "order_id": order.order_id,
-            "fulfillment_group_id": f"{order.order_id}-{method.value}-{location}",  # Unique ID for this sub-task
+            "fulfillment_group_id": fulfillment_group_id,
             "fulfillment_method": method.value,
             "location_id": location,
             "items": item_details,
@@ -206,7 +205,9 @@ class FulfillmentAgent(BaseAgent):
         }
 
         logger.info(
-            f"Publishing fulfillment.requested for order {order.order_id}, group {payload['fulfillment_group_id']}"
+            "Publishing fulfillment.requested for order %s, group %s",
+            order.order_id,
+            fulfillment_group_id,
         )
         await self.publish_event("fulfillment.requested", payload)
 
@@ -214,3 +215,6 @@ class FulfillmentAgent(BaseAgent):
     # async def handle_fulfillment_picked(self, event: RetailEvent): ...
     # async def handle_fulfillment_packed(self, event: RetailEvent): ...
     # async def handle_fulfillment_shipped(self, event: RetailEvent): ...
+
+
+# endregion book:order-orchestration-fulfillment-agent

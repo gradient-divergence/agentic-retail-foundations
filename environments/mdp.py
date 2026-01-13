@@ -3,10 +3,12 @@ MDP environment for dynamic pricing of a seasonal product.
 Refactored for modular use in agentic-retail-foundations.
 """
 
+import pickle
+
 import numpy as np
+
 from config.config import DynamicPricingMDPConfig
 from utils.logger import get_logger
-import pickle
 
 
 class DynamicPricingMDP:
@@ -37,7 +39,10 @@ class DynamicPricingMDP:
         self._episode_states: list[tuple[int, int, int]] = []
         self._episode_actions: list[int] = []
         self.logger.info(
-            f"DynamicPricingMDP initialized: {self.season_length_weeks} weeks, {self.initial_inventory} units, discounts: {self.available_discounts}"
+            "DynamicPricingMDP initialized: %s weeks, %s units, discounts: %s",
+            self.season_length_weeks,
+            self.initial_inventory,
+            self.available_discounts,
         )
 
     def _get_state(self) -> tuple[int, int, int]:
@@ -63,7 +68,9 @@ class DynamicPricingMDP:
     def step(self, action_idx: int) -> tuple[tuple[int, int, int], float, bool, dict]:
         if not (0 <= action_idx < len(self.available_discounts)):
             self.logger.error(
-                f"Invalid action index: {action_idx}. Available: {list(range(len(self.available_discounts)))}"
+                "Invalid action index: %s. Available: %s",
+                action_idx,
+                list(range(len(self.available_discounts))),
             )
             raise ValueError(f"Invalid action index: {action_idx}")
         new_discount = self.available_discounts[action_idx]
@@ -75,9 +82,7 @@ class DynamicPricingMDP:
             expected_demand = self.base_demand * (price_ratio**self.price_elasticity)
         demand_std_dev = 0.15 * expected_demand
         actual_demand = max(0, np.random.normal(expected_demand, demand_std_dev))
-        week_effect = 1.0 + 0.2 * np.sin(
-            np.pi * self.current_week / self.season_length_weeks
-        )
+        week_effect = 1.0 + 0.2 * np.sin(np.pi * self.current_week / self.season_length_weeks)
         actual_demand *= week_effect
         actual_demand = int(round(actual_demand))
         sales = min(self.current_inventory, actual_demand)
@@ -93,7 +98,9 @@ class DynamicPricingMDP:
             salvage_revenue = self.current_inventory * self.end_season_salvage_value
             reward += salvage_revenue
             self.logger.debug(
-                f"End of season. Salvage value added: {salvage_revenue:.2f} for {self.current_inventory} units."
+                "End of season. Salvage value added: %.2f for %s units.",
+                salvage_revenue,
+                self.current_inventory,
             )
         next_state = self._get_state()
         self._episode_rewards.append(reward)
@@ -116,20 +123,27 @@ class DynamicPricingMDP:
             "next_state": next_state,
         }
         self.logger.debug(
-            f"Week {info['week']}: Action={action_idx}({new_discount * 100:.0f}%), Sales={sales}, Inv={previous_inventory}->{self.current_inventory}, Reward={reward:.2f}"
+            "Week %s: Action=%s(%.0f%%), Sales=%s, Inv=%s->%s, Reward=%.2f",
+            info["week"],
+            action_idx,
+            new_discount * 100,
+            sales,
+            previous_inventory,
+            self.current_inventory,
+            reward,
         )
         return next_state, reward, done, info
 
-    def get_available_actions(self) -> list:
+    def get_available_actions(self) -> list[int]:
         return list(range(len(self.available_discounts)))
 
-    def save(self, filepath: str):
+    def save(self, filepath: str) -> None:
         """Serialize the environment state to a file."""
         with open(filepath, "wb") as f:
             pickle.dump(self.__dict__, f)
         self.logger.info(f"Environment state saved to {filepath}")
 
-    def load(self, filepath: str):
+    def load(self, filepath: str) -> None:
         """Load the environment state from a file."""
         with open(filepath, "rb") as f:
             state = pickle.load(f)

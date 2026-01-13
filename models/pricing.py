@@ -3,6 +3,7 @@ Pricing-related data models for agentic-retail-foundations.
 Includes the PricingProduct dataclass for OODA pricing agent demonstration.
 """
 
+# region book:pricing-product-model
 from dataclasses import dataclass, field
 
 
@@ -23,3 +24,6 @@ class PricingProduct:
     target_profit_margin: float = 0.3
     competitor_prices: dict[str, float] = field(default_factory=dict)
     sales_last_7_days: list[int] = field(default_factory=list)
+
+
+# endregion book:pricing-product-model

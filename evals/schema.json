@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentEvalCase v1",
+  "type": "object",
+  "required": ["id", "description", "inputs", "expected_actions"],
+  "properties": {
+    "id": {"type": "string"},
+    "description": {"type": "string"},
+    "inputs": {"type": "object"},
+    "expected_actions": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "expected_events": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "kpis": {
+      "type": "object",
+      "additionalProperties": {"type": "number"}
+    },
+    "constraints": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "failure_modes": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  }
+}

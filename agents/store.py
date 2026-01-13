@@ -2,12 +2,16 @@
 Defines the Store Agent class representing a store participating in protocols like CNP.
 """
 
-from dataclasses import dataclass, field
+# region book:task-allocation-store-agent
 import asyncio
+import logging
 import random
+from dataclasses import dataclass, field
 
 # Import the data models from the models directory
-from models.task import TaskStatus, Task, Bid
+from models.task import Bid, Task, TaskStatus
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -24,7 +28,7 @@ class StoreAgent:
     location: str = field(init=False)  # Set in post_init
     assigned_tasks: list[Task] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Use name as location if not specified otherwise
         self.location = self.name
 
@@ -44,9 +48,7 @@ class StoreAgent:
 
         efficiency_cost = self.efficiency
 
-        urgency_factor = 1 + (task.urgency / 20.0) * (
-            len(self.assigned_tasks) / max(1, self.capacity)
-        )
+        urgency_factor = 1 + (task.urgency / 20.0) * (len(self.assigned_tasks) / max(1, self.capacity))
 
         location_penalty = 0.0
         if task.location and task.location != self.location:
@@ -56,9 +58,7 @@ class StoreAgent:
 
         bid_amount = (base_cost * efficiency_cost * urgency_factor) + location_penalty
 
-        current_workload_duration = sum(
-            t.required_capacity * self.efficiency for t in self.assigned_tasks
-        )
+        current_workload_duration = sum(t.required_capacity * self.efficiency for t in self.assigned_tasks)
         estimated_task_duration = task.required_capacity * self.efficiency
         completion_time = current_workload_duration + estimated_task_duration
 
@@ -77,7 +77,7 @@ class StoreAgent:
         Execute a task asynchronously, simulating execution time and success/failure.
         Updates task status internally.
         """
-        print(f"Agent {self.name} executing task {task.id}: {task.description}")
+        logger.info("Agent %s executing task %s: %s", self.name, task.id, task.description)
         task.status = TaskStatus.IN_PROGRESS
         execution_time = max(0.1, task.required_capacity * self.efficiency * 0.1)
         await asyncio.sleep(execution_time)
@@ -86,12 +86,15 @@ class StoreAgent:
         success = random.random() < success_probability
 
         if success:
-            print(f"Agent {self.name} completed task {task.id}")
+            logger.info("Agent %s completed task %s", self.name, task.id)
             task.status = TaskStatus.COMPLETED
         else:
-            print(f"Agent {self.name} failed task {task.id}")
+            logger.warning("Agent %s failed task %s", self.name, task.id)
             task.status = TaskStatus.FAILED
 
         # Remove task from assigned list upon completion/failure
         self.assigned_tasks = [t for t in self.assigned_tasks if t.id != task.id]
         return success
+
+
+# endregion book:task-allocation-store-agent

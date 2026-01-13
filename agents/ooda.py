@@ -2,14 +2,19 @@
 OODA (Observe-Orient-Decide-Act) agent for dynamic pricing in agentic-retail-foundations.
 """
 
-from datetime import datetime
-import random
+# region book:ooda-pricing-imports
 import logging
+import random
+from datetime import datetime
+from typing import Any
+
 from models.pricing import PricingProduct
 
 logger = logging.getLogger("AgentFrameworks")
+# endregion book:ooda-pricing-imports
 
 
+# region book:ooda-pricing-agent-init
 class OODAPricingAgent:
     """
     An agent for dynamic pricing using the OODA loop.
@@ -18,11 +23,11 @@ class OODAPricingAgent:
 
     def __init__(
         self,
-        inventory_weight=0.3,
-        competitor_weight=0.4,
-        sales_weight=0.3,
-        max_price_change_pct=5.0,
-    ):
+        inventory_weight: float = 0.3,
+        competitor_weight: float = 0.4,
+        sales_weight: float = 0.3,
+        max_price_change_pct: float = 5.0,
+    ) -> None:
         self.products: dict[str, PricingProduct] = {}
         self.inventory_weight = inventory_weight
         self.competitor_weight = competitor_weight
@@ -36,11 +41,13 @@ class OODAPricingAgent:
             f"MaxChange={max_price_change_pct}%)"
         )
 
-    def update_products(self, products_data: dict[str, PricingProduct]):
+    def update_products(self, products_data: dict[str, PricingProduct]) -> None:
         self.products = products_data
         logger.info(f"Updated agent with {len(products_data)} products.")
 
-    def observe(self, product_id: str) -> dict:
+    # endregion book:ooda-pricing-agent-init
+
+    def observe(self, product_id: str) -> dict[str, Any]:
         if product_id not in self.products:
             logger.warning(f"Observe: {product_id} not found.")
             return {}
@@ -65,7 +72,7 @@ class OODAPricingAgent:
         }
         return observation
 
-    def orient(self, product_id: str, observation: dict) -> dict:
+    def orient(self, product_id: str, observation: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         if not observation or product_id not in self.products:
             logger.warning(f"Orient: Missing data for {product_id}.")
             return {}
@@ -132,12 +139,12 @@ class OODAPricingAgent:
             "days_of_supply": days_of_supply,
         }
         logger.info(
-            f"Orient {product_id}: {situation} "
-            f"(Inv={inv_status}, Sales={sales_assess}, Price={price_pos})"
+            f"Orient {product_id}: {situation} (Inv={inv_status}, Sales={sales_assess}, Price={price_pos})"
         )
         return orientation
 
-    def decide(self, product_id: str, orientation: dict) -> dict:
+    # region book:ooda-pricing-decide
+    def decide(self, product_id: str, orientation: dict[str, Any]) -> dict[str, Any]:
         if not orientation or product_id not in self.products:
             logger.warning(f"Decide: Missing orientation for {product_id}.")
             return {}
@@ -177,9 +184,7 @@ class OODAPricingAgent:
             + comp_component * self.competitor_weight
             + sales_component * self.sales_weight
         )
-        capped_change = max(
-            -self.max_price_change_pct, min(self.max_price_change_pct, total_change)
-        )
+        capped_change = max(-self.max_price_change_pct, min(self.max_price_change_pct, total_change))
         new_price = curr_price * (1 + capped_change / 100)
 
         # Respect min/max
@@ -192,11 +197,7 @@ class OODAPricingAgent:
             "competitor": abs(comp_component * self.competitor_weight),
             "sales": abs(sales_component * self.sales_weight),
         }
-        main_driver = (
-            max(comps, key=lambda k: comps[k])
-            if any(v > 0 for v in comps.values())
-            else "none"
-        )
+        main_driver = max(comps, key=lambda k: comps[k]) if any(v > 0 for v in comps.values()) else "none"
 
         decision = {
             "timestamp": datetime.now(),
@@ -212,7 +213,10 @@ class OODAPricingAgent:
         )
         return decision
 
-    def act(self, product_id: str, decision: dict) -> bool:
+    # endregion book:ooda-pricing-decide
+
+    # region book:ooda-pricing-act
+    def act(self, product_id: str, decision: dict[str, Any]) -> bool:
         if not decision or product_id not in self.products:
             logger.warning(f"Act: Missing decision for {product_id}.")
             return False
@@ -240,6 +244,9 @@ class OODAPricingAgent:
             logger.error(f"Act {product_id}: update failed.")
         return success
 
+    # endregion book:ooda-pricing-act
+
+    # region book:ooda-pricing-run-cycle
     def run_cycle_for_product(self, product_id: str) -> bool:
         logger.info(f"\n--- OODA Cycle Start: {product_id} ---")
         obs = self.observe(product_id)
@@ -255,7 +262,10 @@ class OODAPricingAgent:
         logger.info(f"--- OODA Cycle End: {product_id} (Action Taken: {acted}) ---")
         return acted
 
+    # endregion book:ooda-pricing-run-cycle
+
     # Helpers
+    # region book:ooda-pricing-helpers
     def _fetch_competitor_prices(self, product: PricingProduct) -> dict[str, float]:
         base_price = product.current_price
         noise_a = random.uniform(-0.08, 0.08)
@@ -272,3 +282,5 @@ class OODAPricingAgent:
             return float(int(price)) + 0.99
         else:
             return float(int(price)) + 0.99
+
+    # endregion book:ooda-pricing-helpers

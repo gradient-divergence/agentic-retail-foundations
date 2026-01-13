@@ -1,0 +1,18 @@
+{
+  "acp_cart_delegate": {
+    "cart_id": "cart_123",
+    "items": [
+      {"sku": "SKU123", "qty": 2},
+      {"sku": "SKU456", "qty": 1}
+    ],
+    "policy_refs": ["returns_policy", "price_floor"],
+    "expires_at": "YYYY-MM-DDT00:00:00Z"
+  },
+  "ap2_payment_request": {
+    "payment_id": "pay_456",
+    "amount": 129.99,
+    "currency": "USD",
+    "order_id": "order_789",
+    "confirmation_channel": "a2ui"
+  }
+}

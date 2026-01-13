@@ -5,12 +5,13 @@ This module implements the Contract Net Protocol for task allocation in retail s
 The CNP is a negotiation protocol used to solve distributed problem solving tasks.
 """
 
-from typing import Any
+# region book:task-allocation-contract-net-coordinator
 from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
-from models.task import Task, TaskStatus, Bid
 from models.messaging import AgentMessage, Performative
+from models.task import Bid, Task, TaskStatus
 
 
 class RetailCoordinator:
@@ -72,7 +73,9 @@ class RetailCoordinator:
             # for more robust checking, or ensure handlers are typed correctly.
             result = self.message_handlers[message.performative](message)
             # If unsure about handler return types, could assert here:
-            # assert isinstance(result, (AgentMessage, type(None))), f"Handler for {message.performative} returned wrong type"
+            # assert isinstance(result, (AgentMessage, type(None))), (
+            #     f"Handler for {message.performative} returned wrong type"
+            # )
             return result  # type: ignore[no-any-return]
         return None
 
@@ -209,3 +212,6 @@ class RetailCoordinator:
         self.task_history.append(task_record)
 
         return True
+
+
+# endregion book:task-allocation-contract-net-coordinator

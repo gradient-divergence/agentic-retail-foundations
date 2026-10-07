@@ -5,7 +5,7 @@ Adapt the structure to your ADK runtime and tool registry.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationInfo, field_validator
 
 
 class InventoryCheckPayload(BaseModel):
@@ -23,6 +23,12 @@ class Task(BaseModel):
     task_id: str
     intent: str
     payload: TaskPayload
+
+    @field_validator("payload", mode="before")
+    @classmethod
+    def select_payload(cls, value, info: ValidationInfo) -> TaskPayload:
+        model = PriceUpdatePayload if info.data.get("intent") == "update_price" else InventoryCheckPayload
+        return model.model_validate(value)
 
 
 class TaskResult(BaseModel):

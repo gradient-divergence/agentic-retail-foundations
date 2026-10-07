@@ -176,9 +176,9 @@ class ShelfMonitoringAgent:
         issues = self._compare_with_planogram(detected_products, planogram_model)
 
         # Update detected issues
+        self.detected_issues[section_id] = issues
         if issues:
             timestamp = datetime.now().isoformat()
-            self.detected_issues[section_id] = issues
 
             # Report issues to inventory system for action
             await self._report_issues(location_id, section_id, issues, timestamp)

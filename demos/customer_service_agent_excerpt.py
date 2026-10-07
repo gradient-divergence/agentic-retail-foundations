@@ -5,7 +5,7 @@ Print-friendly excerpt of the LLM-powered customer service flow.
 # region book:customer-service-agent-excerpt
 from __future__ import annotations
 
-from pydantic import BaseModel, JsonValue, RootModel
+from pydantic import BaseModel, JsonValue, RootModel, ValidationError
 
 from agents.llm import RetailCustomerServiceAgent
 
@@ -37,19 +37,23 @@ async def handle_inquiry(agent: RetailCustomerServiceAgent, inquiry: Inquiry) ->
         if order_id:
             context_data["order_details"] = await agent.order_system.get_order_details(order_id)
     elif intent == "product_question":
-        product_id = await agent._extract_product_id(inquiry.message)
+        identifier = await agent._extract_product_identifier(inquiry.message)
+        product_id = await agent.product_db.resolve_product_id(identifier) if identifier else None
         if product_id:
             context_data["product_details"] = await agent.product_db.get_product(product_id)
             context_data["inventory"] = await agent.product_db.get_inventory(product_id)
 
     response = await agent._generate_response(
-        customer_info=customer_info,
+        customer_info=customer_info or {},
         intent=intent,
         message=inquiry.message,
         context_data=context_data,
         conversation_history=[],
     )
-    return AgentReply.model_validate(response)
+    try:
+        return AgentReply.model_validate(response)
+    except ValidationError:
+        return AgentReply(message="Please contact support for assistance.", intent="error", actions=[])
 
 
 # endregion book:customer-service-agent-excerpt

@@ -1,27 +1,34 @@
+"""AP2 test-mode sketch: build synthetic payment types locally; no payment is sent."""
+
 from __future__ import annotations
 
-try:
-    from ap2.types.payment_request import (
-        PaymentCurrencyAmount,
-        PaymentDetailsInit,
-        PaymentItem,
-        PaymentMethodData,
-        PaymentOptions,
-        PaymentRequest,
-    )
-except ModuleNotFoundError as exc:
-    raise ModuleNotFoundError(
-        'ap2 types package is not installed. Install with: uv pip install -e ".[agent_protocols]"'
-    ) from exc
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ap2.models.payment_request import PaymentRequest
 
 
 def build_payment_request() -> PaymentRequest:
+    try:
+        from ap2.models.payment_request import (
+            PaymentCurrencyAmount,
+            PaymentDetailsInit,
+            PaymentItem,
+            PaymentMethodData,
+            PaymentOptions,
+            PaymentRequest,
+        )
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            'ap2 types package is not installed. Install with: uv pip install -e ".[agent_protocols]"'
+        ) from exc
+
     item = PaymentItem(
         label="Seasonal jacket",
         amount=PaymentCurrencyAmount(currency="USD", value="129.99"),
     )
     details = PaymentDetailsInit(
-        id="order_789",
+        id="test_order_789",
         display_items=[item],
         total=PaymentItem(
             label="Total",

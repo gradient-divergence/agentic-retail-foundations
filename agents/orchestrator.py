@@ -33,6 +33,7 @@ class MasterOrchestrator(BaseAgent):
             "order.allocated",
             "order.payment_processed",
             "order.exception",  # Listen for exceptions published by other agents
+            "order.stalled",
             "fulfillment.requested",
             "fulfillment.picked",
             "fulfillment.packed",
@@ -140,7 +141,6 @@ class MasterOrchestrator(BaseAgent):
     #       rather than being called on every single event.
     async def _check_for_stalled_orders(self) -> None:
         """Identify and potentially resolve stalled orders."""
-        now = datetime.now()
         threshold = timedelta(minutes=30)  # Use timedelta for comparison
 
         stalled_orders = []
@@ -149,9 +149,12 @@ class MasterOrchestrator(BaseAgent):
             if not last_update_iso:
                 continue
             try:
-                last_update = datetime.fromisoformat(last_update_iso)
-                # Make timezone-aware if necessary, assuming naive for now
-                elapsed = now - last_update
+                last_update = (
+                    last_update_iso
+                    if isinstance(last_update_iso, datetime)
+                    else datetime.fromisoformat(last_update_iso)
+                )
+                elapsed = datetime.now(last_update.tzinfo) - last_update
 
                 if elapsed > threshold and details.get("current_status") not in [
                     OrderStatus.COMPLETED.value,

@@ -18,6 +18,8 @@ class EventBus:
 
     def __init__(self) -> None:
         self.subscribers: dict[str, list[Callable[[RetailEvent], Coroutine[Any, Any, None]]]] = {}
+        # ponytail: unbounded process-local receipts; persist with retention for long-lived buses.
+        self._delivered: set[tuple[str, Callable]] = set()
 
     def subscribe(
         self,
@@ -60,13 +62,27 @@ class EventBus:
 
         logger_event_bus.info(f"Event published: {event.event_type} from {event.source.value}")
         if event.event_type in self.subscribers:
-            # Gather tasks to run handlers concurrently
-            tasks = [asyncio.create_task(callback(event)) for callback in self.subscribers[event.event_type]]
+            callbacks = [
+                callback
+                for callback in self.subscribers[event.event_type].copy()
+                if (event.event_id, callback) not in self._delivered
+            ]
+            # Claim deliveries before yielding so concurrent/reentrant replays are ignored.
+            self._delivered.update((event.event_id, callback) for callback in callbacks)
+
+            async def deliver(callback):
+                try:
+                    await callback(event)
+                except BaseException:
+                    self._delivered.discard((event.event_id, callback))
+                    raise
+
+            tasks = [asyncio.create_task(deliver(callback)) for callback in callbacks]
             if tasks:
                 results = await asyncio.gather(*tasks, return_exceptions=True)
-                for i, result in enumerate(results):
+                for callback, result in zip(callbacks, results, strict=True):
                     if isinstance(result, Exception):
-                        callback_name = self.subscribers[event.event_type][i].__name__
+                        callback_name = callback.__name__
                         logger_event_bus.error(
                             "Error in subscriber callback '%s' for event %s: %s",
                             callback_name,

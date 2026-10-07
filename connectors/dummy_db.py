@@ -50,10 +50,10 @@ class DummyDB:
         "P4": {"status": "In Stock"},
     }
 
-    async def get_customer(self, cid: str) -> dict[str, Any]:
+    async def get_customer(self, cid: str) -> dict[str, Any] | None:
         """Get customer info by ID."""
         await asyncio.sleep(0.01)
-        return self._customers.get(cid, {"name": f"Cust {cid}", "loyalty_tier": "Standard"})
+        return self._customers.get(cid)
 
     async def search_products(self, query: str) -> list[dict[str, Any]]:
         """Search for products by name or ID (simple substring match)."""
@@ -82,6 +82,8 @@ class DummyDB:
     async def resolve_product_id(self, identifier: str) -> str | None:
         """Resolve a product ID or name to a product ID."""
         await asyncio.sleep(0.01)
+        if not identifier.strip():
+            return None
         if identifier in self._products:
             return identifier
         identifier_lower = identifier.lower()

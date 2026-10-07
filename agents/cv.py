@@ -33,37 +33,9 @@ class ShelfMonitoringAgent:
         check_frequency_seconds: int = 300,
     ) -> None:
         """Initialize the shelf monitoring agent."""
-        # Try to load a TorchScript model. In demo / documentation settings a real
-        # model may not be available, so fall back to a *no-op* model that returns empty
-        # detections. This lets the rest of the agent run without crashing while still
-        # warning the user that no detections will be produced.
-        try:
-            self.detection_model = torch.jit.load(model_path)
-            self.detection_model.eval()
-        except (OSError, ValueError) as e:
-            logger.warning(
-                "ShelfMonitoringAgent: Could not load model from '%s': %s. "
-                "Falling back to a dummy detection model (no detections will be produced).",
-                model_path,
-                e,
-            )
-
-            class _DummyModel:
-                """A minimal stand-in that mimics the detection model API."""
-
-                def __call__(  # noqa: D401 – simple stub
-                    self, inputs: Any, *args: Any, **kwargs: Any
-                ) -> dict[str, torch.Tensor]:
-                    batch = inputs.shape[0] if hasattr(inputs, "shape") else 1
-                    empty = torch.zeros((batch, 1, 4), dtype=torch.float32)
-                    zeros = torch.zeros((batch, 1), dtype=torch.float32)
-                    return {
-                        "detection_boxes": empty,
-                        "detection_classes": zeros,
-                        "detection_scores": zeros,
-                    }
-
-            self.detection_model = _DummyModel()
+        # A missing detector must not turn an unavailable audit into out-of-stock alerts.
+        self.detection_model = torch.jit.load(model_path)
+        self.detection_model.eval()
         self.planogram_db = planogram_database
         self.inventory_system = inventory_system
         self.camera_streams = camera_stream_urls
@@ -130,9 +102,9 @@ class ShelfMonitoringAgent:
         detections = self.detection_model(input_tensor)
         detected_products = self._process_detections(detections, frame.shape[1], frame.shape[0])
         issues = self._compare_with_planogram(detected_products, planogram)
+        self.detected_issues[section_id] = issues
         if issues:
             timestamp = datetime.now().isoformat()
-            self.detected_issues[section_id] = issues
             await self._report_issues(location_id, section_id, issues, timestamp)
 
     def _preprocess_image(self, image: np.ndarray) -> torch.Tensor:

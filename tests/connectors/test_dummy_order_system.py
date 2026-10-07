@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from unittest.mock import patch
@@ -12,6 +13,12 @@ from connectors.dummy_order_system import DummyOrderSystem
 def order_system() -> DummyOrderSystem:
     """Provides a DummyOrderSystem instance for testing."""
     return DummyOrderSystem()
+
+
+def test_order_details_use_customer_prompt_field_names():
+    details = asyncio.run(DummyOrderSystem().get_order_details("ORD988"))
+    assert details["estimated_delivery"] == "2023-11-01"
+    assert details["tracking_number"] == "TRK123"
 
 
 # --- Test get_recent_orders --- #

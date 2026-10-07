@@ -7,7 +7,11 @@ import uuid
 from datetime import datetime
 
 import httpx
-import redis
+
+try:
+    import redis
+except ModuleNotFoundError:
+    raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -38,9 +42,6 @@ app.add_middleware(
 
 # region book:api-gateway-redis-config
 redis_client = redis.Redis(host="redis", port=6379, db=0)
-SECRET_KEY = "YOUR_SECRET_KEY_HERE"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 SERVICE_REGISTRY = {
     "product-service": "http://product-service:8000",

@@ -2,30 +2,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from demos.openai_agents_sdk_import import import_openai_agents_sdk
-
-agents_sdk = import_openai_agents_sdk()
-Agent = agents_sdk.Agent
-Runner = agents_sdk.Runner
-Tool = agents_sdk.Tool
 
 
 class PriceProposalInput(BaseModel):
     product_id: str
-    current_price: float
-    discount_pct: float = Field(ge=0, le=100)
+    current_price: float = Field(gt=0, allow_inf_nan=False)
+    discount_pct: float = Field(ge=0, le=100, allow_inf_nan=False)
 
 
 class PriceProposal(BaseModel):
     product_id: str
-    current_price: float
-    discount_pct: float
-    new_price: float
+    current_price: float = Field(gt=0, allow_inf_nan=False)
+    discount_pct: float = Field(ge=0, le=100, allow_inf_nan=False)
+    new_price: float = Field(ge=0, allow_inf_nan=False)
 
 
 def propose_price(payload: PriceProposalInput) -> PriceProposal:
@@ -36,28 +31,6 @@ def propose_price(payload: PriceProposalInput) -> PriceProposal:
         discount_pct=payload.discount_pct,
         new_price=new_price,
     )
-
-
-price_tool = Tool(
-    name="propose_price",
-    func=propose_price,
-    description="Propose a new price based on a discount percentage.",
-)
-
-
-planner_agent = Agent(
-    name="PlannerAgent",
-    instructions=(
-        "You propose price changes using the propose_price tool. "
-        "Return a concise recommendation and the tool output."
-    ),
-    tools=[price_tool],
-)
-
-executor_agent = Agent(
-    name="ExecutorAgent",
-    instructions=("You validate and execute approved pricing changes. Return a short execution summary."),
-)
 
 
 TraceMetadata: TypeAlias = dict[str, str | float | int | bool]
@@ -91,18 +64,56 @@ class GuardrailResult(BaseModel):
     reason: str | None = None
 
 
+class ExecutionSummary(BaseModel):
+    status: Literal["executed", "blocked", "failed"]
+
+
 def guardrail_check(recommendation: PriceProposal) -> GuardrailResult:
-    if recommendation.discount_pct > 25:
+    if recommendation.discount_pct > 25 or recommendation.new_price < round(
+        recommendation.current_price * 0.75, 2
+    ):
         return GuardrailResult(passed=False, reason="discount_exceeds_threshold")
     return GuardrailResult(passed=True)
 
 
 def eval_output(execution_summary: str, trace_id: str) -> EvalResult:
-    score = 0.9 if "executed" in execution_summary.lower() else 0.4
+    try:
+        summary = ExecutionSummary.model_validate_json(execution_summary)
+        executed = summary.status == "executed"
+    except ValidationError:
+        executed = False
+    score = 0.9 if executed else 0.4
     return EvalResult(trace_id=trace_id, score=score, passed=score >= 0.8)
 
 
 def run_demo() -> None:
+    agents_sdk = import_openai_agents_sdk()
+    Agent = agents_sdk.Agent
+    Runner = agents_sdk.Runner
+    function_tool = agents_sdk.function_tool
+
+    price_tool = function_tool(
+        propose_price,
+        description_override="Propose a new price based on a discount percentage.",
+    )
+
+    planner_agent = Agent(
+        name="PlannerAgent",
+        instructions=(
+            "You propose price changes using the propose_price tool. "
+            "Return only the tool output as JSON with product_id, current_price, discount_pct, and new_price."
+        ),
+        tools=[price_tool],
+    )
+
+    executor_agent = Agent(
+        name="ExecutorAgent",
+        instructions=(
+            "You simulate approved pricing changes; no live price is changed. "
+            'Return only JSON with a status of "executed", "blocked", or "failed".'
+        ),
+    )
+
     trace = TraceLog()
 
     task = "Propose a 15% discount for SKU123 priced at 49.99."
@@ -110,9 +121,16 @@ def run_demo() -> None:
     plan = Runner.run_sync(planner_agent, task)
     trace.log("plan_completed", {"output": plan.final_output})
 
-    recommendation = propose_price(
-        PriceProposalInput(product_id="SKU123", current_price=49.99, discount_pct=15)
-    )
+    try:
+        recommendation = PriceProposal.model_validate_json(plan.final_output)
+    except ValidationError:
+        trace.log("handoff_blocked", {"reason": "invalid_price_proposal"})
+        print("Guardrail blocked handoff: invalid_price_proposal")
+        return
+    if recommendation.product_id != "SKU123" or recommendation.current_price != 49.99:
+        trace.log("handoff_blocked", {"reason": "proposal_does_not_match_task"})
+        print("Guardrail blocked handoff: proposal_does_not_match_task")
+        return
     guardrail = guardrail_check(recommendation)
     trace.log("guardrail_checked", {"passed": guardrail.passed, "reason": guardrail.reason or ""})
 
@@ -138,4 +156,7 @@ def run_demo() -> None:
 
 
 if __name__ == "__main__":
-    run_demo()
+    try:
+        run_demo()
+    except (RuntimeError, ImportError) as exc:
+        raise SystemExit(str(exc)) from None

@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from openai import AsyncOpenAI, OpenAI
+from pydantic import TypeAdapter, ValidationError
 
 from agents.prompts import build_action_extraction_prompt
 from utils.openai_utils import safe_chat_completion
+
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI, OpenAI
 
 __all__ = [
     "build_response_prompt",
@@ -218,24 +221,22 @@ async def extract_actions(  # noqa: C901
             action_list: list[str] | None = None
             if isinstance(parsed_data, dict):
                 # In case the LLM returns a dict wrapper: {"actions": [...]}
-                for value in parsed_data.values():
-                    if isinstance(value, list):
-                        action_list = value
-                        break
+                action_list = parsed_data.get("actions")
             elif isinstance(parsed_data, list):
                 action_list = parsed_data
             if action_list is not None:
-                validated = [a for a in action_list if isinstance(a, str)]
+                validated = TypeAdapter(list[str]).validate_python(action_list, strict=True)
                 existing_types = {a["type"] for a in actions}
                 for action_type in validated:
                     if action_type not in existing_types:
                         actions.append({"type": action_type})
+                        existing_types.add(action_type)
             else:
                 logger.warning(
                     "LLM action extraction did not return a valid list: %s",
                     extracted_text,
                 )
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValidationError):
             logger.warning("LLM action extraction returned invalid JSON: %s", extracted_text)
     except Exception as exc:  # noqa: BLE001
         logger.error("LLM action extraction failed: %s", exc)

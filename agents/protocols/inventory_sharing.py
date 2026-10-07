@@ -123,11 +123,20 @@ class InventoryCollaborationNetwork:
             rid = op["receiver_id"]
             pid = op["product_id"]
             qty = op["quantity"]
-            s = self.stores[sid]
-            r = self.stores[rid]
-            send_ok = s.execute_transfer(pid, qty, rid, True)
-            recv_ok = r.execute_transfer(pid, qty, sid, False)
-            success = send_ok and recv_ok
+            s = self.stores.get(sid)
+            r = self.stores.get(rid)
+            # Both synchronous legs must be valid before either store changes.
+            success = bool(
+                s is not None
+                and r is not None
+                and sid != rid
+                and type(qty) is int
+                and qty > 0
+                and pid in r.inventory
+                and s.can_transfer(pid, qty)
+            )
+            if success:
+                success = s.execute_transfer(pid, qty, rid, True) and r.execute_transfer(pid, qty, sid, False)
             op_res = op.copy()
             op_res["status"] = "completed" if success else "failed"
             op_res["timestamp"] = datetime.now()

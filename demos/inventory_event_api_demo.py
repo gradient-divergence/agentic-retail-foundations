@@ -8,7 +8,10 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-import redis
+try:
+    import redis
+except ModuleNotFoundError:
+    raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field, JsonValue
 

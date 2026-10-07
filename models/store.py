@@ -144,7 +144,7 @@ class Store:
 
     def can_transfer(self, product_id: str, quantity: int) -> bool:
         """Check if the store can transfer out the given quantity of a product."""
-        if product_id not in self.inventory:
+        if quantity <= 0 or product_id not in self.inventory:
             return False
         return self.inventory[product_id].excess_units() >= quantity
 
@@ -163,7 +163,7 @@ class Store:
         Returns:
             bool: Success or failure of the transfer
         """
-        if product_id not in self.inventory:
+        if quantity <= 0 or product_id not in self.inventory:
             return False
 
         position = self.inventory[product_id]

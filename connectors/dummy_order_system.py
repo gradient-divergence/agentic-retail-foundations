@@ -32,8 +32,8 @@ class DummyOrderSystem:
             "order_date": "2023-10-25",
             "status": "Shipped",
             "items": [{"name": "Running Shoes"}, {"name": "Water Bottle"}],
-            "est_delivery": "2023-11-01",
-            "tracking": "TRK123",
+            "estimated_delivery": "2023-11-01",
+            "tracking_number": "TRK123",
         },
         "ORD999": {
             "order_id": "ORD999",
@@ -41,7 +41,7 @@ class DummyOrderSystem:
             "order_date": "2023-10-28",
             "status": "Delayed",
             "items": [{"name": "Water Bottle"}],
-            "est_delivery": "2023-11-03",
+            "estimated_delivery": "2023-11-03",
         },
     }
     _return_eligibility = {

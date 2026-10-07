@@ -1,8 +1,9 @@
+# region book:sensor-processor-imports
 from __future__ import annotations
 
-# region book:sensor-processor-imports
 import asyncio
 import json
+from contextlib import suppress
 from datetime import datetime, timedelta
 
 from fastapi import FastAPI, WebSocket
@@ -89,18 +90,24 @@ class SensorDataProcessor:
     # region book:sensor-processor-process-message
     async def process_sensor_message(self, message: SensorMessage):
         """Process an incoming sensor reading"""
-        payload = message.payload
-        sensor_id = message.sensor_id or str(payload.get("sensor_id"))
+        payload = {**message.payload, "timestamp": message.timestamp or message.payload.get("timestamp")}
+        sensor_id = message.sensor_id or payload.get("sensor_id")
         sensor_type = message.sensor_type or str(payload.get("sensor_type"))
+        if not isinstance(sensor_id, str):
+            return
+        try:
+            datetime.fromisoformat(payload.get("timestamp", ""))
+        except (TypeError, ValueError):
+            return
         if sensor_id not in self.recent_readings:
             self.recent_readings[sensor_id] = []
 
         self.recent_readings[sensor_id].append(payload)
-        cutoff = datetime.now() - timedelta(hours=24)
+        cutoff = datetime.now().astimezone() - timedelta(hours=24)
         self.recent_readings[sensor_id] = [
             reading
             for reading in self.recent_readings[sensor_id]
-            if datetime.fromisoformat(reading.get("timestamp", "")) > cutoff
+            if datetime.fromisoformat(reading["timestamp"]).astimezone() > cutoff
         ]
 
         if sensor_type == "rfid":
@@ -158,13 +165,21 @@ class SensorDataProcessor:
         current_weight = message.get("current_weight_grams")
         expected_weight = message.get("expected_weight_grams")
         product_info = message.get("product_info", {})
+        unit_weight = product_info.get("unit_weight_grams", 1)
+        if (
+            not isinstance(current_weight, int | float)
+            or not isinstance(expected_weight, int | float)
+            or not isinstance(unit_weight, int | float)
+            or unit_weight <= 0
+        ):
+            return
 
         weight_diff = abs(current_weight - expected_weight)
-        weight_threshold = product_info.get("unit_weight_grams", 0) * 0.5
+        weight_threshold = unit_weight * 0.5
 
         if weight_diff > weight_threshold:
-            estimated_units = max(0, round(current_weight / product_info.get("unit_weight_grams", 1)))
-            expected_units = max(0, round(expected_weight / product_info.get("unit_weight_grams", 1)))
+            estimated_units = max(0, round(current_weight / unit_weight))
+            expected_units = max(0, round(expected_weight / unit_weight))
 
             if estimated_units < expected_units:
                 discrepancy_type = "low_stock" if estimated_units > 0 else "out_of_stock"
@@ -383,8 +398,14 @@ class SensorDataProcessor:
         """Run the main processing loop"""
         import uvicorn
 
-        _maintenance_task = asyncio.create_task(self._run_maintenance_loop())
-        await uvicorn.run(self.app, host="0.0.0.0", port=8080)
+        server = uvicorn.Server(uvicorn.Config(self.app, host="0.0.0.0", port=8080))
+        maintenance_task = asyncio.create_task(self._run_maintenance_loop())
+        try:
+            await server.serve()
+        finally:
+            maintenance_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await maintenance_task
 
     # endregion book:sensor-processor-run
 

@@ -5,8 +5,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from dowhy import CausalModel
-from econml.dml import CausalForestDML
 from pydantic import BaseModel, ConfigDict
 
 # endregion book:promotion-causal-imports
@@ -107,29 +105,54 @@ class PromotionCausalAnalyzer:
         # Merge sales with product attributes
         df = pd.merge(
             self.sales_data,
-            self.product_data,
+            self.product_data.drop(
+                columns=self.product_data.columns.intersection(self.sales_data.columns).difference(
+                    ["product_id"]
+                )
+            ),
             on="product_id",
             how="left",
+            validate="many_to_one",
         )
         # Add store characteristics
         df = pd.merge(
             df,
-            self.store_data,
+            self.store_data.drop(
+                columns=self.store_data.columns.intersection(df.columns).difference(["store_id"])
+            ),
             on="store_id",
             how="left",
+            validate="many_to_one",
         )
         # endregion book:promotion-causal-prepare-data-merge
 
         # region book:promotion-causal-prepare-data-promo
         # Add promotion flags
+        df["date"] = pd.to_datetime(df["date"])
+        promotions = self.promotion_data.copy()
+        promotions["date"] = pd.to_datetime(promotions["date"])
+        if "on_promotion" in df:
+            promotions = promotions.rename(columns={"on_promotion": "_promotion_treatment"})
         df = pd.merge(
             df,
-            self.promotion_data,
+            promotions,
             on=["product_id", "store_id", "date"],
             how="left",
+            validate="many_to_one",
+            suffixes=(False, False),
         )
+        if "_promotion_treatment" in df:
+            supplied = df.pop("_promotion_treatment")
+            existing = df["on_promotion"]
+            if (existing.notna() & supplied.notna() & (existing != supplied)).any():
+                raise ValueError("Sales and promotion data disagree on the treatment indicator.")
+            df["on_promotion"] = existing.combine_first(supplied)
+        if "on_promotion" not in df:
+            raise ValueError("Could not determine the promotion treatment indicator.")
+        if not df["on_promotion"].dropna().isin([0, 1]).all():
+            raise ValueError("The promotion treatment indicator must be binary.")
         # Fill missing promotion flags with False
-        df["on_promotion"] = df["on_promotion"].fillna(False)
+        df["on_promotion"] = df["on_promotion"].fillna(False).astype(bool)
         # Create calendar features
         df["date"] = pd.to_datetime(df["date"])
         df["day_of_week"] = df["date"].dt.dayofweek
@@ -140,6 +163,7 @@ class PromotionCausalAnalyzer:
 
         # region book:promotion-causal-prepare-data-lags
         # Create lagged features
+        df = df.sort_values(["store_id", "product_id", "date"], kind="stable").reset_index(drop=True)
         for lag in [1, 2, 3, 7, 14]:
             df[f"sales_lag_{lag}"] = df.groupby(["product_id", "store_id"])["sales_units"].shift(lag)
             df[f"on_promotion_lag_{lag}"] = (
@@ -277,11 +301,12 @@ class PromotionCausalAnalyzer:
     # region book:promotion-causal-regression
     def regression_adjustment(self) -> RegressionAdjustment:
         """Estimate promotion impact using regression adjustment for confounders"""
+        if self.analysis_data["on_promotion"].nunique() != 2:
+            raise ValueError("Effect estimation requires both promotion groups.")
         # Prepare features
         X = self.analysis_data[
             [
                 "on_promotion",
-                "price",
                 "day_of_week",
                 "month",
                 "weekend",
@@ -294,7 +319,7 @@ class PromotionCausalAnalyzer:
         # Convert categorical variables to dummies
         X = pd.get_dummies(X, columns=["day_of_week", "month", "product_category", "store_tier"])
         # Add intercept
-        X = sm.add_constant(X)
+        X = sm.add_constant(X.astype(float), has_constant="add")
         # Target variable
         y = self.analysis_data["sales_units"]
         # Fit model
@@ -316,9 +341,9 @@ class PromotionCausalAnalyzer:
         from sklearn.linear_model import LogisticRegression
 
         # Features for propensity model
+        # Discounted price is a mediator; store_traffic must be measured before treatment.
         X = self.analysis_data[
             [
-                "price",
                 "day_of_week",
                 "month",
                 "weekend",
@@ -370,16 +395,14 @@ class PromotionCausalAnalyzer:
                 average_treatment_effect=float(effect),
                 percent_effect=float(percent_effect),
             )
-        return MatchingImpact(
-            matched_pairs=0,
-            average_treatment_effect=0.0,
-            percent_effect=0.0,
-        )
+        raise ValueError("No eligible matches; effect is not estimable.")
         # endregion book:promotion-causal-matching-effect
 
     # region book:promotion-causal-double-ml
     def double_ml_forest(self) -> DoubleMLResult:
         """Estimate heterogeneous treatment effects using double ML causal forest"""
+        from econml.dml import CausalForestDML
+
         # Prepare data
         df = self.analysis_data.copy()
         # Treatment variable
@@ -389,7 +412,6 @@ class PromotionCausalAnalyzer:
         # Features for effect estimation
         X = df[
             [
-                "price",
                 "day_of_week",
                 "month",
                 "weekend",
@@ -406,23 +428,21 @@ class PromotionCausalAnalyzer:
             min_samples_leaf=10,
             max_depth=5,
             random_state=42,
+            discrete_treatment=True,
         )
         cf.fit(Y, T, X=X, W=W)
         # endregion book:promotion-causal-double-ml
 
         # region book:promotion-causal-double-ml-ate
         # Get overall average treatment effect
-        ate = cf.ate(X.values, W=W.values)
+        ate = cf.ate(X=X)
         # Generate heterogeneous treatment effects
-        cate_estimates = cf.effect(X.values, W=W.values)
+        cate_estimates = cf.effect(X=X)
         # Analyze heterogeneity by product category and store tier
         df["cate"] = cate_estimates
-        # Get original category and tier names before dummy encoding
-        category_columns = [col for col in W.columns if col.startswith("product_category_")]
-        tier_columns = [col for col in W.columns if col.startswith("store_tier_")]
-        # Re-encode back to original categories
-        df["original_category"] = df[category_columns].idxmax(axis=1).str.replace("product_category_", "")
-        df["original_tier"] = df[tier_columns].idxmax(axis=1).str.replace("store_tier_", "")
+        # Keep the original labels; dummy columns exist only in W.
+        df["original_category"] = df["product_category"]
+        df["original_tier"] = df["store_tier"]
         # endregion book:promotion-causal-double-ml-ate
 
         # region book:promotion-causal-double-ml-by-segment
@@ -442,20 +462,19 @@ class PromotionCausalAnalyzer:
     # region book:promotion-causal-dowhy
     def dowhy_analysis(self) -> DoWhyResult:
         """Estimate causal effect using the DoWhy causal inference framework"""
+        from dowhy import CausalModel
+
         # Identify variables from our causal graph
         treatment = "on_promotion"
         outcome = "sales_units"
         # Convert our internal graph to DoWhy format
-        edges = []
-        for u, v in self.causal_graph.edges():
-            if u in self.analysis_data.columns and v in self.analysis_data.columns:
-                edges.append((u, v))
+        graph = self.causal_graph.subgraph(self.analysis_data.columns).copy()
         # Create DoWhy model
         model = CausalModel(
             data=self.analysis_data,
             treatment=treatment,
             outcome=outcome,
-            graph=edges,
+            graph=graph,
         )
         # Identify effect
         identified_estimand = model.identify_effect()
@@ -495,29 +514,37 @@ class PromotionCausalAnalyzer:
     # region book:promotion-causal-counterfactual
     def perform_counterfactual_analysis(self, scenario: CounterfactualScenario) -> CounterfactualResult:
         """Predict outcomes under counterfactual scenarios"""
+        if self.analysis_data["on_promotion"].nunique() != 2:
+            raise ValueError("Effect estimation requires both promotion groups.")
         # Create a copy of the analysis data
         cf_data = self.analysis_data.copy()
         # Apply counterfactual scenario changes
         for key, value in scenario.overrides.items():
             if key in cf_data.columns:
                 cf_data[key] = value
-        # Get features for prediction
-        X = cf_data[
-            [
-                "on_promotion",
-                "price",
-                "day_of_week",
-                "month",
-                "weekend",
-                "holiday",
-                "store_traffic",
-            ]
+        # Use the same pre-treatment covariates as regression adjustment.
+        features = [
+            "on_promotion",
+            "day_of_week",
+            "month",
+            "weekend",
+            "holiday",
+            "store_traffic",
+            "product_category",
+            "store_tier",
         ]
+        unsupported = set(scenario.overrides) - set(features)
+        if unsupported:
+            return CounterfactualResult(error=f"Counterfactual features not modeled: {sorted(unsupported)}")
+        categorical = ["day_of_week", "month", "product_category", "store_tier"]
+        actual_features = pd.get_dummies(self.analysis_data[features], columns=categorical, dtype=float)
+        X = pd.get_dummies(cf_data[features], columns=categorical, dtype=float)
+        X = X.reindex(columns=actual_features.columns, fill_value=0)
         # Add intercept
-        X = sm.add_constant(X)
+        X = sm.add_constant(X.astype(float), has_constant="add")
         # Train regression model on original data
         y = self.analysis_data["sales_units"]
-        model = sm.OLS(y, sm.add_constant(self.analysis_data[X.columns[1:]])).fit()
+        model = sm.OLS(y, sm.add_constant(actual_features.astype(float), has_constant="add")).fit()
         # endregion book:promotion-causal-counterfactual
 
         # region book:promotion-causal-counterfactual-predict
@@ -553,10 +580,11 @@ class PromotionCausalAnalyzer:
         # Get causal effect estimate
         causal_effect = self.regression_adjustment()
         # Get product price and margin data
-        avg_price = self.analysis_data["price"].mean()
+        promoted = self.analysis_data["on_promotion"]
+        avg_price = self.analysis_data.loc[promoted, "price"].mean()
         avg_margin_percent = 0.35  # Placeholder - would come from actual data
         # Calculate incremental units
-        incremental_units = causal_effect.promotion_effect
+        incremental_units = causal_effect.promotion_effect * promoted.sum()
         # Calculate incremental revenue
         incremental_revenue = incremental_units * avg_price
         # Calculate incremental profit
@@ -644,14 +672,7 @@ if __name__ == "__main__":
             "store_tier": [f"Tier {(s - 1) // 3 + 1}" for s in range(1, 11)],
         }
     )
-    promotion_df = pd.DataFrame(
-        {
-            "date": [d for d in dates for _ in range(len(products) * len(stores))],
-            "product_id": [p for _ in dates for _ in stores for p in products],
-            "store_id": [s for _ in dates for s in stores for _ in products],
-            "on_promotion": np.random.random(len(dates) * len(products) * len(stores)) < 0.2,
-        }
-    )
+    promotion_df = sales_df[["date", "product_id", "store_id", "on_promotion"]].copy()
 
     # Initialize analyzer
     analyzer = PromotionCausalAnalyzer(sales_df, product_df, store_df, promotion_df)
@@ -665,7 +686,7 @@ if __name__ == "__main__":
     print(f"Promotion ROI: {roi_result.roi_percent:.2f}%")
     # Counterfactual scenario: What if we ran promotions only on weekends?
     counterfactual = analyzer.perform_counterfactual_analysis(
-        CounterfactualScenario(overrides={"on_promotion": sales_df["weekend"] == 1})
+        CounterfactualScenario(overrides={"on_promotion": analyzer.analysis_data["weekend"] == 1})
     )
     if counterfactual.summary:
         print(

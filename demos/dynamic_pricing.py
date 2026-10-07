@@ -107,3 +107,7 @@ def demonstrate_mdp_dynamic_pricing(
     )
     logger.info("--- MDP Dynamic Pricing Demonstration Complete ---")
     return results
+
+
+if __name__ == "__main__":
+    demonstrate_mdp_dynamic_pricing()

@@ -33,7 +33,8 @@ def mock_inventory_system() -> MagicMock:
 
 
 @pytest.fixture
-def agent_params(mock_planogram_db, mock_inventory_system) -> dict:
+def agent_params(mock_planogram_db, mock_inventory_system, monkeypatch) -> dict:
+    monkeypatch.setattr(torch.jit, "load", lambda path: MagicMock())
     return {
         "model_path": "fake/model/path",
         "planogram_database": mock_planogram_db,
@@ -88,18 +89,13 @@ def test_agent_initialization_model_load_success(mock_torch_load, agent_params):
 # Patch the specific torch function used in __init__
 @patch("agents.cv.torch.jit.load")
 def test_agent_initialization_model_load_fail(mock_torch_load, agent_params, caplog):
-    """Test initialization uses dummy model when torch model load fails."""
+    """A missing detector fails rather than creating false stock alerts."""
     mock_torch_load.side_effect = OSError("Load failed")
 
-    with caplog.at_level(logging.WARNING):
-        agent = ShelfMonitoringAgent(**agent_params)
+    with pytest.raises(OSError, match="Load failed"):
+        ShelfMonitoringAgent(**agent_params)
 
     mock_torch_load.assert_called_once_with(agent_params["model_path"])
-    # Check if the dummy model class is instantiated (check type)
-    assert agent.detection_model is not None
-    assert type(agent.detection_model).__name__ == "_DummyModel"
-    assert "Could not load model" in caplog.text
-    assert "Falling back to a dummy detection model" in caplog.text
 
 
 # --- Test Helper Methods --- #

@@ -8,6 +8,7 @@ sensor data streams for real-time inventory and environment monitoring.
 import asyncio
 import json
 import logging
+from contextlib import suppress
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -79,14 +80,19 @@ class SensorDataProcessor:
         if not isinstance(sensor_id, str):
             logger.warning("Invalid or missing sensor_id in message: %s", message)
             return
+        try:
+            datetime.fromisoformat(message.get("timestamp", ""))
+        except (TypeError, ValueError):
+            logger.warning("Invalid or missing timestamp for sensor %s", sensor_id)
+            return
         if sensor_id not in self.recent_readings:
             self.recent_readings[sensor_id] = []
         self.recent_readings[sensor_id].append(message)
-        cutoff = datetime.now() - timedelta(hours=24)
+        cutoff = datetime.now().astimezone() - timedelta(hours=24)
         self.recent_readings[sensor_id] = [
             reading
             for reading in self.recent_readings[sensor_id]
-            if datetime.fromisoformat(reading.get("timestamp", "")) > cutoff
+            if datetime.fromisoformat(reading["timestamp"]).astimezone() > cutoff
         ]
         if sensor_type == "rfid":
             await self._process_rfid_reading(message)
@@ -141,7 +147,8 @@ class SensorDataProcessor:
             weight_diff = abs(current_weight - expected_weight)
             unit_weight = product_info.get("unit_weight_grams", 1)  # Default to 1 to avoid division by zero
             if not isinstance(unit_weight, int | float) or unit_weight <= 0:
-                unit_weight = 1  # Ensure unit_weight is a positive number
+                logger.warning("Invalid unit weight for smart shelf %s: %s", shelf_id, unit_weight)
+                return
 
             weight_threshold = unit_weight * 0.5
             if weight_diff > weight_threshold:
@@ -359,10 +366,16 @@ class SensorDataProcessor:
 
     async def run(self) -> None:
         """Run the main processing loop."""
-        _maintenance_task = asyncio.create_task(self._run_maintenance_loop())
         import uvicorn
 
-        await asyncio.to_thread(uvicorn.run, self.app, host="0.0.0.0", port=8080)
+        server = uvicorn.Server(uvicorn.Config(self.app, host="0.0.0.0", port=8080))
+        maintenance_task = asyncio.create_task(self._run_maintenance_loop())
+        try:
+            await server.serve()
+        finally:
+            maintenance_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await maintenance_task
 
     async def _run_maintenance_loop(self) -> None:
         """Run periodic maintenance tasks."""

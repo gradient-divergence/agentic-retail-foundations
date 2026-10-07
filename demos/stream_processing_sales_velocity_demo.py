@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 # region book:spark-streaming-imports
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import avg, col, count, from_json, sum, window
-from pyspark.sql.types import (
-    DoubleType,
-    StringType,
-    StructField,
-    StructType,
-    TimestampType,
-)
+try:
+    from pyspark.sql import SparkSession
+    from pyspark.sql.functions import avg, col, count, from_json, sum, window
+    from pyspark.sql.types import (
+        DoubleType,
+        StringType,
+        StructField,
+        StructType,
+        TimestampType,
+    )
+except ModuleNotFoundError:
+    raise SystemExit("Install the spark extra: uv sync --extra spark") from None
 
 schema = StructType(
     [
@@ -22,6 +25,15 @@ schema = StructType(
     ]
 )
 # endregion book:spark-streaming-imports
+
+if __name__ == "__main__":
+    import socket
+
+    try:
+        with socket.create_connection(("kafka", 9092), timeout=1):
+            pass
+    except OSError:
+        raise SystemExit("Start Kafka at kafka:9092 and a Spark JVM to run this demo.") from None
 
 
 # region book:spark-streaming-session
@@ -59,7 +71,11 @@ sales_velocity = (
 
 # region book:spark-streaming-query
 query = (
-    sales_velocity.writeStream.outputMode("append")
+    sales_velocity.selectExpr(
+        "CAST(product_id AS STRING) AS key",
+        "to_json(struct(*)) AS value",
+    )
+    .writeStream.outputMode("append")
     .format("kafka")
     .option("kafka.bootstrap.servers", "kafka:9092")
     .option("topic", "sales-velocity-metrics")

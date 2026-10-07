@@ -4,16 +4,15 @@ Module: agents.llm
 Contains the RetailCustomerServiceAgent class for LLM-powered customer service in retail.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 import re
 from collections import defaultdict, deque
 from datetime import datetime
-from typing import Any, cast
-
-from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletion
+from typing import TYPE_CHECKING, Any, cast
 
 # Utils
 from agents.response_builder import build_response_prompt, extract_actions
@@ -21,6 +20,10 @@ from agents.response_builder import build_response_prompt, extract_actions
 # NLP helpers
 from utils import nlp
 from utils.openai_utils import safe_chat_completion
+
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI
+    from openai.types.chat import ChatCompletion
 
 
 class RetailCustomerServiceAgent:
@@ -51,6 +54,7 @@ class RetailCustomerServiceAgent:
         retry_backoff: float = 1.0,
         response_model: str = "gpt-5.2",
         utility_model: str = "gpt-5-mini",
+        client: Any = None,
     ) -> None:
         """Initializes the RetailCustomerServiceAgent."""
         self.product_db = product_database
@@ -67,8 +71,13 @@ class RetailCustomerServiceAgent:
             lambda: deque(maxlen=self.max_history_per_user)
         )
         resolved_key = api_key or os.getenv("OPENAI_API_KEY")
-        if resolved_key and resolved_key != "YOUR_API_KEY_HERE":
+        self.client = client
+        if client is not None:
+            pass
+        elif resolved_key and resolved_key != "YOUR_API_KEY_HERE":
             try:
+                from openai import AsyncOpenAI
+
                 self.client = AsyncOpenAI(api_key=resolved_key)
                 self.logger.info("AsyncOpenAI client initialized successfully.")
             except Exception as e:
@@ -263,30 +272,18 @@ class RetailCustomerServiceAgent:
 
     async def _extract_order_id(self, message: str, recent_orders: list[dict[str, Any]]) -> str | None:
         """Extract order ID from message or infer from recent orders."""
-        match = re.search(r"(?:#|order\s*|order number\s*)?([a-z0-9]{6,})", message, re.IGNORECASE)
-        plausible_id = None
-        if match:
-            potential_id = match.group(1)
-            if not re.fullmatch(
-                r"(status|product|item|sku|mat|shoes|bottle)",
-                potential_id,
-                re.IGNORECASE,
-            ):
-                plausible_id = potential_id.upper()
-                self.logger.debug(f"Extracted potential order ID via regex: {plausible_id}")
-                # Validate against recent orders only if regex found something
-                if plausible_id:
-                    is_recent = False
-                    for order in recent_orders:
-                        order_id_val = order.get("order_id")
-                        if order_id_val and order_id_val.upper() == plausible_id:
-                            self.logger.debug(f"Regex extracted ID {plausible_id} matches recent order.")
-                            is_recent = True
-                            # Return the correctly cased ID from the order system
-                            return str(order_id_val)
-                    if not is_recent:
-                        self.logger.debug(f"Regex ID {plausible_id} not in recent orders.")
-                        # Keep plausible_id, LLM might confirm/deny
+        candidates = [
+            match.group().upper()
+            for match in re.finditer(r"\b[a-z0-9]{6,}\b", message, re.IGNORECASE)
+            if any(char.isdigit() for char in match.group())
+        ]
+        if len(set(candidates)) > 1:
+            return None
+        plausible_id = candidates[0] if candidates else None
+        for order in recent_orders:
+            order_id_val = order.get("order_id")
+            if order_id_val and order_id_val.upper() == plausible_id:
+                return str(order_id_val)
 
         if not self.client:  # Should be AsyncOpenAI if initialized
             self.logger.warning("LLM client not available for order ID extraction.")

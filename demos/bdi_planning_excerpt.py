@@ -20,17 +20,7 @@ class Intention(BaseModel):
 
 def plan_for_goals(agent: InventoryBDIAgent, prioritized_goals: list[str]) -> list[Intention]:
     """Trigger planning routines for a subset of goals."""
-    processed_products: set[str] = set()
-
-    if "minimize_stockouts" in prioritized_goals:
-        agent._plan_reorders(processed_products)
-    if "reduce_excess" in prioritized_goals:
-        agent._plan_inventory_reduction(processed_products)
-    if "maximize_profit" in prioritized_goals:
-        agent._plan_margin_optimization(processed_products)
-    if "preserve_freshness" in prioritized_goals:
-        agent._plan_freshness_management(processed_products)
-
+    agent.generate_intentions(prioritized_goals)
     return [Intention(**intention) for intention in agent.active_intentions]
 
 

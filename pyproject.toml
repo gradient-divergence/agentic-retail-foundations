@@ -24,6 +24,10 @@ classifiers = [
 # List your core runtime dependencies here
 dependencies = [
     "marimo>=0.13.4",
+    "numpy",
+    "scipy",
+    "statsmodels",
+    "jsonschema",
     "pandas>=2.1.0",
     "matplotlib>=3.8.0",
     "seaborn>=0.13.0",
@@ -67,12 +71,19 @@ dependencies = [
     "doubleml>=0.9.3",
     "networkx>=3.4.2",
     "python-dotenv>=1.0.0",
-    "psycopg2-binary>=2.9.9",
-    "supabase>=2.0.0",
-    "redis>=5.0",
+    "starlette",
 ]
 
 [project.optional-dependencies]
+streaming = ["redis>=5.0", "kafka-python>=2.0"]
+spark = ["pyspark"]
+gnn = ["torch-geometric"]
+monitoring = ["prometheus-client"]
+cloud = ["psycopg2-binary>=2.9.9", "supabase>=2.0.0"]
+# Passlib's bcrypt backend probe requires the pre-4.1 bcrypt API.
+auth = ["python-jose", "passlib[bcrypt]", "bcrypt<4.1"]
+explainability = ["shap"]
+
 # Development dependencies: linters, formatters, testing, docs
 dev = [
     "ruff>=0.4.0", # Linter, formatter, and more
@@ -83,8 +94,6 @@ dev = [
     "coverage[toml]>=7.0",
     "pre-commit>=4.2.0",
     "uv>=0.1.20",
-    # Dependencies needed for mocking in tests
-    "kafka-python>=2.0", # For mocking kafka clients
     # Type stubs
     "types-requests",
     "pandas-stubs",
@@ -214,7 +223,8 @@ disable_error_code = ["name-defined", "no-redef"]
 [tool.pytest.ini_options]
 # See https://docs.pytest.org/en/stable/reference/customize.html#pyproject-toml
 minversion = "6.0"
-addopts = "-ra -q --cov --cov-report=term-missing" # Basic options: report reasons for skip/fail, quiet, enable coverage
+addopts = "-ra -q" # Coverage is opt-in through make coverage.
+markers = ["asyncio: coroutine test run with an event loop"]
 testpaths = [
     "tests", # Directory where tests are located
 ]

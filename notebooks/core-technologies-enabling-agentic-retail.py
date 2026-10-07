@@ -9,11 +9,16 @@ def _(mo):
     mo.md(r"""
     # Chapter 6: Foundation Models and Visual Intelligence
 
-    This chapter explores how Foundation Models, powered by large language models and advanced visual intelligence, redefine responsiveness and adaptability in retail environments.
+    This chapter explores how Foundation Models, powered by large language models and advanced visual
+    intelligence, redefine responsiveness and adaptability in retail environments.
 
-    You'll discover how integrating these powerful AI capabilities can enable real-time shelf monitoring, improved customer interactions, and intelligent product recognition. Additionally, the chapter dives into Knowledge Graphs and Semantic Reasoning, illustrating how structured knowledge and ontologies significantly enhance decision accuracy, personalization, and overall retail intelligence.
+    You'll discover how integrating these powerful AI capabilities can enable real-time shelf monitoring,
+    improved customer interactions, and intelligent product recognition. Additionally, the chapter dives into
+    Knowledge Graphs and Semantic Reasoning, illustrating how structured knowledge and ontologies
+    significantly enhance decision accuracy, personalization, and overall retail intelligence.
 
-    By combining these critical technologies, you'll be equipped to build sophisticated AI-driven retail experiences that seamlessly blend perception, language, and reasoning.
+    By combining these critical technologies, you'll be equipped to build sophisticated AI-driven retail
+    experiences that seamlessly blend perception, language, and reasoning.
     """)
     return
 
@@ -33,10 +38,10 @@ def _():
     # Setup basic logging
     import logging
     import os
-
-    import marimo as mo
     import sys
     from pathlib import Path
+
+    import marimo as mo
 
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
@@ -48,9 +53,7 @@ def _():
     logger.setLevel(logging.INFO)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
@@ -63,6 +66,7 @@ def _():
 
     # Import DummyPlanogramDB and DummyInventorySystem from connectors
     from connectors.dummy_planogram_db import DummyPlanogramDB
+
     return (
         DummyDB,
         DummyInventorySystem,
@@ -102,15 +106,14 @@ def _(mo):
 @app.cell
 def _():
     from agents.llm import RetailCustomerServiceAgent
+
     return (RetailCustomerServiceAgent,)
 
 
 @app.cell
 def _(DummyDB, DummyOrderSystem, RetailCustomerServiceAgent, os):
     # Define dummy database/system connectors for demonstration
-    policy_guidelines = {
-        "returns": {"return_window_days": 30, "methods": ["Mail", "Store"]}
-    }
+    policy_guidelines = {"returns": {"return_window_days": 30, "return_methods": ["Mail", "Store"]}}
     api_key = os.environ.get("OPENAI_API_KEY", "YOUR_API_KEY_HERE")
 
     customer_service_agent = RetailCustomerServiceAgent(
@@ -132,20 +135,14 @@ def _(customer_service_agent, mo):
         ]
         responses_md = []
 
-        if (
-            not hasattr(customer_service_agent, "client")
-            or customer_service_agent.client is None
-        ):
+        if not hasattr(customer_service_agent, "client") or customer_service_agent.client is None:
             return mo.md(
-                "**Error:** OpenAI client not initialized. Cannot run LLM demo. "
-                "Please set `OPENAI_API_KEY`."
+                "**Error:** OpenAI client not initialized. Cannot run LLM demo. Please set `OPENAI_API_KEY`."
             )
 
         responses_md.append(mo.md("### Customer Service Agent Demo"))
         for msg in messages:
-            response = await customer_service_agent.process_customer_inquiry(
-                customer_id, msg
-            )
+            response = await customer_service_agent.process_customer_inquiry(customer_id, msg)
             responses_md.append(
                 mo.md(
                     f"**You:** {msg}\n\n"
@@ -156,6 +153,7 @@ def _(customer_service_agent, mo):
             responses_md.append("---")
 
         return mo.vstack(responses_md)
+
     return (run_customer_interaction_demo,)
 
 
@@ -172,7 +170,7 @@ async def _(logger, mo, run_customer_interaction_demo):
         interaction_output = mo.md(f"**Error running LLM Demo:** {e}")
 
     # Display the output in this cell
-    interaction_output
+    mo.output.replace(interaction_output)
     return
 
 
@@ -185,20 +183,25 @@ def _(mo):
 
 
 @app.cell
-def _(DummyInventorySystem, DummyPlanogramDB, ShelfMonitoringAgent):
+def _(DummyInventorySystem, DummyPlanogramDB, ShelfMonitoringAgent, mo, os):
     # Instantiation
-    model_path = "models/dummy_detection_model/"  # <<<--- UPDATED to dummy model path
-    # Remove camera 0 to prevent OpenCV error if no camera is present
-    cam_urls = {"CAM02": "1"}  # Removed CAM01: "0"
-
-    shelf_agent = ShelfMonitoringAgent(
-        model_path,
-        DummyPlanogramDB(),
-        DummyInventorySystem(),
-        cam_urls,
-        confidence_threshold=0.5,
-        check_frequency_seconds=15,
-    )
+    model_path = os.getenv("SHELF_MODEL_PATH", "")
+    camera_url = os.getenv("SHELF_CAMERA_URL", "")
+    shelf_agent = None
+    if not model_path or not camera_url:
+        mo.md("Set `SHELF_MODEL_PATH` (TorchScript) and `SHELF_CAMERA_URL` to run shelf monitoring.")
+    else:
+        try:
+            shelf_agent = ShelfMonitoringAgent(
+                model_path,
+                DummyPlanogramDB(),
+                DummyInventorySystem(),
+                {"CAM02": camera_url},
+                confidence_threshold=0.5,
+                check_frequency_seconds=15,
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            mo.md(f"**Shelf model unavailable:** {exc}")
     return (shelf_agent,)
 
 
@@ -212,44 +215,44 @@ def _(asyncio, logger, mo, pd, shelf_agent):
                 True,
                 mo.md(
                     "**Error:** Shelf Agent/Model not loaded. "
-                    "Check `model_path` & TF install."
+                    "Check `SHELF_MODEL_PATH` and the TorchScript model."
                 ),
             )
             # The return below is now technically unreachable due to mo.stop,
             # but kept for clarity if mo.stop is removed later.
             return mo.md(
-                "**Error:** Shelf Agent/Model not loaded. "
-                "Check `model_path` & TF install."
+                "**Error:** Shelf Agent/Model not loaded. Check `SHELF_MODEL_PATH` and the TorchScript model."
             )
 
         loc = "LOC1"
-        sections = ["SEC001"]  # Only monitor SEC001 (CAM01='0') by default
-        cam1_src = shelf_agent.camera_streams.get("CAM01", "N/A")
+        sections = ["SEC002"]
+        camera_src = shelf_agent.camera_streams.get("CAM02", "N/A")
         output = [
             mo.md("## Shelf Monitoring Demo"),
             mo.md(f"Monitoring sections: {sections} at {loc}..."),
             mo.md(
-                f"_Ensure CAM01 (src: '{cam1_src}') active & sees target items "
+                f"_Ensure CAM02 (src: '{camera_src}') active & sees target items "
                 f"(e.g., cans/bottles). Check console logs._"
             ),
         ]
 
         try:
             start_tasks = [
-                shelf_agent.start_monitoring_section(loc, s) for s in sections
+                asyncio.create_task(shelf_agent.start_monitoring_section(loc, s)) for s in sections
             ]
-            await asyncio.gather(*start_tasks)
 
             duration = 35  # seconds
             output.append(mo.md(f"Monitoring for **{duration} seconds**..."))
             await asyncio.sleep(duration)
             output.append(mo.md("Stopping monitoring..."))
+            final_issues = dict(shelf_agent.detected_issues)
             await shelf_agent.stop_all_monitoring()
+            await asyncio.gather(*start_tasks)
             output.append(mo.md("Monitoring stopped."))
             output.append(mo.md("---"))
 
             for section in sections:
-                final = shelf_agent.detected_issues.get(section, [])
+                final = final_issues.get(section, [])
                 output.append(mo.md(f"**Final Issues for {section} ({len(final)}):**"))
                 if final:
                     try:
@@ -286,7 +289,7 @@ async def _(logger, mo, run_shelf_monitoring_demo):
         monitoring_output = mo.md(f"**Error setting up Shelf Demo:** {e}")
 
     # Display the output
-    monitoring_output
+    mo.output.replace(monitoring_output)
     return
 
 

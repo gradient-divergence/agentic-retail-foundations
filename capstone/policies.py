@@ -9,10 +9,10 @@ from models.governance import AuditLogEntry, PolicyDecision, SupervisorAction
 
 class PolicyInput(BaseModel):
     action: str
-    amount: float | None = None
+    amount: float | None = Field(default=None, allow_inf_nan=False)
     customer_tier: Literal["standard", "gold", "vip"] | None = None
     channel: Literal["email", "sms", "app"] | None = None
-    risk_score: float = 0.0
+    risk_score: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
     evidence: list[str] = Field(default_factory=list)
 
 
@@ -72,27 +72,34 @@ def build_audit_entry(
     )
 
 
-def apply_supervisor_action(decision: PolicyDecision, supervisor_action: SupervisorAction) -> PolicyDecision:
-    if supervisor_action.action == "approve":
-        return decision.model_copy(
-            update={
-                "allowed": True,
-                "reason": "approved_by_supervisor",
-                "risk_level": decision.risk_level,
-            }
-        )
-    if supervisor_action.action == "reject":
-        return decision.model_copy(
-            update={
-                "allowed": False,
-                "reason": "rejected_by_supervisor",
-                "risk_level": decision.risk_level,
-            }
-        )
-    return decision.model_copy(
+def apply_supervisor_action(
+    decision: PolicyDecision,
+    supervisor_action: SupervisorAction,
+    *,
+    requester: str,
+    trace_id: str,
+    audit_log: list[AuditLogEntry],
+    action: str | None = None,
+    evidence: list[str] | None = None,
+) -> PolicyDecision:
+    requester, reviewer = requester.strip(), supervisor_action.reviewer.strip()
+    if not requester or not reviewer or requester == reviewer:
+        raise ValueError("Supervisor review requires distinct, nonblank requester and reviewer")
+    reason = {
+        "approve": "approved_by_supervisor",
+        "reject": "rejected_by_supervisor",
+        "request_info": "supervisor_requested_info",
+    }[supervisor_action.action]
+    outcome = decision.model_copy(
         update={
-            "allowed": False,
-            "reason": "supervisor_requested_info",
-            "risk_level": decision.risk_level,
+            "allowed": supervisor_action.action == "approve",
+            "reason": reason,
         }
     )
+    audit_evidence = [*(evidence or []), f"requester={requester}"]
+    if supervisor_action.notes:
+        audit_evidence.append(supervisor_action.notes)
+    audit_log.append(
+        build_audit_entry(outcome, trace_id, reviewer, action or supervisor_action.action, audit_evidence)
+    )
+    return outcome

@@ -9,7 +9,10 @@ Run with: uvicorn demos.state_manager_demo:app --reload
 import json
 import logging
 
-import redis.asyncio as redis
+try:
+    import redis.asyncio as redis
+except ModuleNotFoundError:
+    raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 

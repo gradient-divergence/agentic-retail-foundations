@@ -1,13 +1,11 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
-try:
-    from a2a.types import AgentCapabilities, AgentCard, AgentSkill
-except ModuleNotFoundError as exc:
-    raise ModuleNotFoundError(
-        'a2a-sdk is not installed. Install with: uv pip install -e ".[agent_protocols]"'
-    ) from exc
+if TYPE_CHECKING:
+    from a2a.types import AgentCard
 
 
 class InventoryLookupRequest(BaseModel):
@@ -21,6 +19,13 @@ class InventoryLookupResponse(BaseModel):
 
 
 def build_agent_card() -> AgentCard:
+    try:
+        from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            'a2a-sdk is not installed. Install with: uv pip install -e ".[agent_protocols]"'
+        ) from exc
+
     skill = AgentSkill(
         id="inventory_lookup",
         name="Inventory availability",

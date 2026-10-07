@@ -4,19 +4,25 @@ from __future__ import annotations
 import os
 
 from fastapi import FastAPI, HTTPException
-from supabase import create_client
 
 app = FastAPI()
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase = create_client(url, key)
 
 
 @app.get("/metrics/agents")
 def get_agent_metrics():
-    res = supabase.table("agent_metrics").select("*").execute()
-    if res.error:
-        raise HTTPException(status_code=500, detail=res.error.message)
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        raise HTTPException(status_code=503, detail="Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+    try:
+        from supabase import create_client
+    except ModuleNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="supabase is not installed") from exc
+    try:
+        supabase = create_client(url, key)
+        res = supabase.table("agent_metrics").select("*").execute()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Agent metrics query failed") from exc
     return {"agents": res.data}
 
 

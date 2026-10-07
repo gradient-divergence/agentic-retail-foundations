@@ -53,6 +53,8 @@ class PNCounter:
         """
         if not isinstance(other, PNCounter):
             raise TypeError("Can only merge with another PNCounter")
+        if (self.product_id, self.location_id) != (other.product_id, other.location_id):
+            raise ValueError("Can only merge counters for the same product and location")
 
         # Merge increments (take max value for each node)
         all_inc_keys: set[str] = set(self.increments.keys()) | set(other.increments.keys())
@@ -67,15 +69,15 @@ class PNCounter:
     @property
     def state(self) -> dict[str, Any]:
         """Return the full state (increments and decrements) for serialization."""
-        return {"p": self.increments, "n": self.decrements}
+        return {"p": self.increments.copy(), "n": self.decrements.copy()}
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage/serialization."""
         return {
             "product_id": self.product_id,
             "location_id": self.location_id,
-            "increments": self.increments,
-            "decrements": self.decrements,
+            "increments": self.increments.copy(),
+            "decrements": self.decrements.copy(),
         }
 
     @classmethod
@@ -86,10 +88,6 @@ class PNCounter:
 
         counter = cls(data["product_id"], data["location_id"])
         # Ensure increments/decrements are dicts, provide default empty dict
-        counter.increments = (
-            data.get("increments", {}) if isinstance(data.get("increments", {}), dict) else {}
-        )
-        counter.decrements = (
-            data.get("decrements", {}) if isinstance(data.get("decrements", {}), dict) else {}
-        )
+        counter.increments = data["increments"].copy() if isinstance(data["increments"], dict) else {}
+        counter.decrements = data["decrements"].copy() if isinstance(data["decrements"], dict) else {}
         return counter

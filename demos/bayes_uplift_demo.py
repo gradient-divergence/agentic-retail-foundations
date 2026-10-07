@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
+# region book:bayes-uplift-demo
 from __future__ import annotations
 
 import random
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
-# region book:bayes-uplift-demo
 class AlphaBeta(BaseModel):
     alpha: float = Field(..., gt=0)
     beta: float = Field(..., gt=0)
@@ -18,6 +18,12 @@ class AlphaBeta(BaseModel):
 class PromoOutcome(BaseModel):
     conversions: int = Field(..., ge=0)
     trials: int = Field(..., gt=0)
+
+    @model_validator(mode="after")
+    def validate_conversions(self) -> PromoOutcome:
+        if self.conversions > self.trials:
+            raise ValueError("conversions cannot exceed trials")
+        return self
 
     @property
     def rate(self) -> float:

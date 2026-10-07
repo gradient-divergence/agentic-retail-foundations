@@ -178,4 +178,12 @@ def run_spark_streaming_job():
 
 
 if __name__ == "__main__":
+    import socket
+
+    try:
+        with socket.create_connection(("localhost", 9092), timeout=1):
+            pass
+    except OSError:
+        raise SystemExit("Start Kafka on localhost:9092 and install the spark extra for this demo.") from None
+
     run_spark_streaming_job()

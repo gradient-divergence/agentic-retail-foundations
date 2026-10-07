@@ -10,6 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
+from math import isfinite
 
 # Import supplier models
 from models.supplier import Supplier, SupplierStatus
@@ -71,6 +72,21 @@ class PurchaseOrder:
             raise ValueError("Maximum acceptable price cannot be negative.")
         if not (0 <= self.quality_threshold <= 1):
             raise ValueError("Quality threshold must be between 0 and 1.")
+
+    def accepts_bid(self, bid: SupplierBid) -> bool:
+        """Check bid identity and the purchase order's hard constraints."""
+        return (
+            bid.purchase_order_id == self.id
+            and isinstance(bid.price, int | float)
+            and not isinstance(bid.price, bool)
+            and isfinite(bid.price)
+            and 0 <= bid.price <= self.maximum_acceptable_price
+            and type(bid.delivery_days) is int
+            and 0 <= bid.delivery_days <= self.deadline_days
+            and isinstance(bid.quality_guarantee, int | float)
+            and not isinstance(bid.quality_guarantee, bool)
+            and self.quality_threshold <= bid.quality_guarantee <= 1
+        )
 
 
 # endregion book:procurement-auction-procurement-models
@@ -278,6 +294,8 @@ class ProcurementAuction:
         W_QUALITY = 0.1
 
         for bid in bids_to_evaluate:
+            if bid.supplier_id not in self.suppliers or not purchase_order.accepts_bid(bid):
+                continue
             # Normalize factors (0-1 range, lower is better generally)
             price_norm = bid.price / max(1.0, purchase_order.maximum_acceptable_price)
 

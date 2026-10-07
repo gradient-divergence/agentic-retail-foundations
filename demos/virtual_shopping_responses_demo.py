@@ -2,8 +2,7 @@ from __future__ import annotations
 
 # region book:virtual-shopping-responses-setup
 import json
-
-from openai import OpenAI
+import os
 
 
 def recommend_outfit(style: str) -> list[str]:
@@ -48,40 +47,62 @@ tools = [
     }
 ]
 
-client = OpenAI()
 user_message = "I need an outfit idea for a summer party."
 # endregion book:virtual-shopping-responses-setup
 
+
 # region book:virtual-shopping-responses-run
-input_items = [{"role": "user", "content": user_message}]
+def run_demo(user_message: str = user_message, *, client=None) -> str:
+    if client is None:
+        if not os.getenv("OPENAI_API_KEY", "").strip():
+            raise RuntimeError("Set OPENAI_API_KEY to run this provider demo.")
+        try:
+            from openai import OpenAI
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "openai is not installed. Install the openai package to run this demo."
+            ) from exc
+        client = OpenAI()
 
-response = client.responses.create(
-    model="gpt-5.2",
-    input=input_items,
-    tools=tools,
-)
+    input_items = [{"role": "user", "content": user_message}]
 
-input_items += response.output or []
-tool_calls = [item for item in response.output or [] if item.type == "function_call"]
-if tool_calls:
-    for tool_call in tool_calls:
-        if tool_call.name == "recommend_outfit":
-            args = json.loads(tool_call.arguments)
-            result = recommend_outfit(**args)
-            input_items.append(
-                {
-                    "type": "function_call_output",
-                    "call_id": tool_call.call_id,
-                    "output": json.dumps(result),
-                }
-            )
-
-    final_response = client.responses.create(
+    response = client.responses.create(
         model="gpt-5.2",
         input=input_items,
         tools=tools,
     )
-    assistant_reply = final_response.output_text
+
+    input_items += response.output or []
+    tool_calls = [item for item in response.output or [] if item.type == "function_call"]
+    if tool_calls:
+        for tool_call in tool_calls:
+            if tool_call.name == "recommend_outfit":
+                args = json.loads(tool_call.arguments)
+                result = recommend_outfit(**args)
+                input_items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": tool_call.call_id,
+                        "output": json.dumps(result),
+                    }
+                )
+
+        final_response = client.responses.create(
+            model="gpt-5.2",
+            input=input_items,
+            tools=tools,
+        )
+        response = final_response
+
+    assistant_reply = response.output_text
     print(assistant_reply)
+    return assistant_reply
+
+
+if __name__ == "__main__":
+    try:
+        run_demo()
+    except (RuntimeError, ImportError) as exc:
+        raise SystemExit(str(exc)) from None
 
 # endregion book:virtual-shopping-responses-run

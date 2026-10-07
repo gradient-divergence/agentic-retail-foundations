@@ -6,7 +6,7 @@ import time
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 
 class Product(BaseModel):
@@ -17,19 +17,25 @@ class Product(BaseModel):
 
 
 class SearchCatalogArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
     query: str
 
 
 class ReturnPolicyArgs(BaseModel):
-    pass
+    model_config = ConfigDict(extra="forbid", strict=True)
 
 
 class SearchCatalogCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Literal["search_catalog"]
     args: SearchCatalogArgs
 
 
 class ReturnPolicyCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Literal["get_return_policy"]
     args: ReturnPolicyArgs
 
@@ -86,6 +92,9 @@ def route_query(query: str) -> ToolCall:
 def run_tool_call(query: str) -> AssistantResponse:
     trace_id = str(uuid4())
     tool_call = route_query(query)
+    tool_call = TypeAdapter(ToolCall).validate_python(
+        tool_call.model_dump() if isinstance(tool_call, BaseModel) else tool_call
+    )
 
     if tool_call.name == "search_catalog":
         results = search_catalog(query=tool_call.args.query)
@@ -119,7 +128,7 @@ def log_event(trace_id: str, status: str, latency_ms: int) -> None:
 
 def main() -> None:
     start = time.perf_counter()
-    response = run_tool_call("Do you have running shoes?")
+    response = run_tool_call("running shoes")
     latency_ms = int((time.perf_counter() - start) * 1000)
     log_event(response.trace_id, "ok", latency_ms)
     print(response.model_dump())

@@ -9,7 +9,10 @@ import asyncio
 import json
 import logging
 
-import redis.asyncio as redis  # Use async redis client
+try:
+    import redis.asyncio as redis  # Use async redis client
+except ModuleNotFoundError:
+    raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
 
 # Use standard library for background tasks
 from fastapi import BackgroundTasks, FastAPI, HTTPException

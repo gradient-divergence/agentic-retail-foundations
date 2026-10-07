@@ -1,7 +1,11 @@
 # region book:pricing-explainability-shap
 import numpy as np
 import pandas as pd
-import shap
+
+try:
+    import shap
+except ModuleNotFoundError:
+    raise SystemExit("Install the explainability extra: uv sync --extra explainability") from None
 from sklearn.ensemble import RandomForestRegressor
 
 # Sample training data for a pricing model (for illustration purposes)

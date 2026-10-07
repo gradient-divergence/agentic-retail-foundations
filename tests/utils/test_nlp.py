@@ -3,6 +3,7 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from openai import AsyncOpenAI
 
 # Module to test
 from utils import nlp as nlp_mod
@@ -42,7 +43,7 @@ async def test_classify_intent(monkeypatch):
     # Mock isinstance temporarily to allow AsyncMock to pass the check
     def mock_isinstance(obj, classinfo):
         # If checking for AsyncOpenAI, return True if obj is our AsyncMock
-        if classinfo is nlp_mod.AsyncOpenAI and isinstance(obj, AsyncMock):
+        if classinfo is AsyncOpenAI and isinstance(obj, AsyncMock):
             return True
         # Otherwise, fallback to the real isinstance
         return builtins.isinstance(obj, classinfo)
@@ -80,7 +81,7 @@ async def test_classify_intent_edge_cases(  # noqa: C901
 
     # Mock isinstance as in the original test
     def mock_isinstance(obj, classinfo):
-        if classinfo is nlp_mod.AsyncOpenAI and isinstance(obj, AsyncMock):
+        if classinfo is AsyncOpenAI and isinstance(obj, AsyncMock):
             return True
         return builtins.isinstance(obj, classinfo)
 
@@ -145,7 +146,7 @@ async def test_extract_order_id(monkeypatch):
 
     # Mock isinstance to treat AsyncMock as AsyncOpenAI
     def mock_isinstance(obj, classinfo):
-        if classinfo is nlp_mod.AsyncOpenAI and isinstance(obj, AsyncMock):
+        if classinfo is AsyncOpenAI and isinstance(obj, AsyncMock):
             return True
         return builtins.isinstance(obj, classinfo)
 
@@ -185,7 +186,7 @@ async def test_extract_order_id_llm_edge_cases(monkeypatch, llm_response_content
     monkeypatch.setattr(nlp_mod, "safe_chat_completion", fake_safe_chat_completion)
 
     def mock_isinstance(obj, classinfo):
-        if classinfo is nlp_mod.AsyncOpenAI and isinstance(obj, AsyncMock):
+        if classinfo is AsyncOpenAI and isinstance(obj, AsyncMock):
             return True
         return builtins.isinstance(obj, classinfo)
 

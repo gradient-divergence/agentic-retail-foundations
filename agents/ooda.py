@@ -6,6 +6,7 @@ OODA (Observe-Orient-Decide-Act) agent for dynamic pricing in agentic-retail-fou
 import logging
 import random
 from datetime import datetime
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 from typing import Any
 
 from models.pricing import PricingProduct
@@ -190,6 +191,12 @@ class OODAPricingAgent:
         # Respect min/max
         new_price = max(product.min_price, min(product.max_price, new_price))
         new_price = self._apply_price_psychology(new_price)
+        price = Decimal(str(curr_price))
+        change = Decimal(str(self.max_price_change_pct)) / 100
+        cent = Decimal("0.01")
+        lower = max(Decimal(str(product.min_price)), price * (1 - change)).quantize(cent, ROUND_CEILING)
+        upper = min(Decimal(str(product.max_price)), price * (1 + change)).quantize(cent, ROUND_FLOOR)
+        new_price = float(max(lower, min(upper, Decimal(str(new_price)))))
 
         # Identify main driver
         comps = {

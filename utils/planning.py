@@ -152,6 +152,8 @@ class StoreLayout:
 
     def shortest_path(self, start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]] | None:
         """Find the shortest path using A* algorithm."""
+        if not self.is_valid(*start) or not self.is_valid(*end):
+            return None
         if start == end:
             return [start]
         # Priority queue: stores tuples of (f_score, location)
@@ -220,7 +222,7 @@ class FulfillmentPlanner:
         self.estimated_times = {}
 
         for associate in self.associates:
-            current_time = 0.0
+            current_time = associate.current_task_completion_time
             current_location = associate.current_location
             assigned_to_associate: list[Order] = []
             path_for_associate: list[tuple[int, int]] = [current_location]
@@ -296,11 +298,12 @@ class FulfillmentPlanner:
         total_time = 0.0
         current_location = start_location
         full_path: list[tuple[int, int]] = [start_location]
-        # Get locations from the passed item_details
-        pick_locations = [detail["location"] for detail in item_details]
+        handling_by_location: dict[tuple[int, int], float] = defaultdict(float)
+        for line_item, detail in zip(order.items, item_details, strict=True):
+            handling_by_location[detail["location"]] += line_item.quantity * detail["handling_time"]
 
         # Simple nearest neighbor heuristic for picking order
-        remaining_locations = pick_locations[:]
+        remaining_locations = list(handling_by_location)
         while remaining_locations:
             nearest_loc = min(
                 remaining_locations,
@@ -311,10 +314,7 @@ class FulfillmentPlanner:
                 return None, float("inf")  # Cannot reach item
 
             travel_time = (len(segment_path) - 1) * 0.1  # Example: 0.1 min per step
-            # Get handling time from the passed item_details matching the location
-            handling_time = sum(
-                detail["handling_time"] for detail in item_details if detail["location"] == nearest_loc
-            )
+            handling_time = handling_by_location[nearest_loc]
             total_time += (travel_time + handling_time) / efficiency
             full_path.extend(segment_path[1:])
             current_location = nearest_loc

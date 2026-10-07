@@ -7,18 +7,19 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     # Import necessary libraries
-    import marimo as mo
     import sys
     from pathlib import Path
+
+    import marimo as mo
 
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-
     from demos.dynamic_pricing_agent_demo import run_pricing_demo
     from demos.inventory_management_agent_demo import run_inventory_demo
-    from demos.virtual_shopping_assistant_demo import run_assistant_demo
+    from demos.virtual_shopping_responses_demo import run_demo as run_assistant_demo
+
     return mo, run_assistant_demo, run_inventory_demo, run_pricing_demo
 
 
@@ -60,9 +61,7 @@ def _(mo, run_inventory_demo):
 @app.cell
 def _(mo, run_inventory_button):
     # Display the button and its output value (which will update on click)
-    mo.vstack(
-        [run_inventory_button, mo.md(f"**Demo Output:** {run_inventory_button.value}")]
-    )
+    mo.vstack([run_inventory_button, mo.md(f"**Demo Output:** {run_inventory_button.value}")])
     return
 
 
@@ -100,9 +99,7 @@ def _(mo, run_pricing_demo):
 @app.cell
 def _(mo, run_pricing_button):
     # Display the button and its output value
-    mo.vstack(
-        [run_pricing_button, mo.md(f"**Demo Output:** {run_pricing_button.value}")]
-    )
+    mo.vstack([run_pricing_button, mo.md(f"**Demo Output:** {run_pricing_button.value}")])
     return
 
 
@@ -129,9 +126,7 @@ def _(mo):
 @app.cell
 def _(mo, run_assistant_demo):
     # Input for user query
-    user_query = mo.ui.text(
-        label="Ask the assistant:", value="I need an outfit idea for a summer party."
-    )
+    user_query = mo.ui.text(label="Ask the assistant:", value="I need an outfit idea for a summer party.")
 
     # Button to trigger the assistant demo
     run_assistant_button = mo.ui.button(

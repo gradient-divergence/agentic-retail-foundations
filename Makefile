@@ -9,7 +9,7 @@ PROJECT_NAME := $(shell basename $(CURDIR))
 
 # Directories containing project source code and tests
 # Adjust SRC_DIRS if your structure differs (e.g., src/agents instead of agents/)
-# SRC_DIRS    := agents models utils connectors config environments demos notebooks # Removed as coverage source is read from pyproject.toml
+SRC_DIRS    := agents capstone config connectors demos environments models utils
 TEST_DIRS   := tests # Assuming tests are in a 'tests' directory
 
 
@@ -25,7 +25,7 @@ UV          ?= uv
 PYTHON      ?= $(VENV_BIN)/python
 RUFF        ?= $(VENV_BIN)/ruff
 MYPY        ?= $(VENV_BIN)/mypy
-PYTEST      ?= $(VENV_BIN)/pytest
+PYTEST      ?= $(PYTHON) -m pytest
 COVERAGE    ?= $(VENV_BIN)/coverage
 MKDOCS      ?= $(VENV_BIN)/mkdocs
 PRECOMMIT   ?= $(VENV_BIN)/pre-commit
@@ -102,9 +102,9 @@ precommit-run: venv ## Run pre-commit checks on all files
 # Code Quality (Targets assume venv is active or run via make)
 ###############################################################################
 
-lint: venv ## Run Ruff linter (checks only)
+lint: ## Run Ruff linter with installed tools (checks only; no installation)
 	@echo "--> Running linter ($(RUFF))..."
-	$(RUFF) check . $(TEST_DIRS)
+	$(RUFF) check $(SRC_DIRS) $(TEST_DIRS)
 
 format: venv ## Auto-format code with Ruff formatter & apply fixes
 	@echo "--> Formatting code and fixing lint issues ($(RUFF))..."
@@ -124,11 +124,12 @@ type-check: venv ## Run static type checks with MyPy
 # Testing (Targets assume venv is active or run via make)
 ###############################################################################
 
-test: venv ## Run unit & integration tests with Pytest
+test: ## Run offline tests with the selected interpreter (no installation)
 	@echo "--> Running tests ($(PYTEST))..."
 	$(PYTEST) $(TEST_DIRS)
 
-coverage: test ## Generate test coverage report (assumes tests were run via make test)
+coverage: ## Run tests with coverage and generate reports (requires pytest-cov)
+	$(PYTEST) $(TEST_DIRS) --cov --cov-report=term-missing
 	@echo "--> Generating test coverage report ($(COVERAGE))..."
 	$(COVERAGE) report -m --fail-under=70 # Ensure fail-under matches pyproject.toml
 	@echo "--> HTML report generated: htmlcov/index.html"
@@ -154,7 +155,7 @@ docs-build: venv ## Build static documentation site
 # Continuous Integration composite targets
 ###############################################################################
 
-check: lint type-check test ## Run linters, type checks, and tests (no coverage)
+check: lint test ## Run Ruff and offline tests with installed tools (no installation)
 	@echo "--> All checks passed."
 
 ci: format-check type-check test coverage docs-build ## Full CI pipeline checks (lint implied by format-check)

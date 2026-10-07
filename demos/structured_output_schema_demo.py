@@ -14,11 +14,8 @@ class PriceUpdate(BaseModel):
     confidence: float = Field(..., ge=0, le=1)
 
 
-class PriceUpdatePayload(BaseModel):
-    sku: str
-    new_price: float = Field(..., gt=0)
-    reason: str
-    confidence: float = Field(..., ge=0, le=1)
+class PriceUpdatePayload(PriceUpdate):
+    pass
 
 
 def propose_price_update() -> PriceUpdatePayload:
@@ -30,8 +27,8 @@ def propose_price_update() -> PriceUpdatePayload:
     )
 
 
-def validate_tool_payload(payload: PriceUpdatePayload) -> PriceUpdate:
-    return PriceUpdate.model_validate(payload.model_dump())
+def validate_tool_payload(payload: PriceUpdatePayload | dict) -> PriceUpdate:
+    return PriceUpdate.model_validate(payload.model_dump() if isinstance(payload, BaseModel) else payload)
 
 
 def apply_price(update: PriceUpdate) -> None:
@@ -39,8 +36,8 @@ def apply_price(update: PriceUpdate) -> None:
 
 
 def run_pipeline() -> None:
-    payload = propose_price_update()
     try:
+        payload = propose_price_update()
         update = validate_tool_payload(payload)
     except ValidationError as exc:
         print("route_to_human_review", exc.errors())

@@ -1,28 +1,35 @@
-# Foundations of Agentic AI for Retail (Second Edition Companion Code)
+# Foundations of Agentic AI for Retail (Third Edition Companion Code)
 
-A modular, extensible Python framework and companion codebase for the second edition of *Foundations of Agentic AI for Retail*. It includes agent architectures, coordination protocols, production guardrails, evaluation packs, and end-to-end demos that map to the book's operating model and capstone workflow.
+A modular, extensible Python framework and companion codebase for the third edition of *Foundations of Agentic AI for Retail*. It includes agent architectures, coordination protocols, production guardrails, evaluation packs, and end-to-end demos that map to the book's operating model and capstone workflow.
 
-## Featured Book: Foundations of Agentic AI for Retail — Second Edition
+## Featured Book: Foundations of Agentic AI for Retail, Third Edition
 
 <table>
   <tr>
     <td width="60%">
-      <a href="https://github.com/gradient-divergence/agentic-retail-foundations"><strong>Foundations of Agentic AI for Retail: Operating Models, Decision Frameworks, and Retail-Grade Architectures (Second Edition)</strong></a> by Dr. Fatih Nayebi.
+      <a href="https://github.com/gradient-divergence/agentic-retail-foundations"><strong>Foundations of Agentic AI for Retail: Designing, Building, and Operating Retail AI Agents, from First Principles to Production (Third Edition)</strong></a> by Fatih Nayebi.
       <br><br>
       <em>Retail is the most demanding proving ground for agentic AI: thin margins, live inventory, real customers, and constant change. This edition focuses on production-ready operating models, evaluation, and governance.</em>
       <br><br>
-      <strong>Purchase on Amazon:</strong> <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">US</a> | <a href="https://www.amazon.ca/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">CA</a> | <a href="https://www.amazon.co.jp/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">JP</a> | <a href="https://www.amazon.co.uk/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">UK</a> | <a href="https://www.amazon.de/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">DE</a> | <a href="https://www.amazon.fr/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">FR</a> | <a href="https://www.amazon.in/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IN</a> | <a href="https://www.amazon.it/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IT</a> | <a href="https://www.amazon.es/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">ES</a>
+      The third edition (October 2026) is being prepared for Amazon in paperback, hardcover and Kindle. <strong>The earlier edition on Amazon:</strong> <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">US</a> | <a href="https://www.amazon.ca/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">CA</a> | <a href="https://www.amazon.co.jp/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">JP</a> | <a href="https://www.amazon.co.uk/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">UK</a> | <a href="https://www.amazon.de/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">DE</a> | <a href="https://www.amazon.fr/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">FR</a> | <a href="https://www.amazon.in/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IN</a> | <a href="https://www.amazon.it/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IT</a> | <a href="https://www.amazon.es/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">ES</a>
       <br>
     </td>
     <td width="40%" align="center" valign="center">
       <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">
-        <img src="assets/book-cover-2nd-edition.png" alt="Book Cover: Foundations of Agentic AI for Retail (Second Edition)" width="300"/>
+        <img src="assets/book-cover-3rd-edition.jpg" alt="Book cover: Foundations of Agentic AI for Retail, third edition" width="300"/>
       </a>
     </td>
   </tr>
 </table>
 
-## What's New in the Second Edition
+## What's New in the Third Edition
+
+- **Repaired code.** The demos, agents and utilities were repaired for this edition, and the book's printed listings are drawn from this code.
+- **Regression tests.** Each repair came with a test; the suite grew from 36 test files to 106.
+- **Demos that say what they need.** A demo that needs an API key or a running service now names it and stops, instead of failing midway.
+- **Tags.** `third-edition` marks the code as printed in the third edition; `v2.0.0` is the second edition's.
+
+## What the Second Edition Added
 
 - **Retail Agent Operating Model (RAOM)** as the narrative spine across chapters and code.
 - **Capstone workflow** that accumulates across chapters (inventory risk → supplier outreach → price protection → customer messaging → audit trail).
@@ -37,7 +44,8 @@ A modular, extensible Python framework and companion codebase for the second edi
 
 ## Table of Contents
 
-- [What's New in the Second Edition](#whats-new-in-the-second-edition)
+- [What's New in the Third Edition](#whats-new-in-the-third-edition)
+- [What the Second Edition Added](#what-the-second-edition-added)
 - [Companion Code Highlights](#companion-code-highlights)
 - [Directory Structure](#directory-structure)
 - [Setup Instructions](#setup-instructions)
@@ -143,6 +151,9 @@ agentic-retail-foundations/
         uv pip install -e ".[agent_protocols]"
         ```
     *   ACP is treated as a spec-only protocol reference (no SDK dependency).
+    *   Other optional stacks have named extras: `streaming` (Redis/Kafka), `spark`,
+        `gnn`, `monitoring` (Prometheus), `cloud` (Postgres/Supabase), `auth`, and `explainability` (SHAP).
+        Install one with `uv sync --extra <name>`; use `uv sync --all-extras` for the complete test environment.
 
 9.  **Install Pre-commit Hooks (Recommended):**
     ```sh
@@ -177,7 +188,9 @@ Common development tasks are streamlined using the `Makefile`. Ensure your virtu
 
 *   **Run Tests:**
     ```sh
-    make test          # Run pytest test suite
+    make test          # Run offline pytest tests with the existing .venv
+    make test PYTHON=/path/to/python  # Use an existing interpreter; installs nothing
+    make check         # Run Ruff on packages/tests, then offline tests
     make coverage      # Run tests and generate coverage report
     make ci            # Run format-check, type-check, tests, coverage, docs build
     ```
@@ -209,6 +222,10 @@ Common development tasks are streamlined using the `Makefile`. Ensure your virtu
 *   **Typing:** Use Python type hints extensively. Run `make type-check` (`mypy`) regularly.
 *   **Linting & Formatting:** Adhere to styles enforced by `ruff`. Run `make format` and `make lint` frequently.
 *   **Testing:** Write unit tests (`pytest`) for individual functions/classes and integration tests for components working together.
+    `make test` and `make check` use installed tools and never create an environment or install packages.
+    Full-suite tests require the locked extras (`uv sync --all-extras`); provider calls use fake clients.
+    Coroutine tests with synchronous fixtures can run offline using `asyncio.run` when `pytest-asyncio` is absent.
+    Coverage is opt-in (`make coverage`, requires `pytest-cov`); normal tests use the installed runtime dependencies.
 *   **Documentation:** Maintain docs in `docs/` and keep this README in sync with the book and code.
 
 ## Contribution Guidelines

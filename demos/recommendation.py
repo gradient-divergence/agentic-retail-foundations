@@ -49,3 +49,7 @@ def demo_bayesian_recommendations():
     recommendations_c1 = agent.recommend("C1", all_products, num_recommendations=5)
 
     return recommendations_c1, agent, all_products, product_catalog
+
+
+if __name__ == "__main__":
+    demo_bayesian_recommendations()

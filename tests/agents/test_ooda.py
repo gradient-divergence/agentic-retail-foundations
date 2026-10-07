@@ -288,7 +288,7 @@ def test_orient_missing_data(ooda_agent, sample_product, caplog):
             15.0,
             {
                 "old_price": 10.0,
-                "new_price": 10.99,  # Psychology rounds up
+                "new_price": 10.50,  # Psychological rounding remains within the 5% cap
                 "capped_change_pct": pytest.approx(0.0),  # Components should be 0
                 "primary_driver": "none",
             },
@@ -308,8 +308,8 @@ def test_orient_missing_data(ooda_agent, sample_product, caplog):
                 "old_price": 10.0,
                 # total_change = 0.6 + 0.0 + 0.75 = 1.35 (within cap)
                 # new_price_raw = 10.0 * (1 + 1.35/100) = 10.135
-                # psychology -> 10.99
-                "new_price": 10.99,
+                # psychology -> 10.99, then the 5% limit -> 10.50
+                "new_price": 10.50,
                 "capped_change_pct": pytest.approx(1.35),
                 "primary_driver": "sales",  # abs(0.75) > abs(0.6)
             },
@@ -377,8 +377,8 @@ def test_orient_missing_data(ooda_agent, sample_product, caplog):
                 # Let's assume default cap = 5%
                 # capped_change = 4.016 (within 5% cap)
                 # new_price_raw = 8.0 * (1 + 4.016/100) = 8.321
-                # psychology -> 8.99
-                "new_price": 8.99,
+                # psychology -> 8.99, then the 5% limit -> 8.40
+                "new_price": 8.40,
                 "capped_change_pct": pytest.approx(4.016, 0.01),
                 "primary_driver": "competitor",
             },
@@ -399,8 +399,8 @@ def test_orient_missing_data(ooda_agent, sample_product, caplog):
                 # total_change = (-3.0*0.3) + (5.0*0.4) + (-4.0*0.3) = -0.9 + 2.0 - 1.2 = -0.1
                 # capped_change = -0.1
                 # new_price_raw = 8.5 * (1 - 0.1/100) = 8.4915
-                # psychology -> 8.99
-                "new_price": 8.99,
+                # psychology -> 8.99, then the 5% limit -> 8.92 (whole cents)
+                "new_price": 8.92,
                 "capped_change_pct": pytest.approx(-0.1),
                 "primary_driver": "competitor",
             },
@@ -456,6 +456,8 @@ def test_decide(
 
     decision = ooda_agent.decide(product_id, full_orientation)
 
+    assert min_price <= decision["new_price"] <= max_price
+    assert abs(decision["new_price"] / current_price - 1) <= ooda_agent.max_price_change_pct / 100 + 1e-12
     assert decision["product_id"] == product_id
     assert "timestamp" in decision
     # Check calculated fields against expected values

@@ -125,6 +125,9 @@ make type-check
 # Run the test suite (uses pytest)
 make test
 
+# Run Ruff and offline tests using installed tools; no environment changes
+make check
+
 # Run all checks performed by CI (recommended before submitting PR)
 make ci
 ```
@@ -174,6 +177,13 @@ If you installed pre-commit hooks, `make format` and `make lint` (or parts there
     ```sh
     make test
     ```
+    This target uses the existing `.venv` and installs nothing. To use another existing
+    interpreter, run `make test PYTHON=/path/to/python`. `make check` also performs no
+    installation; override `RUFF=/path/to/ruff` if Ruff lives in another environment.
+    Missing provider SDKs produce explicit collection skips. Tests must use fake clients
+    or `pytest.importorskip` rather than contact external services. Coroutine tests with
+    synchronous fixtures use `asyncio.run` when `pytest-asyncio` is unavailable; async
+    fixtures require `pytest-asyncio`.
 *   Run tests for a specific file or directory:
     ```sh
     # Ensure venv is active
@@ -183,7 +193,8 @@ If you installed pre-commit hooks, `make format` and `make lint` (or parts there
 
 ### Test Coverage
 
-*   While we strive for high test coverage, the focus is on testing critical paths and complex logic.
+*   Coverage is opt-in; plain `python -m pytest tests` does not require `pytest-cov`.
+    While we strive for high test coverage, the focus is on testing critical paths and complex logic.
 *   You can check coverage by running:
     ```sh
     make coverage
@@ -251,4 +262,4 @@ All contributors are expected to adhere to the project's **Code of Conduct** (li
 
 ## Questions?
 
-If you have questions about contributing, feel free to open an issue on GitHub. 
+If you have questions about contributing, feel free to open an issue on GitHub.

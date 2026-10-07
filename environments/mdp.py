@@ -66,6 +66,8 @@ class DynamicPricingMDP:
         return initial_state
 
     def step(self, action_idx: int) -> tuple[tuple[int, int, int], float, bool, dict]:
+        if self.current_week >= self.season_length_weeks:
+            raise RuntimeError("Episode is complete; call reset() before stepping again.")
         if not (0 <= action_idx < len(self.available_discounts)):
             self.logger.error(
                 "Invalid action index: %s. Available: %s",

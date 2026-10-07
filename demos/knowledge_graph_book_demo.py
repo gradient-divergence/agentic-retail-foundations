@@ -2,8 +2,7 @@
 
 from pydantic import BaseModel
 from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
-from rdflib.namespace import RDFS, XSD
-from SPARQLWrapper import JSON, SPARQLWrapper
+from rdflib.namespace import OWL, RDFS, XSD
 
 
 class ProductAttributes(BaseModel):
@@ -72,6 +71,8 @@ class RetailKnowledgeGraph:
         # Connect to external SPARQL endpoint if provided
         self.sparql_endpoint = None
         if graph_uri:
+            from SPARQLWrapper import JSON, SPARQLWrapper
+
             self.sparql_endpoint = SPARQLWrapper(graph_uri)
             self.sparql_endpoint.setReturnFormat(JSON)
         # endregion book:knowledge-graph-init-bindings
@@ -109,9 +110,9 @@ class RetailKnowledgeGraph:
         self.graph.add((self.RETAIL.complementsWith, RDFS.domain, self.RETAIL.Product))
         self.graph.add((self.RETAIL.complementsWith, RDFS.range, self.RETAIL.Product))
         # Define symmetric properties
-        self.graph.add((self.RETAIL.complementsWith, RDF.type, self.RETAIL.SymmetricProperty))
+        self.graph.add((self.RETAIL.complementsWith, RDF.type, OWL.SymmetricProperty))
         # Define transitive properties
-        self.graph.add((self.RETAIL.hasSubcategory, RDF.type, self.RETAIL.TransitiveProperty))
+        self.graph.add((self.RETAIL.hasSubcategory, RDF.type, OWL.TransitiveProperty))
         # endregion book:knowledge-graph-load-ontology-definitions
 
     # region book:knowledge-graph-add-product
@@ -252,7 +253,8 @@ class RetailKnowledgeGraph:
         query = """
         PREFIX retail: <http://retail.example.org/ontology#>
         PREFIX product: <http://retail.example.org/product/>
-        SELECT ?substitute ?name ?price ?brand ?strength
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        SELECT DISTINCT ?substitute ?name ?price ?brand ?strength
         WHERE {
             # Direct substitutes
             {
@@ -262,7 +264,7 @@ class RetailKnowledgeGraph:
                           rdf:subject product:__PRODUCT_ID__ ;
                           rdf:predicate retail:isSubstituteFor ;
                           rdf:object ?substitute ;
-                              retail:strength ?strength .
+                              retail:strength ?candidate_strength .
                     }
                 }
 
@@ -275,7 +277,7 @@ class RetailKnowledgeGraph:
                           rdf:subject ?substitute ;
                           rdf:predicate retail:isSubstituteFor ;
                           rdf:object product:__PRODUCT_ID__ ;
-                              retail:strength ?strength .
+                              retail:strength ?candidate_strength .
                     }
                 }
 
@@ -286,11 +288,13 @@ class RetailKnowledgeGraph:
                 ?substitute retail:hasCategory ?category .
                 product:__PRODUCT_ID__ retail:price ?originalPrice .
                 ?substitute retail:price ?price .
-                # Only include products within 20%% of original price
+                # Only include products within 20% of original price
                 FILTER (?substitute != product:__PRODUCT_ID__)
                 FILTER (?price >= ?originalPrice * 0.8 && ?price <= ?originalPrice * 1.2)
                 # Use a default strength lower than explicit substitutes
-                    BIND(0.7 as ?strength)
+                FILTER NOT EXISTS { product:__PRODUCT_ID__ retail:isSubstituteFor ?substitute . }
+                FILTER NOT EXISTS { ?substitute retail:isSubstituteFor product:__PRODUCT_ID__ . }
+                    BIND(0.7 as ?candidate_strength)
                 }
 
                 # Get additional properties
@@ -298,7 +302,7 @@ class RetailKnowledgeGraph:
                 ?substitute retail:price ?price .
                 ?substitute retail:hasBrand ?brand .
             # If no strength was specified, default to 1.0
-            BIND(COALESCE(?strength, 1.0) as ?strength)
+            BIND(COALESCE(?candidate_strength, 1.0) as ?strength)
         }
         ORDER BY DESC(?strength) ?price
         LIMIT __LIMIT__
@@ -331,19 +335,22 @@ class RetailKnowledgeGraph:
         query = """
         PREFIX retail: <http://retail.example.org/ontology#>
         PREFIX product: <http://retail.example.org/product/>
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-        SELECT ?complement ?name ?price ?brand ?strength ?relation_type
+        SELECT DISTINCT ?complement ?name ?price ?brand ?strength ?relation_type
         WHERE {
             # Direct complements
             {
-                product:__PRODUCT_ID__ retail:complementsWith ?complement .
+                product:__PRODUCT_ID__ (retail:complementsWith|^retail:complementsWith) ?complement .
                 BIND("complement" AS ?relation_type)
                 OPTIONAL {
                     ?stmt rdf:type rdf:Statement ;
-                          rdf:subject product:__PRODUCT_ID__ ;
+                          rdf:subject ?source ;
                           rdf:predicate retail:complementsWith ;
-                          rdf:object ?complement ;
-                              retail:strength ?strength .
+                          rdf:object ?target ;
+                              retail:strength ?explicit_strength .
+                    FILTER((?source = product:__PRODUCT_ID__ && ?target = ?complement)
+                        || (?source = ?complement && ?target = product:__PRODUCT_ID__))
                     }
                 }
 
@@ -357,7 +364,7 @@ class RetailKnowledgeGraph:
                           rdf:subject ?complement ;
                           rdf:predicate retail:isAccessoryFor ;
                           rdf:object product:__PRODUCT_ID__ ;
-                              retail:strength ?strength .
+                              retail:strength ?explicit_strength .
                     }
                 }
 
@@ -380,14 +387,13 @@ class RetailKnowledgeGraph:
 
                 # Get additional properties
                 ?complement retail:name ?name .
-    # endregion book:knowledge-graph-find-complements
                 ?complement retail:price ?price .
                 ?complement retail:hasBrand ?brand .
             # Calculate strength for co-purchases, or use default
             BIND(
                 IF(?relation_type = "co_purchase",
                    ?count / 20, # Normalize co-purchase count
-                       COALESCE(?strength, 1.0))
+                       COALESCE(?explicit_strength, 1.0))
                     AS ?strength
                 )
             }
@@ -396,6 +402,7 @@ class RetailKnowledgeGraph:
             LIMIT __LIMIT__
         """
         query = query.replace("__PRODUCT_ID__", product_id).replace("__LIMIT__", str(max_results))
+        # endregion book:knowledge-graph-find-complements
 
         # region book:knowledge-graph-find-complements-results
         results = self._execute_query(query).rows
@@ -465,7 +472,7 @@ class RetailKnowledgeGraph:
                 ?purchasedProduct retail:hasCategory ?category .
                 ?product retail:hasCategory ?category .
                 # Avoid recommending products they already purchased
-                FILTER(?product != ?purchasedProduct)
+                FILTER NOT EXISTS { customer:%s retail:purchased ?product . }
                 # Basic category-based score
                 BIND(0.5 AS ?baseScore)
                 # Get additional properties
@@ -477,7 +484,8 @@ class RetailKnowledgeGraph:
                 # Boost score for complementary products
                 OPTIONAL {
                     customer:%s retail:purchased ?otherProduct .
-                    ?product retail:complementsWith ?otherProduct .
+                    ?product (retail:complementsWith|^retail:complementsWith|retail:isAccessoryFor)
+                             ?otherProduct .
                 BIND(0.3 AS ?complementBoost)
             }
             # Calculate total score
@@ -486,7 +494,7 @@ class RetailKnowledgeGraph:
             ORDER BY DESC(?score) ?name
             LIMIT %d
 
-        """ % (customer_id, customer_id, max_results)  # noqa: UP031
+        """ % (customer_id, customer_id, customer_id, max_results)  # noqa: UP031
 
         # Add context-specific filters if provided
         if current_context:

@@ -113,6 +113,8 @@ class ProcurementAuction:
 
         if bid.supplier_id not in self.participants:
             return False
+        if not self.purchase_order.accepts_bid(bid):
+            return False
 
         # For reverse auctions, new bids must be lower than the best bid so far
         if (
@@ -121,13 +123,24 @@ class ProcurementAuction:
             and bid.price >= self.current_best_bid.price
         ):
             return False
+        if (
+            self.auction_type == AuctionType.ENGLISH
+            and self.current_best_bid is not None
+            and bid.price <= self.current_best_bid.price
+        ):
+            return False
 
         # Record the bid
         self.bids[bid.supplier_id].append(bid)
 
         # Update best bid if this is better (lower for reverse auction)
-        if self.current_best_bid is None or (
-            self.auction_type == AuctionType.REVERSE and bid.price < self.current_best_bid.price
+        if (
+            self.current_best_bid is None
+            or (
+                self.auction_type in {AuctionType.REVERSE, AuctionType.SEALED_BID}
+                and bid.price < self.current_best_bid.price
+            )
+            or (self.auction_type == AuctionType.ENGLISH and bid.price > self.current_best_bid.price)
         ):
             self.current_best_bid = bid
 
@@ -230,12 +243,8 @@ class ProcurementAuction:
             self.auction_history.append(event)
             return None
 
-        # Check reserve price for reverse auctions
-        if (
-            self.auction_type == AuctionType.REVERSE
-            and self.reserve_price is not None
-            and winning_bid.price > self.reserve_price
-        ):
+        # The reserve is the buyer's maximum price for this purchase order.
+        if self.reserve_price is not None and winning_bid.price > self.reserve_price:
             self.status = AuctionStatus.FAILED
             self.purchase_order.status = PurchaseOrderStatus.CANCELLED
 

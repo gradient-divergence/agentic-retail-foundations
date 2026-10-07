@@ -3,8 +3,17 @@
 This directory vendors the companion repository for the book:
 
 - Upstream: https://github.com/gradient-divergence/agentic-retail-foundations
-- Vendored commit: b188034a75338047ab8fb9f8cdb4f2a6415d8ad7
-- Vendored on: 2025-12-18T08:28:15Z
+- Vendored commit: 28fc5685ab3789245970bd381d59254e4644dd4f
+- Source branch: `fix/integration-2026-10-02` in the local companion repository; not yet pushed upstream
+- Vendored on: 2026-10-02
+
+This refresh integrates the October 2026 repairs to planning, pricing, inventory,
+causal analysis, sensors, customer-service validation, coordination, and approval
+auditing, with regression tests and offline-safe demo entry points. It also brings
+the integration branch's dependency lock, second-edition README, environment
+example, and cover image. The manuscript's included code is regenerated from this
+tree; the local integration commit must be published upstream before readers can
+retrieve these repairs from the public repository.
 
 ## Why this exists
 

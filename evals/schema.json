@@ -27,5 +27,52 @@
       "type": "array",
       "items": {"type": "string"}
     }
+  },
+  "$defs": {
+    "golden_trace": {
+      "type": "object",
+      "required": [
+        "case_id",
+        "trace_id",
+        "tool_calls",
+        "events",
+        "decision"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "args"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "args": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

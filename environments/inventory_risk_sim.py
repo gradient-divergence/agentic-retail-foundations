@@ -70,9 +70,9 @@ class InventoryRiskSimulator:
         policy_fn = policy or default_policy
 
         for week in range(1, self.config.horizon_weeks + 1):
-            arrivals = [qty for arrival_week, qty in pipeline if arrival_week == week]
+            arrivals = [qty for arrival_week, qty in pipeline if arrival_week <= week]
             on_hand += sum(arrivals)
-            pipeline = [(w, q) for (w, q) in pipeline if w != week]
+            pipeline = [(w, q) for (w, q) in pipeline if w > week]
 
             demand = self._demand_for_week(week)
             total_demand += demand
@@ -105,5 +105,4 @@ class InventoryRiskSimulator:
 def evaluate_policies(
     config: InventoryRiskSimConfig, policies: Iterable[PolicyFn]
 ) -> list[SimulationMetrics]:
-    simulator = InventoryRiskSimulator(config)
-    return [simulator.run(policy) for policy in policies]
+    return [InventoryRiskSimulator(config).run(policy) for policy in policies]

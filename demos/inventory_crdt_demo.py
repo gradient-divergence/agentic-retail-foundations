@@ -4,7 +4,10 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-import redis.asyncio as redis
+try:
+    import redis.asyncio as redis
+except ModuleNotFoundError:
+    raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
 from fastapi import FastAPI
 from pydantic import BaseModel, Field, JsonValue
 
@@ -174,6 +177,8 @@ class PNCounter:
     # region book:inventory-crdt-pn-merge
     def merge(self, other: PNCounter) -> PNCounter:
         """Merge with another counter - commutative and associative"""
+        if (self.product_id, self.location_id) != (other.product_id, other.location_id):
+            raise ValueError("Can only merge counters for the same product and location")
         result = PNCounter(self.product_id, self.location_id)
         all_inc_keys = set(self.increments.keys()) | set(other.increments.keys())
         for key in all_inc_keys:
@@ -199,8 +204,8 @@ class PNCounter:
     def from_dict(cls, data: PNCounterSnapshot) -> PNCounter:
         """Create from snapshot"""
         counter = cls(data.product_id, data.location_id)
-        counter.increments = data.increments
-        counter.decrements = data.decrements
+        counter.increments = data.increments.copy()
+        counter.decrements = data.decrements.copy()
         return counter
 
 

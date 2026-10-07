@@ -4,13 +4,6 @@ import os
 
 from pydantic import BaseModel
 
-try:
-    from google.adk.agents.llm_agent import Agent
-except ModuleNotFoundError as exc:
-    raise ModuleNotFoundError(
-        'google-adk is not installed. Install with: uv pip install -e ".[agent_protocols]"'
-    ) from exc
-
 
 class TimeLookupResult(BaseModel):
     status: str
@@ -45,23 +38,34 @@ def lookup_inventory(sku: str, store_id: str) -> InventoryLookupResult:
     )
 
 
-root_agent = Agent(
-    model="gemini-3-flash-preview",
-    name="retail_ops_agent",
-    description="Answers retail operations questions using time and inventory tools.",
-    instruction=(
-        "You are a retail operations assistant. Use tools to answer questions about "
-        "store inventory and local time. Be concise and action-oriented."
-    ),
-    tools=[get_current_time, lookup_inventory],
-)
+def __getattr__(name: str):
+    if name != "root_agent":
+        raise AttributeError(name)
+    if not (os.getenv("GOOGLE_API_KEY", "").strip() or os.getenv("GEMINI_API_KEY", "").strip()):
+        raise RuntimeError("Set GOOGLE_API_KEY (or GEMINI_API_KEY) to run this provider demo.")
+    try:
+        from google.adk.agents.llm_agent import Agent
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            'google-adk is not installed. Install with: uv pip install -e ".[agent_protocols]"'
+        ) from exc
+
+    agent = Agent(
+        model="gemini-3-flash-preview",
+        name="retail_ops_agent",
+        description="Answers retail operations questions using time and inventory tools.",
+        instruction=(
+            "You are a retail operations assistant. Use tools to answer questions about "
+            "store inventory and local time. Be concise and action-oriented."
+        ),
+        tools=[get_current_time, lookup_inventory],
+    )
+    globals()["root_agent"] = agent
+    return agent
 
 
 def main() -> None:
-    print("ADK agent ready:", root_agent.name)
-    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
-        print("Set GOOGLE_API_KEY (or GEMINI_API_KEY) to run this agent with `adk run` or `adk web`.")
-        return
+    print("ADK agent ready:", __getattr__("root_agent").name)
     print("Sample tool inputs:")
     print(" - get_current_time(city='Seattle')")
     print(" - lookup_inventory(sku='SKU-123', store_id='SEA-01')")
@@ -69,4 +73,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (RuntimeError, ImportError) as exc:
+        raise SystemExit(str(exc)) from None

@@ -40,7 +40,13 @@ def decide_price(
     inv_component = 2.0 if inv_status == "low" else -3.0 if inv_status == "high" else 0.0
     comp_component = -(price_diff_pct / 3.0) if abs(price_diff_pct) > 5 else 0.0
     sales_component = (
-        2.5 if sales_assess == "risk_of_stockout" else -2.5 if sales_assess == "slow_moving" else 0.0
+        2.5
+        if sales_assess == "risk_of_stockout"
+        else -2.5
+        if sales_assess == "slow_moving"
+        else -4.0
+        if sales_assess == "stagnant"
+        else 0.0
     )
 
     total_change = (

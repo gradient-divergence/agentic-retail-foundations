@@ -5,8 +5,11 @@ import json
 import time
 from datetime import datetime, timedelta
 
-import redis
-from kafka import KafkaConsumer, KafkaProducer
+try:
+    import redis
+    from kafka import KafkaConsumer, KafkaProducer
+except ModuleNotFoundError:
+    raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
 
 
 class DynamicPricingAgent:
@@ -66,7 +69,7 @@ class DynamicPricingAgent:
             sales_data = self.redis_client.execute_command(
                 "TS.RANGE", f"sales:{self.product_id}:quantity", start_ts, end_ts
             )
-            return [(entry[0], entry[1]) for entry in sales_data]
+            return [(int(entry[0]), float(entry[1])) for entry in sales_data]
         except Exception as exc:
             print(f"Error retrieving sales data: {exc}")
             return []
@@ -76,20 +79,22 @@ class DynamicPricingAgent:
     # region book:pricing-feedback-compute
     def compute_optimal_price(self, recent_sales):
         """Calculate optimal price based on elasticity model"""
-        if not recent_sales or not self.price_history:
+        if not recent_sales:
             return self.current_price
 
         quantities = [q for _, q in recent_sales]
         avg_hourly_demand = sum(quantities) / len(quantities) if quantities else 0
         self.price_history.append(self.current_price)
         self.demand_history.append(avg_hourly_demand)
+        if len(self.price_history) < 2:
+            return self.current_price
         marginal_cost = self.min_price * 0.8
 
-        if self.price_elasticity == -1.0:
+        if self.price_elasticity >= -1.0:
             optimal_price = self.current_price
         else:
             optimal_markup = abs(1 / (1 + (1 / self.price_elasticity)))
-            optimal_price = marginal_cost / optimal_markup
+            optimal_price = marginal_cost * optimal_markup
 
         optimal_price = max(min(optimal_price, self.max_price), self.min_price)
         print(f"Computed optimal price: ${optimal_price:.2f} (current: ${self.current_price:.2f})")
@@ -125,6 +130,7 @@ class DynamicPricingAgent:
                 sale = message.value
                 if sale["product_id"] == self.product_id:
                     self.update_elasticity_model(sale)
+                    return  # One update per observation pair, regardless of batch size.
 
     # endregion book:pricing-feedback-process-sales
 
@@ -132,6 +138,8 @@ class DynamicPricingAgent:
     def update_elasticity_model(self, sale):
         """Update price elasticity estimate based on observed sales"""
         if len(self.price_history) < 2 or len(self.demand_history) < 2:
+            return
+        if self.price_history[-2] <= 0 or self.demand_history[-2] <= 0:
             return
 
         price_pct_change = (self.price_history[-1] - self.price_history[-2]) / self.price_history[-2]
@@ -151,6 +159,15 @@ class DynamicPricingAgent:
 
 # region book:pricing-feedback-main
 if __name__ == "__main__":
+    import socket
+
+    try:
+        for port in (6379, 9092):
+            with socket.create_connection(("localhost", port), timeout=1):
+                pass
+    except OSError:
+        raise SystemExit("Start Redis on localhost:6379 and Kafka on localhost:9092 for this demo.") from None
+
     agent = DynamicPricingAgent(
         product_id="SKU123456",
         initial_price=29.99,

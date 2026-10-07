@@ -44,7 +44,10 @@ async def main() -> None:
         permission="write",
         schema={
             "type": "object",
-            "properties": {"sku": {"type": "string"}, "quantity": {"type": "integer"}},
+            "properties": {
+                "sku": {"type": "string", "minLength": 1},
+                "quantity": {"type": "integer", "minimum": 1},
+            },
             "required": ["sku", "quantity"],
         },
         handler=reserve_inventory,

@@ -76,6 +76,10 @@ class DynamicPricingMDP:
         """
         Take an action (set a discount) and transition to the next state.
         """
+        if self.current_week >= self.season_length_weeks:
+            raise RuntimeError("Episode is complete; call reset() before stepping again.")
+        if not 0 <= action_idx < len(self.available_discounts):
+            raise ValueError(f"Invalid action index: {action_idx}")
         # Get the discount percentage from the action index
         new_discount = self.available_discounts[action_idx]
         # Apply the discount and calculate sales
@@ -239,7 +243,7 @@ class QLearningAgent:
 
 # region book:mdp-dynamic-train
 class PolicyMap(BaseModel):
-    policy: dict[tuple[int, int, int], int]
+    policy: dict[tuple[int, int, float], int]
 
 
 class TrainingResult(BaseModel):
@@ -283,7 +287,7 @@ def train_agent(
         # Record the total return for this episode
         episode_returns.append(episode_return)
 
-        if verbose and (episode + 1) % (num_episodes // 10) == 0:
+        if verbose and (episode + 1) % max(1, num_episodes // 10) == 0:
             print(
                 f"Episode {episode + 1}/{num_episodes}, "
                 + f"Return: {episode_return:.2f}, "
@@ -337,3 +341,7 @@ def demonstrate_mdp_dynamic_pricing():
     # when inventory follows expected sales trajectory, and only applies
     # discounts when inventory levels exceed target levels for the given week
     # endregion book:mdp-dynamic-create-agent
+
+
+if __name__ == "__main__":
+    demonstrate_mdp_dynamic_pricing()

@@ -1,21 +1,13 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-# Use AsyncOpenAI for async operations
-from openai import AsyncOpenAI, OpenAI
-
-# Import specific message param types
-from openai.types.chat import (
-    ChatCompletion,
-    ChatCompletionMessageParam,  # Use the base MessageParam type hint
-    # ChatCompletionSystemMessageParam,
-    # ChatCompletionUserMessageParam,
-)
-
-# Define a type alias for the expected message structure
-# ChatMessage = Union[ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam]
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI, OpenAI
+    from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 
 __all__ = ["safe_chat_completion"]
 
@@ -62,17 +54,18 @@ async def safe_chat_completion(
     if client is None:
         raise RuntimeError("OpenAI client is not initialised.")
 
+    from openai import AsyncOpenAI
+    from openai.types.chat import ChatCompletion
+
     # Ensure client is async for async call
     if not isinstance(client, AsyncOpenAI):
-        # Handle sync client case - either raise error or use asyncio.to_thread
-        # For now, let's raise an error as this function is async
         raise TypeError("Sync OpenAI client provided to async safe_chat_completion.")
 
     logger = logger or logging.getLogger(__name__)
     start_ts: float
     last_exc: Exception | None = None
-    # Cast messages just before use
-    typed_messages: Iterable[ChatCompletionMessageParam] = messages  # type: ignore[assignment]
+    # Materialize generators so every retry receives the same messages.
+    typed_messages: Iterable[ChatCompletionMessageParam] = list(messages)  # type: ignore[assignment]
 
     for attempt in range(1, retry_attempts + 1):
         try:

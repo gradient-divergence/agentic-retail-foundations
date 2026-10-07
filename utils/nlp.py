@@ -5,9 +5,10 @@ such as intent classification, entity extraction (order IDs, product IDs),
 and sentiment analysis, leveraging OpenAI's models.
 """
 
-import logging
+from __future__ import annotations
 
-from openai import AsyncOpenAI
+import logging
+from typing import TYPE_CHECKING
 
 from agents.prompts import (
     build_intent_classification_prompt,
@@ -16,6 +17,9 @@ from agents.prompts import (
     build_sentiment_prompt,
 )
 from utils.openai_utils import safe_chat_completion
+
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI
 
 __all__ = [
     "classify_intent",
@@ -29,6 +33,8 @@ logger_nlp = logging.getLogger(__name__)
 
 async def classify_intent(client: AsyncOpenAI, *, message: str) -> str:
     """Return one of the allowed intents inferred by the LLM."""
+    from openai import AsyncOpenAI
+
     # Ensure client is AsyncOpenAI
     if not isinstance(client, AsyncOpenAI):
         logger_nlp.error("Expected AsyncOpenAI client for classify_intent")
@@ -84,6 +90,8 @@ async def extract_order_id_llm(
     retry_backoff: float = 1.0,
 ) -> str | None:
     """Extract an order ID using LLM, returning None if unable."""
+    from openai import AsyncOpenAI
+
     # Ensure client is AsyncOpenAI
     if not isinstance(client, AsyncOpenAI):
         raise TypeError("client must be an AsyncOpenAI instance")
@@ -119,8 +127,7 @@ async def extract_order_id_llm(
         # Handle explicit non-extraction cases
         if result.lower() in ["none", "ambiguous", "not_recent", "not_found"]:
             return None
-        # Basic validation (e.g., alphanumeric, length) could be added here
-        return result
+        return next((oid for oid in recent_order_ids if oid.casefold() == result.casefold()), None)
     return None
 
 
@@ -134,10 +141,6 @@ async def extract_product_id(
     retry_backoff: float = 1.0,
 ) -> str | None:
     """Extract a product identifier (SKU, name fragment) using LLM."""
-    # Ensure client is AsyncOpenAI
-    if not isinstance(client, AsyncOpenAI):
-        pass  # Or raise TypeError("Expected AsyncOpenAI client for async function")
-
     prompt = build_product_identifier_prompt(message)
     messages = [
         {
@@ -162,7 +165,7 @@ async def extract_product_id(
         if not result:
             return None
         # Basic check to filter out conversational fillers if the model fails strict instruction
-        if result.lower() != "none" and len(result.split()) < 10:  # Avoid long sentences
+        if result.lower() not in {"none", "not_found", "ambiguous"} and len(result.split()) < 10:
             return result
     return None
 
@@ -177,10 +180,6 @@ async def sentiment_analysis(
     retry_backoff: float = 1.0,
 ) -> str:
     """Classify sentiment as positive, neutral, or negative."""
-    # Ensure client is AsyncOpenAI
-    if not isinstance(client, AsyncOpenAI):
-        pass  # Or raise TypeError("Expected AsyncOpenAI client for async function")
-
     prompt = build_sentiment_prompt(message)
     messages = [
         {

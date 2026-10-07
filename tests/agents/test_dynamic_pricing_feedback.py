@@ -28,9 +28,9 @@ def agent_params():
 def mocked_agent(agent_params) -> DynamicPricingAgent:
     # Patch Redis class with a standard MagicMock
     with (
-        patch("agents.dynamic_pricing_feedback.redis.Redis", new_callable=MagicMock) as mock_redis_cls,
-        patch("agents.dynamic_pricing_feedback.KafkaProducer", new_callable=MagicMock) as mock_prod_cls,
-        patch("agents.dynamic_pricing_feedback.KafkaConsumer", new_callable=MagicMock) as mock_cons_cls,
+        patch("redis.asyncio.Redis", new_callable=MagicMock) as mock_redis_cls,
+        patch("kafka.KafkaProducer", new_callable=MagicMock) as mock_prod_cls,
+        patch("kafka.KafkaConsumer", new_callable=MagicMock) as mock_cons_cls,
     ):
         # Create an AsyncMock instance to be the Redis client
         redis_mock = AsyncMock()
@@ -63,9 +63,9 @@ def mocked_agent(agent_params) -> DynamicPricingAgent:
 # --- Test Initialization --- #
 
 
-@patch("agents.dynamic_pricing_feedback.redis.Redis")
-@patch("agents.dynamic_pricing_feedback.KafkaProducer")
-@patch("agents.dynamic_pricing_feedback.KafkaConsumer")
+@patch("redis.asyncio.Redis")
+@patch("kafka.KafkaProducer")
+@patch("kafka.KafkaConsumer")
 def test_agent_initialization_success(
     mock_kafka_consumer_cls, mock_kafka_producer_cls, mock_redis_cls, agent_params
 ):
@@ -95,11 +95,11 @@ def test_agent_initialization_success(
 
 
 @patch(
-    "agents.dynamic_pricing_feedback.redis.Redis",
+    "redis.asyncio.Redis",
     side_effect=ConnectionError("Redis down"),
 )
-@patch("agents.dynamic_pricing_feedback.KafkaProducer", new_callable=MagicMock)
-@patch("agents.dynamic_pricing_feedback.KafkaConsumer", new_callable=MagicMock)
+@patch("kafka.KafkaProducer", new_callable=MagicMock)
+@patch("kafka.KafkaConsumer", new_callable=MagicMock)
 def test_agent_initialization_redis_fail(
     mock_kafka_consumer, mock_kafka_producer, mock_redis_error, agent_params, caplog
 ):
@@ -114,13 +114,13 @@ def test_agent_initialization_redis_fail(
     assert "Redis down" in caplog.text
 
 
-@patch("agents.dynamic_pricing_feedback.redis.Redis", new_callable=MagicMock)
+@patch("redis.asyncio.Redis", new_callable=MagicMock)
 @patch(
-    "agents.dynamic_pricing_feedback.KafkaProducer",
+    "kafka.KafkaProducer",
     side_effect=Exception("Kafka Broker Error"),
 )
 @patch(
-    "agents.dynamic_pricing_feedback.KafkaConsumer",
+    "kafka.KafkaConsumer",
     side_effect=Exception("Kafka Broker Error"),
 )
 def test_agent_initialization_kafka_fail(

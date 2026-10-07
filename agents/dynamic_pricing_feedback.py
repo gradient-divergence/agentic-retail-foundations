@@ -6,14 +6,16 @@ estimated price elasticity.
 Distinguish from agents/qlearning.py which uses Q-learning.
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
-# Assume Redis and Kafka clients are appropriately configured/imported
-import redis.asyncio as redis  # Use built-in asyncio from redis-py
-from kafka import KafkaConsumer, KafkaProducer  # Requires kafka-python
+if TYPE_CHECKING:
+    import redis.asyncio as redis
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,9 @@ class DynamicPricingAgent:
         redis_port: int = 6379,
         kafka_brokers: str = "localhost:9092",
     ) -> None:
+        import redis.asyncio as redis
+        from kafka import KafkaConsumer, KafkaProducer
+
         self.product_id = product_id
         self.current_price = initial_price
         self.min_price = min_price

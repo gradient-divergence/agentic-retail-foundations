@@ -37,8 +37,7 @@ try:
 except ImportError:
     CausalForestDML = None
 try:
-    from doubleml.data import DoubleMLData
-    from doubleml.double_ml import DoubleMLIRM
+    from doubleml import DoubleMLData, DoubleMLIRM
 except ImportError:
     DoubleMLData = None
     DoubleMLIRM = None
@@ -90,47 +89,58 @@ class PromotionCausalAnalyzer:
 
         # Merge product data if available
         if self.product_data is not None:
-            analysis_df = pd.merge(analysis_df, self.product_data, on="product_id", how="left")
+            product_data = self.product_data.drop(
+                columns=self.product_data.columns.intersection(analysis_df.columns).difference(["product_id"])
+            )
+            analysis_df = pd.merge(
+                analysis_df, product_data, on="product_id", how="left", validate="many_to_one"
+            )
 
         # Merge store data if available
         if self.store_data is not None:
-            analysis_df = pd.merge(analysis_df, self.store_data, on="store_id", how="left")
+            store_data = self.store_data.drop(
+                columns=self.store_data.columns.intersection(analysis_df.columns).difference(["store_id"])
+            )
+            analysis_df = pd.merge(analysis_df, store_data, on="store_id", how="left", validate="many_to_one")
 
         # Merge promotion data if available
         if self.promotion_data is not None:
-            # Ensure promotion data date is datetime
-            if "date" in self.promotion_data.columns and not pd.api.types.is_datetime64_any_dtype(
-                self.promotion_data["date"]
-            ):
-                self.promotion_data["date"] = pd.to_datetime(self.promotion_data["date"])
-            # Merge based on relevant keys (e.g., date, product_id, store_id)
-            # Adjust merge keys based on actual promotion data structure
+            promotion_data = self.promotion_data.copy()
             merge_keys = ["date", "product_id", "store_id"]
-            valid_merge_keys = [
-                k for k in merge_keys if k in analysis_df.columns and k in self.promotion_data.columns
-            ]
-            if valid_merge_keys:
-                analysis_df = pd.merge(
-                    analysis_df,
-                    self.promotion_data,
-                    on=valid_merge_keys,
-                    how="left",
-                )
-                # Assume 'promotion_applied' is the treatment indicator, fill NaNs with 0 (no promotion)
-                if "promotion_applied" in analysis_df.columns:
-                    analysis_df["promotion_applied"] = analysis_df["promotion_applied"].fillna(0).astype(int)
-                else:
-                    # If no promotion data merged, assume no promotions applied
-                    analysis_df["promotion_applied"] = 0
-            else:
-                # If keys don't match, assume no promotions applied
-                analysis_df["promotion_applied"] = 0
+            if not all(k in analysis_df and k in promotion_data for k in merge_keys):
+                raise ValueError("Promotion data requires date, product_id and store_id merge keys.")
+            promotion_data["date"] = pd.to_datetime(promotion_data["date"])
+            if "promotion_applied" in analysis_df:
+                promotion_data = promotion_data.rename(columns={"promotion_applied": "_promotion_treatment"})
+            analysis_df = pd.merge(
+                analysis_df,
+                promotion_data,
+                on=merge_keys,
+                how="left",
+                validate="many_to_one",
+                suffixes=(False, False),
+            )
+            if "_promotion_treatment" in analysis_df:
+                supplied = analysis_df.pop("_promotion_treatment")
+                existing = analysis_df["promotion_applied"]
+                if (existing.notna() & supplied.notna() & (existing != supplied)).any():
+                    raise ValueError("Sales and promotion data disagree on the treatment indicator.")
+                analysis_df["promotion_applied"] = existing.combine_first(supplied)
+
+        if "sales" not in analysis_df:
+            raise ValueError("Sales data must contain a 'sales' column.")
+        if "promotion_applied" not in analysis_df:
+            raise ValueError("Could not determine the 'promotion_applied' treatment column.")
+        if not analysis_df["promotion_applied"].dropna().isin([0, 1]).all():
+            raise ValueError("The promotion treatment indicator must be binary.")
+        analysis_df["promotion_applied"] = analysis_df["promotion_applied"].fillna(0).astype(int)
 
         # Feature Engineering (Example: Extract time features)
         if "date" in analysis_df.columns:
             analysis_df["day_of_week"] = analysis_df["date"].dt.dayofweek
             analysis_df["month"] = analysis_df["date"].dt.month
             analysis_df["year"] = analysis_df["date"].dt.year
+            analysis_df["weekend"] = analysis_df["day_of_week"].isin([5, 6]).astype(int)
             # Drop original date column if no longer needed for direct modeling
             # analysis_df = analysis_df.drop(columns=['date'])
 
@@ -144,17 +154,10 @@ class PromotionCausalAnalyzer:
         # Example:
         # analysis_df = pd.get_dummies(analysis_df, columns=['category', 'location_type'], drop_first=True)
 
-        # Ensure required columns exist
-        if "sales" not in analysis_df.columns:
-            raise ValueError("Sales data must contain a 'sales' column.")
-        if "promotion_applied" not in analysis_df.columns:
-            # This case should be handled by the merging logic above, but double-check
-            raise ValueError("Could not determine the 'promotion_applied' treatment column.")
-
         logger.info(
             f"Prepared analysis data with {analysis_df.shape[0]} rows and {analysis_df.shape[1]} columns."
         )
-        logger.info("Columns:", analysis_df.columns.tolist())
+        logger.info("Columns: %s", analysis_df.columns.tolist())
 
         return analysis_df
 
@@ -178,19 +181,22 @@ class PromotionCausalAnalyzer:
             str: A string representing the causal graph in DOT format.
         """
         if common_causes is None:
-            # Infer potential common causes from columns, excluding treatment and outcome
+            # Only known pre-treatment features; discounted price is a mediator.
+            # store_traffic must describe traffic measured before promotion assignment.
             potential_causes = [
                 col
-                for col in self.analysis_data.columns
-                if col
-                not in [
-                    treatment,
-                    outcome,
-                    "date",
-                ]  # Exclude date if not used as direct feature
-                and pd.api.types.is_numeric_dtype(self.analysis_data[col])  # Basic check for numeric features
+                for col in [
+                    "day_of_week",
+                    "month",
+                    "year",
+                    "weekend",
+                    "holiday",
+                    "store_traffic",
+                    "product_category",
+                    "store_tier",
+                ]
+                if col in self.analysis_data.columns and col not in [treatment, outcome]
             ]
-            # Heuristic: Select a subset or use domain knowledge. Here we use all numeric ones found.
             common_causes = potential_causes
             logger.info(f"Inferred common causes: {common_causes}")
 
@@ -267,7 +273,7 @@ class PromotionCausalAnalyzer:
                 common_causes=numeric_common_causes,  # Use only numeric ones
             )
 
-            identified_estimand = model.identify_effect(proceed_when_unidentified=True)
+            identified_estimand = model.identify_effect()
             estimate = model.estimate_effect(
                 identified_estimand, method_name=method_name, test_significance=True
             )
@@ -309,21 +315,20 @@ class PromotionCausalAnalyzer:
             data = self.analysis_data.copy()
             Y = data[self.outcome]
             T = data[self.treatment]
-            X = data[self.common_causes]  # Confounders / Controls
+            X = pd.get_dummies(data[self.common_causes], dtype=float)  # Pre-treatment controls
             # W = None # Optional: Effect modifiers (not used here)
 
             # Ensure X contains only numeric data
-            X = X.select_dtypes(include=np.number)
             if X.isnull().any().any():
                 logger.info("Warning: Missing values found in features (X). Filling with median.")
                 X = X.fillna(X.median())
 
             # Define outcome and treatment models (can use more complex models)
             # Using GradientBoostingRegressor as an example
-            from sklearn.ensemble import GradientBoostingRegressor
+            from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
 
             model_y = GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123)
-            model_t = GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123)
+            model_t = GradientBoostingClassifier(n_estimators=50, max_depth=3, random_state=123)
 
             # Initialize and fit CausalForestDML
             # Note: discrete_treatment=True is important if T is binary/categorical
@@ -381,24 +386,14 @@ class PromotionCausalAnalyzer:
             # Prepare data for DoubleMLData object
             y_col = self.outcome
             d_cols = self.treatment  # Treatment variable must be list-like for DoubleML
-            x_cols = self.common_causes  # Confounders
-
-            # Ensure confounders are numeric and handle NaNs
-            numeric_confounders = data[x_cols].select_dtypes(include=np.number).columns.tolist()
-            if len(numeric_confounders) < len(x_cols):
-                excluded = set(x_cols) - set(numeric_confounders)
-                logger.warning(
-                    "Non-numeric confounders excluded from DoubleML: %s",
-                    excluded,
-                )
-            if not numeric_confounders:
+            controls = pd.get_dummies(data[self.common_causes], dtype=float)
+            x_cols = controls.columns.tolist()
+            if not x_cols:
                 logger.info("Error: No numeric confounders available for DoubleML.")
                 return None
-            x_cols = numeric_confounders
 
             # Handle NaNs in relevant columns
-            relevant_cols = [y_col, d_cols] + x_cols
-            data_subset = data[relevant_cols].dropna()
+            data_subset = pd.concat([data[[y_col, d_cols]], controls], axis=1).dropna()
             if data_subset.shape[0] < data.shape[0]:
                 dropped_rows = data.shape[0] - data_subset.shape[0]
                 logger.warning(
@@ -500,7 +495,7 @@ class PromotionCausalAnalyzer:
             # Example: Assuming self.causal_forest_model is fitted
             if hasattr(self, "causal_forest_model") and self.causal_forest_model is not None:
                 data = self.analysis_data.copy()
-                X = data[self.common_causes].select_dtypes(include=np.number)
+                X = pd.get_dummies(data[self.common_causes], dtype=float)
                 if X.isnull().any().any():
                     X = X.fillna(X.median())
 
@@ -551,15 +546,15 @@ class PromotionCausalAnalyzer:
             data = self.analysis_data.copy()
             Y = data[self.outcome]
             T = data[self.treatment]
-            X = data[self.common_causes].select_dtypes(include=np.number)
+            X = pd.get_dummies(data[self.common_causes], dtype=float)
             if X.isnull().any().any():
                 logger.info("Warning: Missing values found in features (X). Filling with median.")
                 X = X.fillna(X.median())
 
-            from sklearn.ensemble import GradientBoostingRegressor
+            from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
 
             model_y = GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123)
-            model_t = GradientBoostingRegressor(n_estimators=50, max_depth=3, random_state=123)
+            model_t = GradientBoostingClassifier(n_estimators=50, max_depth=3, random_state=123)
 
             est = CausalForestDML(
                 model_y=model_y,
@@ -694,30 +689,30 @@ class PromotionCausalAnalyzer:
             missing_cols = [col for col in required_cols if col not in self.analysis_data.columns]
             if missing_cols:
                 return {"error": f"Missing required columns for regression: {missing_cols}"}
+            if self.analysis_data[self.treatment].nunique() != 2:
+                return {"error": "Effect estimation requires both promotion groups."}
 
             # Select numeric common causes + treatment
-            potential_features = [c for c in self.common_causes if c != "holiday"] + [self.treatment]
+            potential_features = self.common_causes + [self.treatment]
             feature_cols = [
                 col for col in potential_features if pd.api.types.is_numeric_dtype(self.analysis_data[col])
             ]
-            categorical_cols = [c for c in self.common_causes if c != "holiday" and c not in feature_cols]
+            categorical_cols = [c for c in self.common_causes if c not in feature_cols]
 
-            analysis_subset = self.analysis_data[
-                feature_cols + categorical_cols + [self.treatment, self.outcome]
-            ].copy()
+            analysis_subset = self.analysis_data[feature_cols + categorical_cols + [self.outcome]].copy()
 
             if categorical_cols:
-                analysis_subset = pd.get_dummies(analysis_subset, columns=categorical_cols, drop_first=True)
+                analysis_subset = pd.get_dummies(
+                    analysis_subset, columns=categorical_cols, drop_first=True, dtype=float
+                )
                 # Ensure feature_cols remains a list[str]
-                feature_cols = [
-                    col for col in analysis_subset.columns if col not in [self.outcome, self.treatment]
-                ]
+                feature_cols = [col for col in analysis_subset.columns if col != self.outcome]
 
             if not feature_cols:  # Check if list is empty
                 return {"error": "No suitable features found for regression adjustment."}
 
             # Prepare features (X) and outcome (Y)
-            X = analysis_subset[feature_cols]
+            X = analysis_subset[feature_cols].astype(float)
             Y = analysis_subset[self.outcome]
 
             # Add intercept
@@ -788,7 +783,7 @@ class PromotionCausalAnalyzer:
                 "baseline_sales_pred": baseline_mean,
                 "promotion_sales_pred": promotion_sales_pred.mean(),
                 "percent_lift_pred": percent_lift,  # Key expected by notebook
-                "confounders_used": feature_cols,  # Report features used
+                "confounders_used": [col for col in feature_cols if col != self.treatment],
             }
         except Exception as e:
             import traceback
@@ -821,7 +816,9 @@ class PromotionCausalAnalyzer:
             ].copy()
 
             if categorical_cols:
-                analysis_subset = pd.get_dummies(analysis_subset, columns=categorical_cols, drop_first=True)
+                analysis_subset = pd.get_dummies(
+                    analysis_subset, columns=categorical_cols, drop_first=True, dtype=float
+                )
                 # Update feature_cols list with new dummy columns
                 feature_cols = [
                     col for col in analysis_subset.columns if col not in [self.outcome, self.treatment]
@@ -838,12 +835,7 @@ class PromotionCausalAnalyzer:
             propensity_model = LogisticRegression(solver="liblinear", random_state=42, max_iter=1000)
             propensity_model.fit(X, T)
 
-            # Calculate propensity scores (manual dot to avoid matmul warnings)
-            X_np = X.to_numpy()
-            logits = np.dot(X_np, propensity_model.coef_.T) + propensity_model.intercept_
-            logits = np.clip(logits, -20, 20)
-            propensity_scores = 1 / (1 + np.exp(-logits))
-            analysis_subset["propensity_score"] = propensity_scores.ravel()
+            analysis_subset["propensity_score"] = propensity_model.predict_proba(X)[:, 1]
 
             # Separate treatment and control groups
             treatment_group = analysis_subset[analysis_subset[self.treatment] == 1]
@@ -854,7 +846,7 @@ class PromotionCausalAnalyzer:
 
             # Matching (Nearest Neighbor within Caliper)
             matched_pairs = []
-            used_control_indices: set[int] = set()
+            used_control_indices: set[Any] = set()
 
             for _treat_idx, treat_row in treatment_group.iterrows():
                 # Calculate distances to control units not yet used
@@ -879,20 +871,7 @@ class PromotionCausalAnalyzer:
                 for control_idx, control_row in closest_matches.iterrows():
                     if control_idx not in used_control_indices:
                         matched_pairs.append((treat_row[self.outcome], control_row[self.outcome]))
-                        # Cast index to int before adding to Set[int], handle non-int/non-float
-                        if isinstance(control_idx, int | float | np.number):
-                            try:
-                                used_control_indices.add(int(control_idx))
-                            except (ValueError, TypeError):
-                                logger.warning(
-                                    "Could not convert control index %s to int. Skipping.",
-                                    control_idx,
-                                )
-                        else:
-                            logger.warning(
-                                "Control index %s is not numeric. Skipping.",
-                                control_idx,
-                            )
+                        used_control_indices.add(control_idx)
 
             # Calculate treatment effect from matched pairs
             if matched_pairs:
@@ -945,18 +924,21 @@ class PromotionCausalAnalyzer:
         """Predict outcomes under counterfactual scenarios using a regression model."""
 
         try:
+            if self.analysis_data[self.treatment].nunique() != 2:
+                return {"error": "Effect estimation requires both promotion groups."}
             # Fit a regression model on the original data
-            potential_features_model = [c for c in self.common_causes if c != "holiday"] + [self.treatment]
+            potential_features_model = self.common_causes + [self.treatment]
+            unsupported = set(scenario) - set(potential_features_model)
+            if unsupported:
+                return {"error": f"Counterfactual features not modeled: {sorted(unsupported)}"}
             feature_cols_model = [
                 col
                 for col in potential_features_model
                 if pd.api.types.is_numeric_dtype(self.analysis_data[col])
             ]
-            categorical_cols_model = [
-                c for c in self.common_causes if c != "holiday" and c not in feature_cols_model
-            ]
+            categorical_cols_model = [c for c in self.common_causes if c not in feature_cols_model]
             analysis_subset_model = self.analysis_data[
-                feature_cols_model + categorical_cols_model + [self.treatment, self.outcome]
+                feature_cols_model + categorical_cols_model + [self.outcome]
             ].copy()
 
             if categorical_cols_model:
@@ -964,13 +946,12 @@ class PromotionCausalAnalyzer:
                     analysis_subset_model,
                     columns=categorical_cols_model,
                     drop_first=True,
+                    dtype=float,
                 )
                 # Ensure feature_cols_model remains a list[str]
-                feature_cols_model = [
-                    col for col in analysis_subset_model.columns if col not in [self.outcome, self.treatment]
-                ] + [self.treatment]  # type: ignore[assignment]
+                feature_cols_model = [col for col in analysis_subset_model.columns if col != self.outcome]
 
-            X_actual = analysis_subset_model[feature_cols_model]
+            X_actual = analysis_subset_model[feature_cols_model].astype(float)
             Y_actual = analysis_subset_model[self.outcome]
             X_actual = sm.add_constant(X_actual, has_constant="add")
             X_actual.columns = [
@@ -1001,13 +982,13 @@ class PromotionCausalAnalyzer:
 
             # --- Prepare Counterfactual Features (X_cf) ---
             # Start with the same base columns as the model
-            cf_subset = cf_data[feature_cols_model + categorical_cols_model + [self.treatment]].copy()
+            cf_subset = cf_data[potential_features_model].copy()
             if categorical_cols_model:
                 # Apply the same dummy encoding
-                cf_subset = pd.get_dummies(cf_subset, columns=categorical_cols_model, drop_first=True)
+                cf_subset = pd.get_dummies(cf_subset, columns=categorical_cols_model, dtype=float)
 
             # Add constant term
-            X_cf = sm.add_constant(cf_subset, has_constant="add")
+            X_cf = sm.add_constant(cf_subset.astype(float), has_constant="add")
             # Clean column names similarly to X_actual
             X_cf.columns = [
                 (

@@ -22,7 +22,8 @@ class InventoryAgent:
 
     def evaluate_restock(self, snapshot: InventorySnapshot, forecast: DemandForecast) -> RestockPlan:
         orders: dict[str, int] = {}
-        for item, stock in snapshot.stock.items():
+        for item in snapshot.stock.keys() | forecast.demand.keys():
+            stock = snapshot.stock.get(item, 0)
             demand = forecast.demand.get(item, 0)
             if stock < demand + self.safety_stock:
                 order_qty = (demand + self.safety_stock) - stock

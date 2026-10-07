@@ -53,6 +53,15 @@ async def run_dynamic_pricing_demo():
 
 
 if __name__ == "__main__":
+    import socket
+
+    try:
+        for port in (6379, 9092):
+            with socket.create_connection(("localhost", port), timeout=1):
+                pass
+    except OSError:
+        raise SystemExit("Start Redis on localhost:6379 and Kafka on localhost:9092 for this demo.") from None
+
     try:
         asyncio.run(run_dynamic_pricing_demo())
     except KeyboardInterrupt:

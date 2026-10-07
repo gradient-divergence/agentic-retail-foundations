@@ -6,27 +6,22 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
-    # Keep essential imports for notebook structure and potential future use
     import asyncio
     import logging
-    from datetime import datetime, timedelta  # Keep if used
-
-    import marimo as mo
     import sys
     from pathlib import Path
+
+    import marimo as mo
 
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-
-    import pandas as pd  # Keep if used in any display logic
 
     # Configure logging once
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    logger = logging.getLogger("EndToEndIntegrationNotebook")
 
     # Return only commonly needed modules for UI/basic ops
     return asyncio, mo
@@ -37,7 +32,10 @@ def _(mo):
     mo.md(r"""
     # End-to-End Integration for Autonomous Retail
 
-    Understand the principles and practices essential for end-to-end integration in autonomous retail systems. This chapter provides you with frameworks for system-wide coordination, real-time decision-making, and effective agent orchestration, positioning you to overcome integration challenges and optimize retail operations comprehensively.
+    Understand the principles and practices essential for end-to-end integration in autonomous retail systems.
+    This chapter provides you with frameworks for system-wide coordination, real-time decision-making,
+    and effective agent orchestration, positioning you to overcome integration challenges
+    and optimize retail operations comprehensively.
     """)
     return
 
@@ -46,29 +44,25 @@ def _(mo):
 def _(mo):
     mo.md("### Order Orchestration Simulation")
     run_ord_orch_button = mo.ui.button(label="Run Order Orchestration Demo")
-    ord_orch_logs = mo.state([])  # To display completion message
-    return ord_orch_logs, run_ord_orch_button
+    get_ord_orch_logs, set_ord_orch_logs = mo.state([])
+    return run_ord_orch_button, set_ord_orch_logs
 
 
 @app.cell
-def _(ord_orch_logs):
+def _(set_ord_orch_logs):
     # Import needed only when button is clicked
     from demos.order_orchestration_demo import run_orchestration_simulation
 
     async def run_demo():
         # Demo prints logs to console
-        ord_orch_logs.set_value(
-            ["Running Order Orchestration Demo... (Check console)"]
-        )  # Update state
+        set_ord_orch_logs(["Running Order Orchestration Demo... (Check console)"])  # Update state
         try:
             await run_orchestration_simulation()
-            ord_orch_logs.set_value(
+            set_ord_orch_logs(
                 ["Order Orchestration Demo Completed (check console)."]
             )  # Update state on success
         except Exception as e:
-            ord_orch_logs.set_value(
-                [f"Error during demo: {e}"]
-            )  # Update state on error
+            set_ord_orch_logs([f"Error during demo: {e}"])  # Update state on error
 
     # Return the function so the next cell can use it
     return (run_demo,)
@@ -96,7 +90,8 @@ def _(mo):
     ```bash
     uvicorn demos.inventory_api_demo:app --reload --port 8001
     ```
-    You can then interact with it using tools like `curl` or Postman, or run the `inventory_api_client_demo.py` (if created).
+    You can then interact with it using tools like `curl` or Postman,
+    or run the `inventory_api_client_demo.py` (if created).
     (No interactive button here as it's a background service).
     """)
     return

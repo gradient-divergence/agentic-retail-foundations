@@ -12,14 +12,22 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx  # For making async requests to backend services
-import redis.asyncio as redis  # For rate limiting
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt  # For JWT handling
-from passlib.context import CryptContext  # For password hashing (mocked)
 from pydantic import BaseModel
 from starlette.responses import Response
+
+try:
+    import redis.asyncio as redis  # For rate limiting
+except ModuleNotFoundError:
+    raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
+
+try:
+    from jose import JWTError, jwt  # For JWT handling
+    from passlib.context import CryptContext  # For password hashing (mocked)
+except ModuleNotFoundError:
+    raise SystemExit("Install the auth extra: uv sync --extra auth") from None
 
 # Import API models
 from models.api import Agent, RequestLogEntry, Token, TokenData

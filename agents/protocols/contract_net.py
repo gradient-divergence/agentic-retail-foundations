@@ -8,6 +8,7 @@ The CNP is a negotiation protocol used to solve distributed problem solving task
 # region book:task-allocation-contract-net-coordinator
 from collections.abc import Callable
 from datetime import datetime
+from math import isfinite
 from typing import Any
 
 from models.messaging import AgentMessage, Performative
@@ -91,6 +92,7 @@ class RetailCoordinator:
         """
         self.tasks[task.id] = task
         self.bids[task.id] = []
+        task.status = TaskStatus.ANNOUNCED
 
         # In a real implementation, this would send actual messages
         # to participants and wait for responses
@@ -114,8 +116,14 @@ class RetailCoordinator:
         Args:
             bid: The bid to process
         """
-        if bid.task_id not in self.tasks:
-            return  # Ignore bids for unknown tasks
+        task = self.tasks.get(bid.task_id)
+        if (
+            task is None
+            or task.status != TaskStatus.ANNOUNCED
+            or bid.agent_id not in self.participant_ids
+            or not isfinite(bid.bid_value)
+        ):
+            return
 
         if bid.task_id not in self.bids:
             self.bids[bid.task_id] = []
@@ -145,6 +153,8 @@ class RetailCoordinator:
         """
         if task_id not in self.tasks or task_id not in self.bids:
             return None
+        if self.tasks[task_id].status != TaskStatus.ANNOUNCED:
+            return None
 
         if not self.bids[task_id]:
             # No bids received
@@ -157,6 +167,7 @@ class RetailCoordinator:
         # Update task status
         self.tasks[task_id].status = TaskStatus.ALLOCATED
         self.tasks[task_id].assigned_agent_id = best_bid.agent_id
+        self.tasks[task_id].winning_bid = best_bid.bid_value
 
         # Record the award
         task_record = {

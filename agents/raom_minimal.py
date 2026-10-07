@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from math import isfinite
 from types import TracebackType
 from typing import Protocol, TypeAlias
 from uuid import uuid4
@@ -21,7 +22,7 @@ JsonValue: TypeAlias = JsonPrimitive | list[JsonPrimitive] | dict[str, JsonPrimi
 class ActionRequest(BaseModel):
     tool_name: str
     payload: dict[str, JsonValue]
-    estimated_cost: float | None = None
+    estimated_cost: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     request_id: str = Field(default_factory=lambda: f"req_{uuid4().hex}")
 
 
@@ -127,6 +128,10 @@ class ToolAllowlistRule:
 @dataclass(frozen=True)
 class MaxCostRule:
     max_cost: float
+
+    def __post_init__(self) -> None:
+        if not isfinite(self.max_cost) or self.max_cost < 0:
+            raise ValueError("Maximum cost must be finite and non-negative")
 
     def evaluate(self, action: ActionRequest) -> list[str]:
         if action.estimated_cost is None:

@@ -15,6 +15,8 @@ class EventBus:
 
     def __init__(self) -> None:
         self.subscribers: dict[str, list[Callable[[EventEnvelope], Coroutine[Any, Any, None]]]] = {}
+        # ponytail: unbounded process-local receipts; persist with retention for long-lived buses.
+        self._delivered: set[tuple[str, Callable]] = set()
 
     def subscribe(
         self,
@@ -36,11 +38,24 @@ class EventBus:
             return
 
         logger_event_bus.info("Event published: %s", event.event_type)
-        callbacks = self.subscribers.get(event.event_type, [])
+        callbacks = [
+            callback
+            for callback in self.subscribers.get(event.event_type, []).copy()
+            if (event.event_id, callback) not in self._delivered
+        ]
         if not callbacks:
             return
 
-        tasks: list[asyncio.Task[None]] = [asyncio.create_task(callback(event)) for callback in callbacks]
+        self._delivered.update((event.event_id, callback) for callback in callbacks)
+
+        async def deliver(callback):
+            try:
+                await callback(event)
+            except BaseException:
+                self._delivered.discard((event.event_id, callback))
+                raise
+
+        tasks: list[asyncio.Task[None]] = [asyncio.create_task(deliver(callback)) for callback in callbacks]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for callback, result in zip(callbacks, results, strict=False):
             if isinstance(result, Exception):

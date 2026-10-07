@@ -4,7 +4,6 @@ Task allocation and contract net protocol classes for distributed task managemen
 
 import asyncio
 import logging
-from collections import defaultdict
 from typing import Any
 
 # Import StoreAgent from its new location
@@ -136,7 +135,7 @@ class RetailCoordinator:
         Uses asyncio.gather to run task executions concurrently.
         """
         tasks_to_execute = []
-        agent_task_map = defaultdict(list)
+        executions: list[tuple[str, str]] = []
 
         logger.info("Triggering execution of allocated tasks.")
         for task_id, task in self.tasks.items():
@@ -145,7 +144,7 @@ class RetailCoordinator:
                 if agent_id in self.agents:
                     agent = self.agents[agent_id]
                     tasks_to_execute.append(agent.execute_task(task))
-                    agent_task_map[agent_id].append(task_id)
+                    executions.append((agent_id, task_id))
                 else:
                     logger.error(
                         "Agent %s assigned to task %s not found during execution phase.",
@@ -161,22 +160,18 @@ class RetailCoordinator:
         logger.info(
             "Starting execution for %s tasks across %s agents...",
             len(tasks_to_execute),
-            len(agent_task_map),
+            len({agent_id for agent_id, _ in executions}),
         )
         results = await asyncio.gather(*tasks_to_execute, return_exceptions=True)
         logger.info("Task execution cycle complete.")
 
-        i = 0
-        for agent_id, task_ids in agent_task_map.items():
-            for task_id in task_ids:
-                result = results[i]
-                if isinstance(result, Exception):
-                    logger.error(
-                        "Error during execution of task %s by agent %s: %s",
-                        task_id,
-                        agent_id,
-                        result,
-                    )
-                    if task_id in self.tasks:
-                        self.tasks[task_id].status = TaskStatus.FAILED
-                i += 1
+        for (agent_id, task_id), result in zip(executions, results, strict=True):
+            if isinstance(result, Exception):
+                logger.error(
+                    "Error during execution of task %s by agent %s: %s",
+                    task_id,
+                    agent_id,
+                    result,
+                )
+                if task_id in self.tasks:
+                    self.tasks[task_id].status = TaskStatus.FAILED

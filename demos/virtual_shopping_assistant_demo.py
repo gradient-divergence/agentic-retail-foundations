@@ -7,9 +7,10 @@ a predefined function when prompted by the user.
 
 import json
 import logging
+import os
+from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI, OpenAIError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -71,17 +72,25 @@ tools = [
 
 def run_assistant_demo(
     user_message: str = "I need an outfit idea for a summer party.",
+    *,
+    client: Any = None,
 ) -> str:
     """Runs the virtual shopping assistant demo with the given user message."""
     logger.info("--- Starting Virtual Shopping Assistant Demo ---")
     logger.info(f"User Message: {user_message}")
     assistant_reply: str | None = None  # Initialize to allow for None return on error
+    provider_errors: tuple[type[Exception], ...] = ()
 
     try:
-        # Initialize OpenAI client (ensure OPENAI_API_KEY is set in environment)
-        client = OpenAI()
-        if not client.api_key:
-            raise ValueError("OPENAI_API_KEY environment variable not set.")
+        if client is None:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key or api_key == "YOUR_API_KEY_HERE":
+                logger.warning("Set OPENAI_API_KEY to run the virtual shopping assistant demo.")
+                return "Set OPENAI_API_KEY to run the virtual shopping assistant demo."
+            from openai import OpenAI, OpenAIError
+
+            provider_errors = (OpenAIError,)
+            client = OpenAI(api_key=api_key)
 
         input_items = [{"role": "user", "content": user_message}]
 
@@ -107,6 +116,13 @@ def run_assistant_demo(
                 if tool_call.name == "recommend_outfit":
                     try:
                         args = json.loads(tool_call.arguments)
+                        if (
+                            not isinstance(args, dict)
+                            or set(args) != {"style"}
+                            or not isinstance(args["style"], str)
+                            or not args["style"].strip()
+                        ):
+                            raise ValueError("recommend_outfit requires a non-empty string style.")
                         result = recommend_outfit(**args)
                         logger.info("Function executed successfully.")
                         input_items.append(
@@ -146,15 +162,18 @@ def run_assistant_demo(
             logger.info("AI did not call a function. Returning its direct response.")
             assistant_reply = response.output_text
 
-    except OpenAIError as e:
+    except provider_errors as e:
         logger.error(f"OpenAI API Error: {e}")
         assistant_reply = f"Sorry, there was an error communicating with the AI service: {e}"
-    except ValueError as e:
-        logger.error(f"Configuration Error: {e}")
-        assistant_reply = f"Sorry, there was a configuration error: {e}"
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
-        assistant_reply = f"Sorry, an unexpected error occurred: {e}"
+        logger.error(
+            "Configuration Error: %s" if isinstance(e, ValueError) else "An unexpected error occurred: %s", e
+        )
+        assistant_reply = (
+            f"Sorry, there was a configuration error: {e}"
+            if isinstance(e, ValueError)
+            else f"Sorry, an unexpected error occurred: {e}"
+        )
 
     logger.info(f"Assistant Response: {assistant_reply}")
     logger.info("--- Virtual Shopping Assistant Demo Finished ---")

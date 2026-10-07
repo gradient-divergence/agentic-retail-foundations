@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from utils.monitoring import AgentMonitor as MonitorUtilities
+
 
 # region book:agent-monitor-class
 class AgentMonitor:
@@ -38,6 +40,8 @@ class AgentMonitor:
         previous = [v for _, v in self.metrics_history[metric][-window_size * 2 : -window_size]]
         recent_avg = sum(recent) / len(recent)
         previous_avg = sum(previous) / len(previous)
+        if previous_avg == 0:
+            return recent_avg != 0
         percent_change = abs((recent_avg - previous_avg) / previous_avg) * 100
         return percent_change > 15
 
@@ -58,6 +62,9 @@ class AgentMonitor:
                 self._send_email_alert(endpoint["address"], message)
 
     # endregion book:agent-monitor-trigger-alert
+
+    _send_slack_alert = MonitorUtilities._send_slack_alert
+    _send_email_alert = MonitorUtilities._send_email_alert
 
     # region book:agent-monitor-recommend-adaptation
     def recommend_adaptation(self):

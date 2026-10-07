@@ -25,12 +25,10 @@ async def test_get_customer_found(db):
 
 @pytest.mark.asyncio
 async def test_get_customer_not_found(db):
-    """Test getting an unknown customer returns default."""
+    """Test getting an unknown customer reports absence."""
     cid = "C_UNKNOWN"
     customer = await db.get_customer(cid)
-    assert customer is not None
-    assert customer["name"] == f"Cust {cid}"
-    assert customer["loyalty_tier"] == "Standard"
+    assert customer is None
 
 
 # --- Test search_products --- #

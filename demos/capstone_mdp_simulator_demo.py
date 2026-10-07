@@ -20,6 +20,7 @@ class Action(str, Enum):
 class InventoryState(BaseModel):
     week: int
     inventory_on_hand: int
+    pipeline: list[tuple[int, int]]  # (remaining lead time in weeks, quantity)
     risk_level: str
     supplier_status: SupplierStatus
     promo_active: bool
@@ -69,14 +70,13 @@ class InventoryRiskMDP:
         self.price_protect_cost = price_protect_cost
         self.message_demand_reduction = message_demand_reduction
         self.promo_weeks = set(promo_weeks)
-        self.pipeline: list[tuple[int, int]] = []
         self.state = self.reset()
 
     def reset(self) -> InventoryState:
-        self.pipeline = []
         self.state = InventoryState(
             week=0,
             inventory_on_hand=self.initial_inventory,
+            pipeline=[],
             risk_level="low",
             supplier_status=SupplierStatus.STABLE,
             promo_active=False,
@@ -87,15 +87,16 @@ class InventoryRiskMDP:
 
     # region book:capstone-mdp-step-dynamics
     def step(self, action: Action) -> tuple[InventoryState, float, bool, StepInfo]:
+        if self.state.week >= self.horizon_weeks:
+            raise RuntimeError("Episode is complete; call reset() before stepping again.")
         # Deliver any inbound inventory
         delivered = 0
         new_pipeline = []
-        for eta, qty in self.pipeline:
+        for eta, qty in self.state.pipeline:
             if eta <= 1:
                 delivered += qty
             else:
                 new_pipeline.append((eta - 1, qty))
-        self.pipeline = new_pipeline
         inventory = self.state.inventory_on_hand + delivered
 
         # Update supplier status stochastically
@@ -117,7 +118,7 @@ class InventoryRiskMDP:
 
         if action == Action.REORDER:
             lead_time = self.reorder_lead_time + (1 if supplier_status == SupplierStatus.DELAYED else 0)
-            self.pipeline.append((lead_time, self.reorder_qty))
+            new_pipeline.append((lead_time, self.reorder_qty))
             action_cost = 20.0
         elif action == Action.PRICE_PROTECT:
             margin -= self.price_protect_cost
@@ -151,6 +152,7 @@ class InventoryRiskMDP:
         self.state = InventoryState(
             week=next_week,
             inventory_on_hand=next_inventory,
+            pipeline=new_pipeline,
             risk_level=risk_level,
             supplier_status=supplier_status,
             promo_active=promo_active,
@@ -194,7 +196,7 @@ if __name__ == "__main__":
         state, reward, done, info = env.step(action)
         print(
             f"week={state.week} action={action.value} inventory={state.inventory_on_hand} "
-            f"risk={state.risk_level} reward={reward:.1f} stockouts={int(info['stockouts'])}"
+            f"risk={state.risk_level} reward={reward:.1f} stockouts={int(info.stockouts)}"
         )
 
         if done:

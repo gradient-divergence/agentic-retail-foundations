@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 # region book:dynamic-pricing-agents-sdk-demo
-from demos.openai_agents_sdk_import import import_openai_agents_sdk
+from math import isfinite
 
-agents_sdk = import_openai_agents_sdk()
-Agent = agents_sdk.Agent
-Runner = agents_sdk.Runner
-Tool = agents_sdk.Tool
+from demos.openai_agents_sdk_import import import_openai_agents_sdk
 
 competitor_prices = {"product_456": 120.00}
 current_prices = {"product_456": 100.00}
@@ -22,40 +19,52 @@ def get_inventory(product_id: str) -> int:
 
 
 def update_price(product_id: str, new_price: float) -> str:
+    if not isfinite(new_price) or new_price < 0:
+        raise ValueError("Price must be finite and non-negative")
     current_prices[product_id] = new_price
     return f"Price for {product_id} updated to ${new_price:.2f}"
 
 
-price_tool = Tool(
-    name="get_competitor_price",
-    func=get_competitor_price,
-    description="Get competitor's price for a product.",
-)
-stock_tool = Tool(
-    name="get_inventory",
-    func=get_inventory,
-    description="Get current stock level for a product.",
-)
-update_tool = Tool(
-    name="update_price",
-    func=update_price,
-    description="Set a new price for a product.",
-)
+def run_demo() -> None:
+    agents_sdk = import_openai_agents_sdk()
+    Agent = agents_sdk.Agent
+    Runner = agents_sdk.Runner
+    function_tool = agents_sdk.function_tool
 
-pricing_agent = Agent(
-    name="PricingAgent",
-    instructions=(
-        "You are a pricing agent that optimizes product prices for profit while "
-        "avoiding stockouts. Use tools to check competitor pricing and inventory. "
-        "If our price is too low and stock is limited, consider raising it. "
-        "If stock is high or competitor price is lower, consider lowering our price "
-        "to boost sales."
-    ),
-    tools=[price_tool, stock_tool, update_tool],
-)
+    price_tool = function_tool(
+        get_competitor_price,
+        description_override="Get competitor's price for a product.",
+    )
+    stock_tool = function_tool(
+        get_inventory,
+        description_override="Get current stock level for a product.",
+    )
+    update_tool = function_tool(
+        update_price,
+        description_override="Set a new price for a product.",
+    )
 
-task = "Evaluate and adjust the price for product_456."
-result = Runner.run_sync(pricing_agent, task)
-print(result.final_output)
+    pricing_agent = Agent(
+        name="PricingAgent",
+        instructions=(
+            "You are a pricing agent that optimizes product prices for profit while "
+            "avoiding stockouts. Use tools to check competitor pricing and inventory. "
+            "If our price is too low and stock is limited, consider raising it. "
+            "If stock is high or competitor price is lower, consider lowering our price "
+            "to boost sales."
+        ),
+        tools=[price_tool, stock_tool, update_tool],
+    )
+
+    task = "Evaluate and adjust the price for product_456. Its current price is $100."
+    result = Runner.run_sync(pricing_agent, task)
+    print(result.final_output)
+
+
+if __name__ == "__main__":
+    try:
+        run_demo()
+    except (RuntimeError, ImportError) as exc:
+        raise SystemExit(str(exc)) from None
 
 # endregion book:dynamic-pricing-agents-sdk-demo

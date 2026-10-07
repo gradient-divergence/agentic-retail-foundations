@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from pydantic import JsonValue
+from math import isfinite
+
+from jsonschema import ValidationError as SchemaValidationError
+from jsonschema import validate
+from pydantic import JsonValue, ValidationError
 
 from capstone.policies import PolicyEvaluator, PolicyInput
 from capstone.schemas import AuditRecord, ToolCall, ToolResult
@@ -36,12 +40,34 @@ class CapstoneOrchestrator:
                 ),
             )
 
-        policy_input = PolicyInput(
-            action=call.name,
-            amount=_extract_amount(call.args),
-            risk_score=_coerce_float(call.args.get("risk_score")) or 0.0,
-            evidence=[f"permission={spec.permission}"],
-        )
+        try:
+            validate(instance=call.args, schema=spec.schema_)
+            policy_input = PolicyInput(
+                action=call.name,
+                amount=_extract_amount(call.args),
+                risk_score=_coerce_float(call.args.get("risk_score")) or 0.0,
+                evidence=[f"permission={spec.permission}"],
+            )
+            if call.name in {"price_change", "supplier_commitment"} and policy_input.amount is None:
+                raise ValueError("Financial actions require an amount")
+            if call.name == "supplier_commitment" and policy_input.amount < 0:
+                raise ValueError("Supplier commitments require a nonnegative amount")
+        except (SchemaValidationError, ValidationError, ValueError):
+            return (
+                ToolResult(
+                    name=call.name,
+                    status="error",
+                    output={"error": "invalid_arguments"},
+                    trace_id=trace.trace_id,
+                ),
+                AuditRecord(
+                    trace_id=trace.trace_id,
+                    actor=actor,
+                    action=call.name,
+                    decision="invalid_arguments",
+                    evidence=[f"permission={spec.permission}"],
+                ),
+            )
         decision = self._policy.evaluate(policy_input)
         if spec.permission in {"write", "restricted"} and not decision.allowed:
             return (
@@ -88,11 +114,9 @@ def _extract_amount(args: dict[str, JsonValue]) -> float | None:
 def _coerce_float(value: JsonValue | None) -> float | None:
     if value is None:
         return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        try:
-            return float(value)
-        except ValueError:
-            return None
-    return None
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError("Policy values must be finite numbers")
+    number = float(value)
+    if not isfinite(number):
+        raise ValueError("Policy values must be finite numbers")
+    return number

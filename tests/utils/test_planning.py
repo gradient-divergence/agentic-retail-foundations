@@ -581,7 +581,6 @@ def test_fulfillment_planner_plan_insufficient_time(planner_layout, sample_assoc
     item_details_a = [
         mock_details_data["G0"],
         mock_details_data["E1"],
-        mock_details_data["E1"],  # Account for quantity 2
     ]
     _, estimated_time_a = planner._estimate_order_time(
         order_a, item_details_a, alice.current_location, alice.efficiency

@@ -8,8 +8,8 @@ try:
     import torch
     from torch_geometric.data import Data
     from torch_geometric.nn import GCNConv
-except ModuleNotFoundError as exc:
-    raise SystemExit("This demo requires torch and torch_geometric. Install them before running.") from exc
+except ModuleNotFoundError:
+    raise SystemExit("Install the gnn extra: uv sync --extra gnn") from None
 
 
 class DelayPropagationGNN(torch.nn.Module):

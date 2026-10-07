@@ -337,10 +337,8 @@ class InventoryBDIAgent:
             if days_of_supply <= product.lead_time_days + 3:
                 at_risk_count += 1
                 total_value_at_risk += current_val
-        if total_value == 0:
-            return 0.0
-        risk_ratio = total_value_at_risk / total_value
         sku_ratio = at_risk_count / len(self.inventory)
+        risk_ratio = total_value_at_risk / total_value if total_value > 0 else sku_ratio
         return 0.4 * sku_ratio + 0.6 * risk_ratio
 
     def _evaluate_excess_reduction(self) -> float:
@@ -440,6 +438,8 @@ class InventoryBDIAgent:
             buffer_days = 3
             if days_of_supply <= lead_time + buffer_days:
                 needed = item.optimal_stock - (item.current_stock + item.pending_order_quantity)
+                if needed <= 0:
+                    continue
                 order_qty = int(round(max(needed, product.min_order_quantity)))
                 if order_qty > 0:
                     urgency = 1.0 - (days_of_supply / (lead_time + buffer_days))
@@ -531,6 +531,11 @@ class InventoryBDIAgent:
                 continue
             product = self.products[pid]
             if product.shelf_life_days is not None and item.current_stock > 0:
+                sales_obj = self.sales_data.get(pid)
+                if sales_obj:
+                    projected_sales = max(sales_obj.average_daily_sales() * (1 + sales_obj.trend()), 0.1)
+                    if item.current_stock / projected_sales <= product.shelf_life_days * 0.7:
+                        continue
                 self.active_intentions.append(
                     {
                         "action": "discount_perishable",

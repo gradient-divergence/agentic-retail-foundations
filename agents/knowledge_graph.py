@@ -276,9 +276,10 @@ class RetailKnowledgeGraph:
         query = f"""
         PREFIX retail: <http://retail.example.org/ontology#>
         PREFIX product: <http://retail.example.org/product/>
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 
-        SELECT ?substitute ?name ?price ?brand ?final_strength
+        SELECT DISTINCT ?substitute ?name ?price ?brand ?final_strength
         WHERE {{
             {{
                 # Explicit forward substitute
@@ -356,16 +357,19 @@ class RetailKnowledgeGraph:
         query = f"""
         PREFIX retail: <http://retail.example.org/ontology#>
         PREFIX product: <http://retail.example.org/product/>
-        SELECT ?complement ?name ?price ?brand ?strength ?relation_type
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        SELECT DISTINCT ?complement ?name ?price ?brand ?strength ?relation_type
         WHERE {{
-            {{ product:{product_id} retail:complementsWith ?complement .
+            {{ product:{product_id} (retail:complementsWith|^retail:complementsWith) ?complement .
                 BIND("complement" AS ?relation_type)
                 OPTIONAL {{
                     ?stmt rdf:type rdf:Statement ;
-                          rdf:subject product:{product_id} ;
+                          rdf:subject ?source ;
                           rdf:predicate retail:complementsWith ;
-                          rdf:object ?complement ;
-                          retail:strength ?strength .
+                          rdf:object ?target ;
+                          retail:strength ?explicit_strength .
+                    FILTER((?source = product:{product_id} && ?target = ?complement)
+                        || (?source = ?complement && ?target = product:{product_id}))
                 }}
             }}
             UNION
@@ -376,7 +380,7 @@ class RetailKnowledgeGraph:
                           rdf:subject ?complement ;
                           rdf:predicate retail:isAccessoryFor ;
                           rdf:object product:{product_id} ;
-                          retail:strength ?strength .
+                          retail:strength ?explicit_strength .
                 }}
             }}
             UNION
@@ -399,7 +403,7 @@ class RetailKnowledgeGraph:
             BIND(
                 IF(?relation_type = "co_purchase",
                    ?count / 20,
-                   COALESCE(?strength, 1.0))
+                   COALESCE(?explicit_strength, 1.0))
                 AS ?strength
             )
         }}
@@ -434,7 +438,11 @@ class RetailKnowledgeGraph:
                 sparql_results_raw = self.sparql_endpoint.query().convert()
                 if isinstance(sparql_results_raw, dict):
                     bindings = sparql_results_raw.get("results", {}).get("bindings", [])  # type: ignore[union-attr]
-                    return bindings if isinstance(bindings, list) else []
+                    return (
+                        [{key: value["value"] for key, value in row.items()} for row in bindings]
+                        if isinstance(bindings, list)
+                        else []
+                    )
                 else:
                     logger.warning(
                         "Unexpected SPARQL result type: %s",
@@ -497,7 +505,7 @@ class RetailKnowledgeGraph:
             # Optional boost if the product complements/is accessory for *any* purchased product
             OPTIONAL {{
                 customer:{customer_id} retail:purchased ?otherProduct .
-                {{ ?product retail:complementsWith ?otherProduct . }} # Complements
+                {{ ?product (retail:complementsWith|^retail:complementsWith) ?otherProduct . }}
                 UNION
                 {{ ?product retail:isAccessoryFor ?otherProduct . }} # Is Accessory For
                 BIND(0.3 AS ?complementBoost)

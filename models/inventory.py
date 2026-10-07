@@ -95,10 +95,12 @@ class InventoryPosition:
     current_stock: int
     target_stock: int
     daily_sales_rate: float
-    last_updated: datetime = datetime.now()
+    last_updated: datetime = field(default_factory=datetime.now)
 
     def get_status(self) -> InventoryStatus:
         """Return the inventory status based on current stock and target stock."""
+        if self.target_stock == 0:
+            return InventoryStatus.EXCESS if self.current_stock > 0 else InventoryStatus.ADEQUATE
         ratio = self.current_stock / self.target_stock
         if ratio < 0.3:
             return InventoryStatus.CRITICAL

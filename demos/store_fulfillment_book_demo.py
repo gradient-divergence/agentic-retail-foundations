@@ -98,11 +98,9 @@ class Associate:
         self.associate_id = associate_id
         self.name = name
         self.efficiency = efficiency  # multiplier for picking speed
-        self.authorized_zones = authorized_zones or [
-            "ambient",
-            "refrigerated",
-            "frozen",
-        ]
+        self.authorized_zones = (
+            ["ambient", "refrigerated", "frozen"] if authorized_zones is None else authorized_zones
+        )
         self.current_location = current_location
         self.shift_end_time = shift_end_time  # minutes from now
         self.assigned_orders = []
@@ -167,6 +165,11 @@ class StoreLayout:
 
     def shortest_path(self, start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]]:
         """Find shortest path between two points using A* algorithm."""
+        if any(
+            not (0 <= x < self.width and 0 <= y < self.height) or (x, y) in self.obstacles
+            for x, y in (start, end)
+        ):
+            return []
         if start == end:
             return [start]
 
@@ -224,8 +227,11 @@ class StoreLayout:
         while unvisited:
             # Find nearest unvisited location
             nearest = min(unvisited, key=lambda loc: self.distance(current, loc))
+            segment = self.shortest_path(current, nearest)
+            if not segment:
+                return []
             current = nearest
-            path.append(current)
+            path.extend(segment[1:])
             unvisited.remove(nearest)
 
         return path
@@ -345,6 +351,12 @@ class FulfillmentPlanner:
                 # Check if associate can handle all orders in batch
                 if not all(associate.can_handle_order(order) for order in batch):
                     continue
+                if any(
+                    not self.store_layout.shortest_path(associate.current_location, location)
+                    for order in batch
+                    for location in order.get_item_locations()
+                ):
+                    continue
 
                 # Calculate estimated completion time
                 current_workload = associate.estimate_time_to_complete(
@@ -368,9 +380,11 @@ class FulfillmentPlanner:
                 self.assignments[best_associate.associate_id].extend(batch)
                 for order in batch:
                     order.assigned_to = best_associate.associate_id
+                    order.status = "pending"
             else:
                 # Could not assign this batch
                 for order in batch:
+                    order.assigned_to = None
                     order.status = "unassigned"
             # endregion book:store-fulfillment-assign-batch
 
@@ -635,6 +649,7 @@ def demo_fulfillment_system():  # noqa: C901
 
 
 # region book:store-fulfillment-demo-run
-# Uncomment to run the demo
-# demo_fulfillment_system()
+# Run the demo as a module.
+if __name__ == "__main__":
+    demo_fulfillment_system()
 # endregion book:store-fulfillment-demo-run

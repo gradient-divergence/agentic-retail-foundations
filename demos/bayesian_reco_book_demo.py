@@ -199,7 +199,7 @@ class BayesianRecommendationAgent:
         certainty = alpha + beta_val
 
         if pref["interactions"] == 0:
-            reason = "This product aligns with your category interests."
+            reason = "This product has no recorded interactions yet."
         elif expected_preference > 0.7 and certainty > 10:
             reason = "You've shown consistent enthusiasm for similar products."
         elif expected_preference > 0.6:
@@ -328,7 +328,7 @@ def demonstrate_bayesian_recommendations():
     for i, pid in enumerate(recommendations):
         explain = agent.explain_recommendation("C1", pid)
         prod_name = product_catalog[pid].name
-        reason = explain["explanation"]
+        reason = explain.explanation
         print(f"  {i + 1}. {prod_name} -> {reason}")
     # endregion book:bayes-reco-demo-recommend
 
@@ -338,7 +338,7 @@ def demonstrate_bayesian_recommendations():
     for i, pid in enumerate(recommendations_c2):
         explain = agent.explain_recommendation("C2", pid)
         prod_name = product_catalog[pid].name
-        reason = explain["explanation"]
+        reason = explain.explanation
         print(f"  {i + 1}. {prod_name} -> {reason}")
 
     print("\nVisualizing C1's preference distributions for top products:")

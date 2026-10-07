@@ -91,3 +91,51 @@ def test_trace_span_records_events():
     assert "span_started" in event_names
     assert "decision_made" in event_names
     assert "span_finished" in event_names
+
+
+@pytest.mark.parametrize("cost", [float("nan"), float("inf"), -1.0])
+def test_invalid_cost_cannot_bypass_budget(cost):
+    with pytest.raises(ValidationError):
+        ActionRequest(tool_name="place_reorder", payload={}, estimated_cost=cost)
+
+
+@pytest.mark.parametrize("limit", [float("nan"), float("inf"), -1.0])
+def test_invalid_policy_limit_is_rejected(limit):
+    with pytest.raises(ValueError):
+        MaxCostRule(limit)
+
+
+def test_blocked_action_does_not_execute_and_records_trace():
+    executed = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolSpec(
+            name="place_reorder",
+            description="Submit a reorder.",
+            input_model=ReorderRequest,
+            output_model=ReorderResponse,
+            handler=lambda payload: executed.append(payload),
+        )
+    )
+    evaluator = EvaluationRecorder()
+    agent = RAOMAgent(registry, PolicyEngine([MaxCostRule(50)]), reorder_decision, evaluator)
+    result = agent.step(
+        InventoryObservation(product_id="SKU-1", on_hand=3, reorder_point=5, suggested_order=12),
+        trace_id="parent-trace",
+    )
+    assert result.status == "blocked"
+    assert not executed
+    assert evaluator.records[0].result == result
+    assert result.trace_id == evaluator.records[0].trace_id == "parent-trace"
+
+
+def test_tool_failure_is_recorded_with_trace():
+    evaluator = EvaluationRecorder()
+    agent = RAOMAgent(ToolRegistry(), PolicyEngine(), reorder_decision, evaluator)
+    result = agent.step(
+        InventoryObservation(product_id="SKU-1", on_hand=3, reorder_point=5, suggested_order=12),
+        trace_id="parent-trace",
+    )
+    assert result.status == "error"
+    assert "Unknown tool" in result.error
+    assert evaluator.records[0].result.span_id == result.span_id

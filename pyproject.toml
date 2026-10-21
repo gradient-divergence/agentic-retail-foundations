@@ -172,6 +172,8 @@ ignore = [] # Rule codes to ignore (e.g., "E501" if you don't enforce line lengt
 
 [tool.ruff.format]
 # See https://docs.astral.sh/ruff/formatter/
+# Kept exactly as printed in the book, where a call is wrapped to the page width.
+exclude = ["demos/ooda_pricing_decide_excerpt.py"]
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false

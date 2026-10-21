@@ -25,7 +25,7 @@ A modular, extensible Python framework and companion codebase for the third edit
 ## What's New in the Third Edition
 
 - **Repaired code.** The demos, agents and utilities were repaired for this edition, and the book's printed listings are drawn from this code.
-- **Regression tests.** Each repair came with a test; the suite grew from 36 test files to 114 (1,029 tests pass; 5 more check the manuscript's extracted listings and run only beside the book's source).
+- **Regression tests.** Each repair came with a test; the suite grew from 36 test files to 113, and all 1,029 tests pass.
 - **Demos that say what they need.** A demo that needs an API key or a running service now names it and stops, instead of failing midway.
 - **Tags.** `third-edition` (and `v3.1.0`) marks the code as printed in the published third edition; `v3.0.0` is the 7 October pre-release state, and `v2.0.0` is the second edition's.
 

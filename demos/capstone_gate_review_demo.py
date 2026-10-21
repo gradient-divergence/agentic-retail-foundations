@@ -1,6 +1,6 @@
 """Reproducible SIMULATION of SKU-123's next Stage 1 -> 2 gate review.
 
-Criteria quoted from ``summary-and-future-directions.qmd``:
+Criteria quoted from the book's Chapter 14 (Strategy, Maturity, and Futures):
     "value over a measured baseline across a representative window, within
     availability, capital, waste, and workload limits; initial policies;
     incident response exercised"

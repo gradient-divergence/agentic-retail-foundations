@@ -11,6 +11,8 @@ class TraceContext(BaseModel):
     route: str
     tenant_id: str | None = None
     start_time: float = Field(default_factory=time.perf_counter)
+    tool_calls: int = 0
+    tokens_used: int = 0
 
     def finish(self) -> dict[str, float]:
         return {"latency_ms": (time.perf_counter() - self.start_time) * 1000}

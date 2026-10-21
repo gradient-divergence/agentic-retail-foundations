@@ -305,17 +305,17 @@ async def test_recovery_helpers_publish_correct_events(mock_publish, orchestrato
         "inventory.reallocation_requested",
         {
             "order_id": order_id,
-            "allow_substitutions": True,
+            "allow_substitutions": False,
             "try_alternative_methods": True,
         },
     )
 
-    # Test Payment Failure (Retry)
+    # Test Payment Failure (Decline requires customer action)
     mock_publish.reset_mock()
     await orchestrator._handle_payment_failure(order_id, "InsufficientFunds")
     mock_publish.assert_awaited_once_with(
-        "payment.retry_requested",
-        {"order_id": order_id, "retry_count": 1, "delay_minutes": 5},
+        "payment.alternative_requested",
+        {"order_id": order_id, "original_error": "InsufficientFunds"},
     )
 
     # Test Payment Failure (Alternative)

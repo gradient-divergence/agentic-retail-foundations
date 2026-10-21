@@ -20,7 +20,7 @@ class InventoryLookupResponse(BaseModel):
 
 def build_agent_card() -> AgentCard:
     try:
-        from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+        from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             'a2a-sdk is not installed. Install with: uv pip install -e ".[agent_protocols]"'
@@ -36,19 +36,22 @@ def build_agent_card() -> AgentCard:
     return AgentCard(
         name="Retail Inventory Agent",
         description="Answers SKU availability questions for retail operations.",
-        url="http://localhost:9999/",
+        supported_interfaces=[
+            AgentInterface(url="http://localhost:9999/", protocol_binding="JSONRPC", protocol_version="1.0")
+        ],
         version="1.0.0",
         default_input_modes=["application/json"],
         default_output_modes=["application/json"],
-        capabilities=AgentCapabilities(streaming=True),
+        capabilities=AgentCapabilities(streaming=True, extended_agent_card=True),
         skills=[skill],
-        supports_authenticated_extended_card=True,
     )
 
 
 def main() -> None:
+    from google.protobuf.json_format import MessageToJson
+
     card = build_agent_card()
-    print(card.model_dump_json(indent=2))
+    print(MessageToJson(card, indent=2))
 
 
 if __name__ == "__main__":

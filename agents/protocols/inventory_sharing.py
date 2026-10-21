@@ -26,6 +26,7 @@ class InventoryCollaborationNetwork:
         self.max_transfer_distance = max_transfer_distance
         self.transfer_costs: dict[tuple[str, str], float] = {}
         self.pending_transfers: list[dict] = []
+        self.rng = random.Random(7)  # Reproducible synthetic scores, independent of callers.
 
     def register_store(self, store: Store) -> None:
         """
@@ -36,7 +37,8 @@ class InventoryCollaborationNetwork:
         self.stores[store.store_id] = store
         for eid, estore in self.stores.items():
             if eid != store.store_id:
-                cost = store.transfer_cost_factor * estore.transfer_cost_factor * random.uniform(0.5, 2.0)
+                # Random costs are toy scores in the same units as transfer utility, not commercial estimates.
+                cost = store.transfer_cost_factor * estore.transfer_cost_factor * self.rng.uniform(0.5, 2.0)
                 self.transfer_costs[(store.store_id, eid)] = cost
                 self.transfer_costs[(eid, store.store_id)] = cost
 
@@ -55,7 +57,7 @@ class InventoryCollaborationNetwork:
             sender_id: str
             available_qty: int
             transfer_cost: float
-            net_value: float
+            net_value: float  # Synthetic common-unit score, not consolidated profit.
             value_per_unit: float
 
         for sid, st in self.stores.items():

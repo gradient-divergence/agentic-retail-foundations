@@ -11,6 +11,7 @@ This demo keeps the focus on the mechanism:
 # region book:task-allocation-demo
 
 import asyncio
+import random
 
 from agents.protocols.contract_net import RetailCoordinator
 from agents.store import StoreAgent
@@ -18,6 +19,7 @@ from models.task import Task, TaskType
 
 
 async def demo_contract_net_protocol() -> None:
+    random.seed(7)
     coordinator = RetailCoordinator(coordinator_id="coordinator-1", name="Main Coordinator")
 
     store_agents = [
@@ -31,17 +33,19 @@ async def demo_contract_net_protocol() -> None:
     tasks = [
         Task(
             type=TaskType.DELIVERY,
+            id="delivery-north",
             description="Deliver package to Zone A",
             urgency=7,
             required_capacity=3,
-            location="North",
+            location="North Store",
         ),
         Task(
             type=TaskType.INVENTORY_CHECK,
+            id="inventory-south",
             description="Check stock for Item X",
             urgency=5,
             required_capacity=1,
-            location="South",
+            location="South Store",
         ),
     ]
 
@@ -57,12 +61,12 @@ async def demo_contract_net_protocol() -> None:
 
         winning_bid = await coordinator.award_task(task.id)
         if winning_bid is None:
-            print(f"Task {task.id[:8]}: no suitable bids")
+            print(f"Task {task.id}: no suitable bids")
             continue
 
         winner = next(a for a in store_agents if a.agent_id == winning_bid.agent_id)
         winner.assigned_tasks.append(task)
-        print(f"Task {task.id[:8]} awarded to {winner.name} (bid={winning_bid.bid_value:.2f})")
+        print(f"Task {task.id} awarded to {winner.name} (bid={winning_bid.bid_value:.2f})")
 
         await winner.execute_task(task)
 

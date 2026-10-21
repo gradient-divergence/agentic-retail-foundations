@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from models.procurement import ProcurementAuction, SupplierBid
+from models.procurement import ProcurementAuction, PurchaseOrder, SupplierBid
 from models.supplier import Supplier, SupplierRating
 
 
@@ -22,3 +22,9 @@ def test_weighted_auction_rejects_over_budget_bid():
     order_id = auction.create_purchase_order("sku", 10, deadline_days=7, budget=100)
     auction.bids[order_id] = [SupplierBid("a", order_id, 101, 1, 0.99)]
     assert auction.evaluate_bids(order_id) is None
+
+
+def test_delivery_duration_starts_at_the_bid_not_order_creation():
+    order = PurchaseOrder("sku", 10, 7, 100, creation_time=datetime(2026, 10, 1))
+    assert not order.accepts_bid(SupplierBid("a", order.id, 90, 2, 0.95, datetime(2026, 10, 7)))
+    assert order.accepts_bid(SupplierBid("a", order.id, 90, 1, 0.95, datetime(2026, 10, 7)))

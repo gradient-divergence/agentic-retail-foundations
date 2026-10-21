@@ -56,6 +56,10 @@ if __name__ == "__main__":
     posterior = bayesian_update(prior, treatment)
     uplift = estimate_uplift(control, treatment)
 
+    print(
+        f"Control: {control.conversions}/{control.trials}; "
+        f"treatment: {treatment.conversions}/{treatment.trials}"
+    )
     print("Posterior mean conversion rate:", round(posterior.mean(), 4))
     print("Estimated uplift:", round(uplift, 4))
 # endregion book:bayes-uplift-demo

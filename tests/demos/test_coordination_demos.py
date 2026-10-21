@@ -40,7 +40,8 @@ def test_contract_net_demo_awards_lowest_cost_agent(capsys):
         asyncio.run(task_allocation_cnp_demo.demo_contract_net_protocol())
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) == 2
-    assert all("awarded to North Store" in line for line in lines)
+    assert "awarded to North Store" in lines[0]
+    assert "awarded to South Store" in lines[1]
 
 
 def test_inventory_demo_conserves_total():

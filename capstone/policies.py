@@ -10,6 +10,7 @@ from models.governance import AuditLogEntry, PolicyDecision, SupervisorAction
 class PolicyInput(BaseModel):
     action: str
     amount: float | None = Field(default=None, allow_inf_nan=False)
+    currency: Literal["USD"] = "USD"  # Supplier order totals; price_change amounts are fractions.
     customer_tier: Literal["standard", "gold", "vip"] | None = None
     channel: Literal["email", "sms", "app"] | None = None
     risk_score: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)

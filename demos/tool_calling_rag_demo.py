@@ -98,7 +98,11 @@ def run_tool_call(query: str) -> AssistantResponse:
 
     if tool_call.name == "search_catalog":
         results = search_catalog(query=tool_call.args.query)
-        answer = "Top matches: " + ", ".join(p.name for p in results)
+        answer = (
+            "Top matches: " + ", ".join(p.name for p in results)
+            if results
+            else "No catalog matches; ask for another description."
+        )
         sources = [p.sku for p in results]
     else:
         answer = get_return_policy()
@@ -108,7 +112,7 @@ def run_tool_call(query: str) -> AssistantResponse:
         intent=tool_call.name,
         answer=answer,
         sources=sources,
-        confidence=0.86,
+        confidence=0.86 if sources else 0.0,  # Illustrative score; abstain without evidence.
         trace_id=trace_id,
     )
 

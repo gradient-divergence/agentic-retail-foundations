@@ -8,7 +8,7 @@ from types import ModuleType, SimpleNamespace
 
 def test_printed_import_region_defines_sensor_message_without_missing_forward_reference(monkeypatch):
     monkeypatch.setitem(sys.modules, "fastapi", SimpleNamespace(FastAPI=object, WebSocket=object))
-    path = Path(__file__).resolve().parents[2] / "demos/sensor_processor_demo.py"
+    path = Path(__file__).resolve().parents[2] / "agents/sensor.py"
     source = path.read_text()
     region = source.split("# region book:sensor-processor-imports\n", 1)[1]
     region = region.split("# endregion book:sensor-processor-imports", 1)[0]
@@ -22,7 +22,7 @@ def test_printed_import_region_defines_sensor_message_without_missing_forward_re
 
 def test_sensor_message_envelope_timestamp_is_used_without_mutating_payload(monkeypatch):
     monkeypatch.setitem(sys.modules, "fastapi", SimpleNamespace(FastAPI=object, WebSocket=object))
-    path = Path(__file__).resolve().parents[2] / "demos/sensor_processor_demo.py"
+    path = Path(__file__).resolve().parents[2] / "agents/sensor.py"
     module = runpy.run_path(str(path))
     processor_type = module["SensorDataProcessor"]
     processor = processor_type.__new__(processor_type)
@@ -30,5 +30,5 @@ def test_sensor_message_envelope_timestamp_is_used_without_mutating_payload(monk
     timestamp = datetime.now().isoformat()
     message = module["SensorMessage"](sensor_id="S1", sensor_type="unknown", timestamp=timestamp)
     asyncio.run(processor.process_sensor_message(message))
-    assert processor.recent_readings == {"S1": [{"timestamp": timestamp}]}
+    assert processor.recent_readings == {}  # Unknown types and naive timestamps are rejected.
     assert message.payload == {}

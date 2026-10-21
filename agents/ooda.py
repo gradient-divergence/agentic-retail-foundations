@@ -24,8 +24,8 @@ class OODAPricingAgent:
 
     def __init__(
         self,
-        inventory_weight: float = 0.3,
-        competitor_weight: float = 0.4,
+        inventory_weight: float = 0.4,
+        competitor_weight: float = 0.3,
         sales_weight: float = 0.3,
         max_price_change_pct: float = 5.0,
     ) -> None:
@@ -188,15 +188,25 @@ class OODAPricingAgent:
         capped_change = max(-self.max_price_change_pct, min(self.max_price_change_pct, total_change))
         new_price = curr_price * (1 + capped_change / 100)
 
-        # Respect min/max
-        new_price = max(product.min_price, min(product.max_price, new_price))
-        new_price = self._apply_price_psychology(new_price)
         price = Decimal(str(curr_price))
         change = Decimal(str(self.max_price_change_pct)) / 100
         cent = Decimal("0.01")
         lower = max(Decimal(str(product.min_price)), price * (1 - change)).quantize(cent, ROUND_CEILING)
         upper = min(Decimal(str(product.max_price)), price * (1 + change)).quantize(cent, ROUND_FLOOR)
-        new_price = float(max(lower, min(upper, Decimal(str(new_price)))))
+        if price <= 0 or change < 0 or lower > upper:
+            raise ValueError("No feasible price within bounds and change cap")
+        candidate = max(lower, min(upper, Decimal(str(new_price)).quantize(cent)))
+        bounded_candidate = candidate
+        ending = Decimal(str(self._apply_price_psychology(float(candidate))))
+        # Optional ending: at most one cent, preserving direction and bounds.
+        if (
+            lower <= ending <= upper
+            and abs(ending - candidate) <= cent
+            and (ending - price) * (candidate - price) > 0
+        ):
+            candidate = ending
+        new_price = float(candidate)
+        capped_change = float((candidate - price) / price * 100)
 
         # Identify main driver
         comps = {
@@ -212,6 +222,7 @@ class OODAPricingAgent:
             "old_price": curr_price,
             "new_price": round(new_price, 2),
             "capped_change_pct": capped_change,
+            "price_ending_adjustment": float(candidate - bounded_candidate),
             "primary_driver": main_driver,
         }
         logger.info(
@@ -231,7 +242,7 @@ class OODAPricingAgent:
         old_p = decision.get("old_price", product.current_price)
         new_p = decision.get("new_price", product.current_price)
 
-        if abs(new_p - old_p) < 0.01:
+        if abs(Decimal(str(new_p)) - Decimal(str(old_p))) < Decimal("0.01"):
             logger.info(f"Act {product_id}: price change too small, skipping.")
             return False
 

@@ -10,8 +10,10 @@ def test_malformed_proposal_routes_to_human(monkeypatch, capsys):
 
 
 def test_proposal_validation_error_routes_to_human(monkeypatch, capsys):
+    original_payload = demo.propose_price_update().model_dump()
+
     def invalid_proposal():
-        return demo.PriceUpdatePayload(sku="SKU-1001", new_price=-1, reason="bad", confidence=0.5)
+        return demo.PriceUpdatePayload(**{**original_payload, "new_price": -1})
 
     monkeypatch.setattr(demo, "propose_price_update", invalid_proposal)
     demo.run_pipeline()
@@ -20,10 +22,9 @@ def test_proposal_validation_error_routes_to_human(monkeypatch, capsys):
 
 def test_extra_fields_do_not_disappear(monkeypatch, capsys):
     def invalid_proposal():
-        return demo.PriceUpdatePayload(
-            sku="SKU-1001", new_price=1, reason="bad", confidence=0.5, unapproved=True
-        )
+        return demo.PriceUpdatePayload(**{**original_payload, "unapproved": True})
 
+    original_payload = demo.propose_price_update().model_dump()
     monkeypatch.setattr(demo, "propose_price_update", invalid_proposal)
     demo.run_pipeline()
     assert "route_to_human_review" in capsys.readouterr().out
@@ -31,4 +32,4 @@ def test_extra_fields_do_not_disappear(monkeypatch, capsys):
 
 def test_valid_pipeline_prints_original_result(capsys):
     demo.run_pipeline()
-    assert capsys.readouterr().out == "Apply price: SKU-1001 -> 109.0\n"
+    assert capsys.readouterr().out == "Apply price: SKU-1001 -> 109.0 USD\n"

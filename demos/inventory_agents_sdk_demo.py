@@ -44,6 +44,8 @@ def run_demo() -> None:
 
     task = "Ensure product_123 has at least 50 units in stock."
     result = Runner.run_sync(inventory_agent, task)
+    if check_inventory("product_123") < 50:
+        raise RuntimeError("Inventory postcondition failed: product_123 still has fewer than 50 units")
     print(result.final_output)
 
 

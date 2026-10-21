@@ -35,21 +35,6 @@ class ProductInfo:
 
 
 @dataclass
-class InventoryItem:
-    """
-    Data model for inventory item state.
-    """
-
-    product_id: str
-    current_stock: int
-    reorder_point: int
-    optimal_stock: int
-    last_reorder_date: datetime | None = None
-    expected_delivery_date: datetime | None = None
-    pending_order_quantity: int = 0
-
-
-@dataclass
 class SalesData:
     """
     Data model for sales data, including daily sales and trend calculation.
@@ -74,7 +59,30 @@ class SalesData:
         return (recent_week_sales - previous_week_sales) / previous_week_sales
 
 
-# endregion book:bdi-inventory-data-models
+@dataclass
+class InventoryItem:
+    """
+    Data model for inventory item state.
+    """
+
+    product_id: str
+    current_stock: int
+    reorder_point: int
+    optimal_stock: int
+    last_reorder_date: datetime | None = None
+    pending_receipts: list[tuple[datetime, int]] = field(default_factory=list)
+
+    # endregion book:bdi-inventory-data-models
+
+    @property
+    def pending_order_quantity(self) -> int:
+        return sum(quantity for _, quantity in self.pending_receipts)
+
+    def receive_due(self, date: datetime) -> int:
+        delivered = sum(qty for eta, qty in self.pending_receipts if eta <= date)
+        self.pending_receipts = [(eta, qty) for eta, qty in self.pending_receipts if eta > date]
+        self.current_stock += delivered
+        return delivered
 
 
 # region book:inventory-sharing-inventory-models

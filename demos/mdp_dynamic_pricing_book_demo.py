@@ -11,13 +11,13 @@ class DynamicPricingMDP:
     An MDP formulation for dynamic pricing of a seasonal product.
 
     States: (weeks_remaining, inventory_level, current_discount)
-    Actions: Set discount to 0%, 20%, 40%, or 60%
-    Rewards: Revenue from sales minus inventory holding costs
+    Actions: Configured discounts (demo: 0%, 10%, ..., 50%)
+    Rewards: USD revenue minus holding costs, plus terminal salvage
     """
 
     # endregion book:mdp-dynamic-imports
 
-    # region book:mdp-dynamic-init
+    # region book:mdp-dynamic-init-joined
     def __init__(
         self,
         initial_inventory: int = 100,
@@ -39,9 +39,7 @@ class DynamicPricingMDP:
         self.price_elasticity = price_elasticity
         self.holding_cost_per_unit = holding_cost_per_unit
         self.end_season_salvage_value = end_season_salvage_value
-        # endregion book:mdp-dynamic-init
 
-        # region book:mdp-dynamic-discounts
         # Available discount levels
         self.available_discounts = available_discounts or [0.0, 0.2, 0.4, 0.6]
         # Define state space dimensions
@@ -50,7 +48,7 @@ class DynamicPricingMDP:
         self.episode_rewards = []
         self.episode_states = []
         self.episode_actions = []
-        # endregion book:mdp-dynamic-discounts
+        # endregion book:mdp-dynamic-init-joined
 
     # region book:mdp-dynamic-reset
     def reset(self) -> tuple[int, int, float]:
@@ -303,9 +301,45 @@ def train_agent(
 # endregion book:mdp-dynamic-train
 
 
-# region book:mdp-dynamic-demo
+# region book:mdp-dynamic-evaluate
+def evaluate_policy(
+    env: DynamicPricingMDP,
+    policy: dict,
+    seeds: tuple[int, ...] = (1001, 1002, 1003),
+    discount_factor: float = 0.95,
+) -> dict:
+    """Frozen greedy policy versus full-price baseline on identical held-out seeds."""
+    results = {}
+    for name in ("learned", "full_price"):
+        runs = []
+        for seed in seeds:
+            random.seed(seed)
+            np.random.seed(seed)
+            state, discounted, business_total, trace = env.reset(), 0.0, 0.0, []
+            for week in range(env.season_length_weeks):
+                action = policy.get(state, 0) if name == "learned" else 0
+                next_state, reward, done, info = env.step(action)
+                business_total += reward
+                discounted += discount_factor**week * reward
+                trace.append((state, action, round(reward, 2)))
+                state = next_state
+                if done:
+                    break
+            runs.append(
+                dict(discounted_return=discounted, undiscounted_business_total=business_total, trace=trace)
+            )
+        results[name] = runs
+    return results
+
+
+# endregion book:mdp-dynamic-evaluate
+
+
+# region book:mdp-dynamic-demo-joined
 def demonstrate_mdp_dynamic_pricing():
-    """Demonstrate the MDP for dynamic pricing."""
+    """Seeded seasonal repricing; prices may rise, so this is not permanent markdown."""
+    random.seed(7)
+    np.random.seed(7)
     # Create the environment
     env = DynamicPricingMDP(
         initial_inventory=100,
@@ -317,9 +351,7 @@ def demonstrate_mdp_dynamic_pricing():
         end_season_salvage_value=15.0,
         available_discounts=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
     )
-    # endregion book:mdp-dynamic-demo
 
-    # region book:mdp-dynamic-create-agent
     # Create the agent
     agent = QLearningAgent(
         learning_rate=0.1,
@@ -331,16 +363,14 @@ def demonstrate_mdp_dynamic_pricing():
     # Train the agent
     train_agent(env, agent, num_episodes=500, verbose=True)
 
-    # Test the policy
-    # Sample insight from the learned policy:
-    # - Early in season: Minimal discounts unless inventory is very high
-    # - Mid-season: Moderate discounts if inventory is above target trajectory
-    # - End of season: Deep discounts to clear remaining inventory
-
-    # Key pattern observed: The optimal policy tends to maintain regular price
-    # when inventory follows expected sales trajectory, and only applies
-    # discounts when inventory levels exceed target levels for the given week
-    # endregion book:mdp-dynamic-create-agent
+    evaluation = evaluate_policy(env, agent.get_policy().policy, discount_factor=agent.discount_factor)
+    for name, runs in evaluation.items():
+        print(
+            f"Frozen {name}: mean discounted return={np.mean([r['discounted_return'] for r in runs]):.2f}; "
+            f"undiscounted business total={np.mean([r['undiscounted_business_total'] for r in runs]):.2f}"
+        )
+    print("Held-out learned state/action/reward trace:", evaluation["learned"][0]["trace"])
+    # endregion book:mdp-dynamic-demo-joined
 
 
 if __name__ == "__main__":

@@ -82,7 +82,7 @@ def _():
         predicted_demand = {"Jeans": 15, "T-Shirt": 5}
         orders = agent.evaluate_restock(current_stock, predicted_demand)
         # The agent should order Jeans because 5 < 15+10, but not T-Shirt because 20 >= 5+10
-        assert "Jeans" in orders and orders["Jeans"] >= 20, "Jeans restock quantity should be at least 20"
+        assert "Jeans" in orders and orders["Jeans"] == 20, "Jeans restock quantity should be exactly 20"
         assert orders["T-Shirt"] == 0, "T-Shirt should not be reordered"
 
         # Scenario: plenty of stock should result in no orders
@@ -108,7 +108,7 @@ def _(mo):
     scenarios:
 
     - In the first scenario, *Jeans* have current stock 5 and predicted demand 15. Since 5 is less than 15+10,
-    the agent should decide to restock. We assert that the order for Jeans is at least 20 (in fact, it should
+    the agent should decide to restock. We assert that the order for Jeans is exactly 20 (it should
     be exactly 20 in this logic). For *T-Shirt*, stock is 20 and demand 5, which is above the threshold
     (5+10=15, stock is 20), so no restock – we assert the order is 0.
     - In the second scenario, stock is plenty relative to demand, so we expect no orders.

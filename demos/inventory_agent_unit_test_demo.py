@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class InventorySnapshot(BaseModel):
     stock: dict[str, int]
+    on_order: dict[str, int] = Field(default_factory=dict)
+    season_open: bool = True
 
 
 class DemandForecast(BaseModel):
@@ -23,9 +25,9 @@ class InventoryAgent:
     def evaluate_restock(self, snapshot: InventorySnapshot, forecast: DemandForecast) -> RestockPlan:
         orders: dict[str, int] = {}
         for item in snapshot.stock.keys() | forecast.demand.keys():
-            stock = snapshot.stock.get(item, 0)
+            stock = snapshot.stock.get(item, 0) + snapshot.on_order.get(item, 0)
             demand = forecast.demand.get(item, 0)
-            if stock < demand + self.safety_stock:
+            if snapshot.season_open and stock < demand + self.safety_stock:
                 order_qty = (demand + self.safety_stock) - stock
                 orders[item] = max(order_qty, 0)
             else:
@@ -35,16 +37,17 @@ class InventoryAgent:
 
 def test_inventory_restock_logic():
     agent = InventoryAgent(safety_stock=10)
-    snapshot = InventorySnapshot(stock={"Jeans": 5, "T-Shirt": 20})
-    forecast = DemandForecast(demand={"Jeans": 15, "T-Shirt": 5})
+    snapshot = InventorySnapshot(stock={"SKU-123": 5, "SKU-456": 20})
+    forecast = DemandForecast(demand={"SKU-123": 15, "SKU-456": 5})
     orders = agent.evaluate_restock(snapshot, forecast)
-    assert orders.orders["Jeans"] >= 20
-    assert orders.orders["T-Shirt"] == 0
+    assert orders.orders["SKU-123"] == 20
+    assert orders.orders["SKU-456"] == 0
 
-    snapshot = InventorySnapshot(stock={"Dress": 50})
-    forecast = DemandForecast(demand={"Dress": 30})
+    snapshot = InventorySnapshot(stock={"SKU-789": 50})
+    forecast = DemandForecast(demand={"SKU-789": 30})
     orders = agent.evaluate_restock(snapshot, forecast)
-    assert orders.orders["Dress"] == 0
+    assert orders.orders["SKU-789"] == 0
+    assert agent.evaluate_restock(InventorySnapshot(stock={"SKU-789": 40}), forecast).orders["SKU-789"] == 0
 
 
 # endregion book:inventory-agent-unit-test-demo

@@ -1,7 +1,7 @@
 """Compact decide-phase excerpt for OODA pricing."""
 
-# region book:ooda-pricing-decide-excerpt
 from datetime import datetime
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 
 from pydantic import BaseModel
 
@@ -25,6 +25,19 @@ class PriceDecision(BaseModel):
     capped_change_pct: float
 
 
+def _bounded_price(current_price, proposed_price, min_price, max_price, max_change_pct):
+    price = Decimal(str(current_price))
+    cap = Decimal(str(max_change_pct)) / 100
+    cent = Decimal("0.01")
+    lower = max(Decimal(str(min_price)), price * (1 - cap)).quantize(cent, ROUND_CEILING)
+    upper = min(Decimal(str(max_price)), price * (1 + cap)).quantize(cent, ROUND_FLOOR)
+    if price <= 0 or cap < 0 or lower > upper:
+        raise ValueError("No feasible price within bounds and change cap")
+    final = max(lower, min(upper, Decimal(str(proposed_price)).quantize(cent)))
+    return float(final), float((final - price) / price * 100)
+
+
+# region book:ooda-pricing-decide-excerpt
 def decide_price(
     current_price: float,
     orientation: OrientationSignal,
@@ -56,7 +69,9 @@ def decide_price(
     )
     capped_change = max(-max_change_pct, min(max_change_pct, total_change))
     new_price = current_price * (1 + capped_change / 100)
-    new_price = max(min_price, min(max_price, new_price))
+    new_price, capped_change = _bounded_price(
+        current_price, new_price, min_price, max_price, max_change_pct
+    )
 
     return PriceDecision(
         timestamp=datetime.now(),

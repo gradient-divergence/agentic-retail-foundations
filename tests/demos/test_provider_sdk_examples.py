@@ -155,3 +155,29 @@ def test_pricing_tool_rejects_invalid_prices(price):
     with pytest.raises(ValueError):
         update_price("product_456", price)
     assert current_prices == before
+
+
+def test_installed_a2a_card_serializes_deterministically(capsys):
+    from demos.a2a_agent_card_demo import main
+
+    main()
+    first = capsys.readouterr().out
+    main()
+    assert capsys.readouterr().out == first
+    import json
+
+    card = json.loads(first)
+    assert card["supportedInterfaces"] == [
+        {"url": "http://localhost:9999/", "protocolBinding": "JSONRPC", "protocolVersion": "1.0"}
+    ]
+    assert card["capabilities"] == {"streaming": True, "extendedAgentCard": True}
+    assert card["skills"][0]["id"] == "inventory_lookup"
+
+
+def test_official_ap2_payment_request_builds_offline():
+    from demos.ap2_payment_request_demo import build_payment_request
+
+    request = build_payment_request()
+    assert request.details.total.amount.currency == "USD"
+    assert request.details.total.amount.value == 129.99
+    assert request.options.request_payer_email

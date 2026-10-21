@@ -84,6 +84,6 @@ def test_injected_client_exercises_entire_model_pipeline(monkeypatch):
     reply = asyncio.run(agent.process_customer_inquiry("C123", "Please check ORD988"))
     assert reply["message"] == "Your order is shipped."
     assert reply["actions"] == []
-    assert "Estimated delivery: 2023-11-01" in calls[1]["messages"][0]["content"]
-    assert "Tracking: TRK123" in calls[1]["messages"][0]["content"]
+    assert "Estimated delivery: 2023-11-01" in calls[1]["messages"][1]["content"]
+    assert "Tracking: TRK123" in calls[1]["messages"][1]["content"]
     assert len(calls) == 4

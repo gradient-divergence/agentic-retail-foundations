@@ -19,7 +19,7 @@ state_redis = redis.Redis(host="redis", port=6379, db=1)
 # endregion book:inventory-crdt-imports
 
 
-# region book:inventory-crdt-enum-event-type
+# region book:inventory-crdt-enum-event-type-joined
 class InventoryEventType(str, Enum):
     """Types of inventory events"""
 
@@ -33,10 +33,6 @@ class InventoryEventType(str, Enum):
     SNAPSHOT = "SNAPSHOT"
 
 
-# endregion book:inventory-crdt-enum-event-type
-
-
-# region book:inventory-crdt-enum-channel
 class InventoryChannel(str, Enum):
     """Available inventory channels"""
 
@@ -48,10 +44,6 @@ class InventoryChannel(str, Enum):
     MOBILE_APP = "MOBILE_APP"
 
 
-# endregion book:inventory-crdt-enum-channel
-
-
-# region book:inventory-crdt-enum-reservation-status
 class ReservationStatus(str, Enum):
     """Possible reservation statuses"""
 
@@ -61,10 +53,10 @@ class ReservationStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 
-# endregion book:inventory-crdt-enum-reservation-status
+# endregion book:inventory-crdt-enum-event-type-joined
 
 
-# region book:inventory-crdt-event-model
+# region book:inventory-crdt-event-model-joined
 class InventoryEvent(BaseModel):
     """Base event model"""
 
@@ -80,10 +72,6 @@ class InventoryEvent(BaseModel):
     metadata: dict[str, JsonValue] = Field(default_factory=dict)
 
 
-# endregion book:inventory-crdt-event-model
-
-
-# region book:inventory-crdt-reservation-model
 class InventoryReservation(BaseModel):
     """Model for inventory reservations"""
 
@@ -98,10 +86,6 @@ class InventoryReservation(BaseModel):
     status: ReservationStatus = ReservationStatus.ACTIVE
 
 
-# endregion book:inventory-crdt-reservation-model
-
-
-# region book:inventory-crdt-product-state
 class ProductInventoryState(BaseModel):
     """Current inventory state for a product at a location"""
 
@@ -123,14 +107,16 @@ class PNCounterSnapshot(BaseModel):
     decrements: dict[str, int]
 
 
-# endregion book:inventory-crdt-product-state
+# endregion book:inventory-crdt-event-model-joined
 
 
-# region book:inventory-crdt-pn-counter
+# region book:inventory-crdt-pn-counter-joined
 class PNCounter:
     """
     Positive-Negative Counter CRDT for inventory tracking
-    Guarantees eventual consistency across distributed nodes
+    Converges recorded state, not physical stock or reservation safety.
+    Each writer owns one unique durable component; replicas must share a baseline.
+    Reusing a writer identity loses concurrent independent increments (see tests).
     """
 
     def __init__(self, product_id: str, location_id: str, initial_value: int = 0):
@@ -143,9 +129,6 @@ class PNCounter:
         elif initial_value < 0:
             self.decrements["initial"] = abs(initial_value)
 
-    # endregion book:inventory-crdt-pn-counter
-
-    # region book:inventory-crdt-pn-increment
     def increment(self, node_id: str, value: int) -> None:
         """Increment counter by value"""
         if value < 0:
@@ -154,9 +137,6 @@ class PNCounter:
             self.increments[node_id] = 0
         self.increments[node_id] += value
 
-    # endregion book:inventory-crdt-pn-increment
-
-    # region book:inventory-crdt-pn-decrement
     def decrement(self, node_id: str, value: int) -> None:
         """Decrement counter by value"""
         if value < 0:
@@ -165,16 +145,13 @@ class PNCounter:
             self.decrements[node_id] = 0
         self.decrements[node_id] += value
 
-    # endregion book:inventory-crdt-pn-decrement
-
-    # region book:inventory-crdt-pn-value
     def value(self) -> int:
         """Get current counter value"""
         return sum(self.increments.values()) - sum(self.decrements.values())
 
-    # endregion book:inventory-crdt-pn-value
+    # endregion book:inventory-crdt-pn-counter-joined
 
-    # region book:inventory-crdt-pn-merge
+    # region book:inventory-crdt-pn-merge-joined
     def merge(self, other: PNCounter) -> PNCounter:
         """Merge with another counter - commutative and associative"""
         if (self.product_id, self.location_id) != (other.product_id, other.location_id):
@@ -188,9 +165,6 @@ class PNCounter:
             result.decrements[key] = max(self.decrements.get(key, 0), other.decrements.get(key, 0))
         return result
 
-    # endregion book:inventory-crdt-pn-merge
-
-    # region book:inventory-crdt-pn-dict
     def to_dict(self) -> PNCounterSnapshot:
         """Convert to snapshot for storage"""
         return PNCounterSnapshot(
@@ -209,4 +183,4 @@ class PNCounter:
         return counter
 
 
-# endregion book:inventory-crdt-pn-dict
+# endregion book:inventory-crdt-pn-merge-joined

@@ -194,9 +194,9 @@ class Store:
 
     def calculate_transfer_value(self, product_id: str, quantity: int, is_sending: bool) -> float:
         """
-        Calculate the value/benefit of transferring a product.
+        Calculate a synthetic transfer score in common toy units, not monetary value.
         Positive values indicate beneficial transfers, negative values indicate harmful ones.
-        Used to decide whether transfers should be approved.
+        Random transfer costs are illustrative scores, not commercial estimates.
 
         Args:
             product_id: ID of product to transfer

@@ -41,6 +41,7 @@ class MasterOrchestrator(BaseAgent):
             "order.delivered",
             "order.completed",
             "order.cancelled",
+            "payment.status_reconciliation_requested",
             "payment.retry_requested",  # Listen for specific recovery events
             "payment.alternative_requested",
             "inventory.reallocation_requested",
@@ -73,6 +74,8 @@ class MasterOrchestrator(BaseAgent):
                 "current_status": None,
             }
 
+        if event.event_type == "order.created":
+            self.orders[order_id]["policy"] = event.payload.get("policy", {})
         # Add event to history
         self.orders[order_id]["events"].append(
             {
@@ -217,7 +220,10 @@ class MasterOrchestrator(BaseAgent):
             "inventory.reallocation_requested",
             {
                 "order_id": order_id,
-                "allow_substitutions": True,  # Example policy
+                "allow_substitutions": self.orders.get(order_id, {})
+                .get("policy", {})
+                .get("allow_substitutions")
+                is True,
                 "try_alternative_methods": True,
             },
         )
@@ -228,13 +234,12 @@ class MasterOrchestrator(BaseAgent):
         if error_type in [
             "TemporaryProcessingError",
             "GatewayTimeout",
-            "InsufficientFunds",
         ]:
-            # Transient error or solvable error, retry payment after delay
+            # A timeout is uncertain; reconcile before any idempotent retry.
             logger.info(f"Requesting payment retry for order {order_id}.")
             await self.publish_event(
-                "payment.retry_requested",
-                {"order_id": order_id, "retry_count": 1, "delay_minutes": 5},
+                "payment.status_reconciliation_requested",
+                {"order_id": order_id, "idempotency_key": f"payment:{order_id}"},
             )
         else:
             # Permanent error (e.g., invalid card), request alternative payment

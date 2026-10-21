@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from math import isfinite
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,8 @@ class PreferencePair:
 def to_preference_pairs(cases: Iterable[EvalCase]) -> list[PreferencePair]:
     pairs: list[PreferencePair] = []
     for case in cases:
+        if not isfinite(case.score_a) or not isfinite(case.score_b):
+            raise ValueError("Preference scores must be finite")
         if case.score_a == case.score_b:
             continue
         chosen, rejected = (

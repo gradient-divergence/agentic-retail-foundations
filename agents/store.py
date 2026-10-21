@@ -9,7 +9,7 @@ import random
 from dataclasses import dataclass, field
 
 # Import the data models from the models directory
-from models.task import Bid, Task, TaskStatus
+from models.task import Bid, Task, TaskStatus, TaskType
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,8 @@ class StoreAgent:
         Returns None if the agent cannot perform the task.
         The bid_value represents the agent's cost/desirability (lower is better).
         """
+        if task.type == TaskType.INVENTORY_CHECK and task.location != self.location:
+            return None
         used_capacity = sum(
             t.required_capacity
             for t in self.assigned_tasks

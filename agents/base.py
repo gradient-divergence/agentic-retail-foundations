@@ -74,7 +74,11 @@ class BaseAgent:
 
         # Publish exception event
         # Ensure payload keys match expected structure if defined elsewhere
-        await self.publish_event("system.exception", {"error_details": error_details})
+        order_id = getattr(order, "order_id", None) or context.get("order_id")
+        payload: dict[str, Any] = {"error_details": error_details}
+        if order_id:
+            payload["order_id"] = order_id
+        await self.publish_event("order.exception" if order_id else "system.exception", payload)
 
 
 # endregion book:order-orchestration-base-agent

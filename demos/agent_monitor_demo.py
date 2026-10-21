@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+from math import isfinite
+
 import numpy as np
 
 from utils.monitoring import AgentMonitor as MonitorUtilities
@@ -12,16 +15,23 @@ class AgentMonitor:
         self.metric_thresholds = metric_thresholds
         self.alert_endpoints = alert_endpoints
         self.metrics_history = {}
+        self.history_limit = 120
 
     # endregion book:agent-monitor-class
 
     # region book:agent-monitor-record-metrics
     def record_metrics(self, timestamp, metrics_dict):
         """Record a set of performance metrics at a specific time"""
+        if any(not isfinite(value) for value in metrics_dict.values()):
+            logging.getLogger(__name__).warning(
+                "monitor.measurement_rejected", extra={"agent_id": self.agent_id, "reason": "nonfinite"}
+            )
+            raise ValueError("Metric measurements must be finite")
         for metric, value in metrics_dict.items():
             if metric not in self.metrics_history:
                 self.metrics_history[metric] = []
             self.metrics_history[metric].append((timestamp, value))
+            self.metrics_history[metric] = self.metrics_history[metric][-self.history_limit :]
 
             if metric in self.metric_thresholds:
                 min_val, max_val = self.metric_thresholds[metric]
@@ -32,7 +42,7 @@ class AgentMonitor:
 
     # region book:agent-monitor-detect-drift
     def detect_drift(self, metric, window_size=30):
-        """Detect if a metric is drifting from historical patterns"""
+        """Illustrative 15% mean-shift heuristic; assumes equally spaced observations"""
         if len(self.metrics_history.get(metric, [])) < window_size * 2:
             return False
 
@@ -74,9 +84,13 @@ class AgentMonitor:
         for metric, history in self.metrics_history.items():
             if self.detect_drift(metric):
                 if metric == "conversion_rate" and self._is_decreasing(history, 10):
-                    recommendations.append("Decrease price sensitivity coefficient")
+                    recommendations.append(
+                        "Investigate conversion against plan, availability, and seasonality"
+                    )
                 elif metric == "inventory_turnover" and self._is_decreasing(history, 10):
-                    recommendations.append("Increase promotion aggressiveness")
+                    recommendations.append(
+                        "Investigate turnover receipts, demand, and clearance contribution"
+                    )
 
         return recommendations
 

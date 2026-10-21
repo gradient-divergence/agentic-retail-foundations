@@ -307,34 +307,30 @@ class FulfillmentPlanner:
 
     # region book:store-fulfillment-batch-orders
     def batch_orders(self, max_items_per_batch: int = 10) -> list[list[Order]]:
-        """Group orders into batches for efficient picking."""
-        # Sort orders by priority (highest first)
+        """Batch by priority and temperature zones, preserving ambient-only work."""
         sorted_orders = sorted(self.orders, key=lambda o: -o.priority)
         batches = []
         current_batch = []
         current_items = 0
-
         for order in sorted_orders:
-            # If adding this order would exceed the max items, start a new batch
-            if current_items + len(order.items) > max_items_per_batch and current_batch:
+            zones_change = (
+                current_batch and order.get_temperature_zones() != current_batch[0].get_temperature_zones()
+            )
+            if current_batch and (current_items + len(order.items) > max_items_per_batch or zones_change):
                 batches.append(current_batch)
                 current_batch = []
                 current_items = 0
-
             current_batch.append(order)
             current_items += len(order.items)
-
-        # Add the last batch if not empty
         if current_batch:
             batches.append(current_batch)
-
         return batches
 
     # endregion book:store-fulfillment-batch-orders
 
     # region book:store-fulfillment-optimize-assignments
     def optimize_assignments(self):
-        """Assign orders to associates optimally."""
+        """Prefer eligible specialists, then handling time; oversized orders stay unassigned."""
         # Reset assignments
         self.assignments = {a.associate_id: [] for a in self.associates}
         # Group orders into batches
@@ -342,35 +338,19 @@ class FulfillmentPlanner:
         # Sort associates by efficiency (highest first)
         sorted_associates = sorted(self.associates, key=lambda a: -a.efficiency)
         # Assign batches to associates
-        for batch in batches:
-            # Find the best associate for this batch
+        while batches:
+            batch = batches.pop(0)
+            if sum(len(order.items) for order in batch) > 10:
+                for order in batch:
+                    order.assigned_to, order.status = None, "unassigned"
+                continue
             best_associate = None
-            min_completion_time = float("inf")
-
+            best_score = (float("inf"), float("inf"))
             for associate in sorted_associates:
-                # Check if associate can handle all orders in batch
-                if not all(associate.can_handle_order(order) for order in batch):
-                    continue
-                if any(
-                    not self.store_layout.shortest_path(associate.current_location, location)
-                    for order in batch
-                    for location in order.get_item_locations()
-                ):
-                    continue
-
-                # Calculate estimated completion time
-                current_workload = associate.estimate_time_to_complete(
-                    self.assignments.get(associate.associate_id, [])
-                )
-                batch_time = associate.estimate_time_to_complete(batch)
-                total_time = current_workload + batch_time
-
-                # Check if associate has enough time in shift
-                if associate.available_time() < total_time:
-                    continue
-
-                if total_time < min_completion_time:
-                    min_completion_time = total_time
+                total_time = self._eligible_completion_time(associate, batch)
+                score = (len(associate.authorized_zones), total_time)
+                if total_time < float("inf") and score < best_score:
+                    best_score = score
                     best_associate = associate
             # endregion book:store-fulfillment-optimize-assignments
 
@@ -382,11 +362,30 @@ class FulfillmentPlanner:
                     order.assigned_to = best_associate.associate_id
                     order.status = "pending"
             else:
-                # Could not assign this batch
+                if len(batch) > 1:
+                    batches[0:0] = [[order] for order in batch]
+                    continue
+                # Could not assign this atomic order
                 for order in batch:
                     order.assigned_to = None
                     order.status = "unassigned"
             # endregion book:store-fulfillment-assign-batch
+
+    # region book:store-fulfillment-eligible-completion
+    def _eligible_completion_time(self, associate: Associate, batch: list[Order]) -> float:
+        if not all(associate.can_handle_order(order) for order in batch):
+            return float("inf")
+        if any(
+            not self.store_layout.shortest_path(associate.current_location, location)
+            for order in batch
+            for location in order.get_item_locations()
+        ):
+            return float("inf")
+        workload = associate.estimate_time_to_complete(self.assignments.get(associate.associate_id, []))
+        total = workload + associate.estimate_time_to_complete(batch)
+        return total if associate.available_time() >= total else float("inf")
+
+    # endregion book:store-fulfillment-eligible-completion
 
     # region book:store-fulfillment-generate-paths
     def generate_picking_paths(self):
@@ -472,7 +471,7 @@ class FulfillmentPlanner:
                 )
                 explanation.append(f"- Walking distance: {total_distance} units")
                 zones = set().union(*(o.get_temperature_zones() for o in assigned))
-                explanation.append(f"- Temperature zones: {', '.join(zones)}")
+                explanation.append(f"- Temperature zones: {', '.join(sorted(zones))}")
 
         return "\n".join(explanation)
 
@@ -483,6 +482,7 @@ class FulfillmentPlanner:
 # Example usage
 def demo_fulfillment_system():  # noqa: C901
     """Demonstrate the fulfillment optimization system with a sample scenario."""
+    random.seed(7)
     # Create store layout
     store = StoreLayout(width=50, height=40)
     store.add_section((5, 15), (5, 15), "Grocery")

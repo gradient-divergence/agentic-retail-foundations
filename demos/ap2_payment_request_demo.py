@@ -5,12 +5,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ap2.models.payment_request import PaymentRequest
+    from ap2.types.payment_request import PaymentRequest
 
 
 def build_payment_request() -> PaymentRequest:
     try:
-        from ap2.models.payment_request import (
+        from ap2.types.payment_request import (
             PaymentCurrencyAmount,
             PaymentDetailsInit,
             PaymentItem,
@@ -25,14 +25,14 @@ def build_payment_request() -> PaymentRequest:
 
     item = PaymentItem(
         label="Seasonal jacket",
-        amount=PaymentCurrencyAmount(currency="USD", value="129.99"),
+        amount=PaymentCurrencyAmount(currency="USD", value=129.99),
     )
     details = PaymentDetailsInit(
         id="test_order_789",
         display_items=[item],
         total=PaymentItem(
             label="Total",
-            amount=PaymentCurrencyAmount(currency="USD", value="129.99"),
+            amount=PaymentCurrencyAmount(currency="USD", value=129.99),
         ),
     )
     method_data = PaymentMethodData(supported_methods="basic-card")

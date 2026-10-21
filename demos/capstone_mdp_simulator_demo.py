@@ -1,3 +1,5 @@
+"""Synthetic weekly simulator; margins, costs, and rewards are in USD."""
+
 # region book:capstone-mdp-imports
 import random
 from enum import Enum
@@ -30,7 +32,7 @@ class StepInfo(BaseModel):
     demand: float
     sales: float
     stockouts: float
-    revenue: float
+    contribution: float
     holding_cost: float
     penalty: float
     action_cost: float
@@ -77,9 +79,9 @@ class InventoryRiskMDP:
             week=0,
             inventory_on_hand=self.initial_inventory,
             pipeline=[],
-            risk_level="low",
+            risk_level=self._compute_risk(self.initial_inventory, SupplierStatus.STABLE),
             supplier_status=SupplierStatus.STABLE,
-            promo_active=False,
+            promo_active=0 in self.promo_weeks,
         )
         return self.state
 
@@ -117,7 +119,7 @@ class InventoryRiskMDP:
         stockout_penalty_multiplier = 1.0
 
         if action == Action.REORDER:
-            lead_time = self.reorder_lead_time + (1 if supplier_status == SupplierStatus.DELAYED else 0)
+            lead_time = self.reorder_lead_time + (self.state.supplier_status == SupplierStatus.DELAYED)
             new_pipeline.append((lead_time, self.reorder_qty))
             action_cost = 20.0
         elif action == Action.PRICE_PROTECT:
@@ -138,10 +140,10 @@ class InventoryRiskMDP:
         stockouts = max(0, demand - sales)
 
         # Reward components
-        revenue = sales * margin
+        contribution = sales * margin
         holding_cost = (inventory - sales) * self.holding_cost_per_unit
         penalty = stockouts * self.stockout_penalty * stockout_penalty_multiplier
-        reward = revenue - holding_cost - penalty - action_cost
+        reward = contribution - holding_cost - penalty - action_cost
 
         # Advance time
         next_week = self.state.week + 1
@@ -155,14 +157,14 @@ class InventoryRiskMDP:
             pipeline=new_pipeline,
             risk_level=risk_level,
             supplier_status=supplier_status,
-            promo_active=promo_active,
+            promo_active=next_week in self.promo_weeks,
         )
 
         info = StepInfo(
             demand=float(demand),
             sales=float(sales),
             stockouts=float(stockouts),
-            revenue=revenue,
+            contribution=contribution,
             holding_cost=holding_cost,
             penalty=penalty,
             action_cost=action_cost,
@@ -179,6 +181,25 @@ class InventoryRiskMDP:
     # endregion book:capstone-mdp-step-reward
 
 
+# region book:capstone-mdp-baseline
+def baseline_action(env: InventoryRiskMDP, state: InventoryState) -> Action:
+    """Reorder for a projected shortage over the supply horizon, including dated receipts."""
+    horizon = env.reorder_lead_time + (state.supplier_status == SupplierStatus.DELAYED)
+    if state.week + horizon >= env.horizon_weeks:
+        return Action.WAIT  # No saleable receipt before the episode ends.
+    available = state.inventory_on_hand
+    for week in range(horizon + 1):
+        available += sum(qty for eta, qty in state.pipeline if eta == week + 1)
+        demand = env.base_demand * (1 + (env.promo_lift if state.week + week in env.promo_weeks else 0))
+        available -= demand
+        if available < 0:
+            return Action.REORDER
+    return Action.WAIT
+
+
+# endregion book:capstone-mdp-baseline
+
+
 # region book:capstone-mdp-run
 if __name__ == "__main__":
     random.seed(7)
@@ -186,12 +207,7 @@ if __name__ == "__main__":
     state = env.reset()
 
     for _ in range(env.horizon_weeks):
-        if state.inventory_on_hand < 50:
-            action = Action.REORDER
-        elif state.risk_level == "high":
-            action = Action.MESSAGE_CUSTOMERS
-        else:
-            action = Action.WAIT
+        action = baseline_action(env, state)
 
         state, reward, done, info = env.step(action)
         print(

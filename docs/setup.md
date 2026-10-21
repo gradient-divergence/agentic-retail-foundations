@@ -4,7 +4,7 @@ This guide explains how to set up the project environment and run the examples.
 
 ## Prerequisites
 
-*   Python 3.10 or higher
+*   Python 3.13 (required by the current dependency stack)
 *   `pip` (or ideally `uv` for faster dependency management)
 *   Git
 *   (Optional but Recommended) Docker and Docker Compose (for running dependencies like Redis, Kafka easily)
@@ -18,35 +18,30 @@ This guide explains how to set up the project environment and run the examples.
     cd agentic-retail-foundations
     ```
 
-2.  **Create and Activate Virtual Environment:**
+2.  **Create the Locked Environment:** Run from the companion repository root.
+    Install `uv` before this step, then let it create the local `.venv`.
     ```bash
-    python -m venv .venv         # Create venv
-    source .venv/bin/activate  # Activate (Linux/macOS)
-    # .venv\Scripts\activate   # Activate (Windows - Command Prompt)
-    # .venv\Scripts\Activate.ps1 # Activate (Windows - PowerShell)
+    uv sync --frozen --extra dev --extra docs
     ```
+    Select additional named extras for the demonstrations you run: `streaming`,
+    `auth`, `cloud`, `monitoring`, `gnn`, or `spark`. Provider demos also require
+    their explicitly documented credentials; the offline examples do not.
 
-3.  **Install Dependencies:**
-    We recommend using `uv` for faster installation.
+3.  **Run an Offline Example:**
     ```bash
-    # Install uv if you don't have it
-    pip install uv 
-    
-    # Install core + development dependencies (linters, types, testing, docs)
-    uv pip install -e ".[dev,docs]"
+    uv run --frozen python -m demos.preference_pair_builder_demo
     ```
-    *Alternatively, using pip:* 
-    ```bash
-    pip install -e ".[dev,docs]"
-    ```
-    The `-e` flag installs the project in editable mode.
+    The logical output is one pair choosing “Returns accepted within 30 days
+    with receipt.” over “Sure, just send it back anytime.”, with reason
+    `preference_eval`. Start from a verified, release-pinned checkout; the
+    published third-edition ref requires separate verification.
 
 4.  **Environment Variables:**
     Copy the example environment file and fill in your details (especially the OpenAI key if using LLM features):
     ```bash
     cp .env.example .env
     # Now edit .env with your text editor
-    nano .env 
+    nano .env
     ```
 
 5.  **(Optional) Start Services:**
@@ -57,28 +52,28 @@ This guide explains how to set up the project environment and run the examples.
 
 ## Running Demos
 
-Most demonstration scripts are located in the `demos/` directory. Ensure your virtual environment is activated.
+Run these commands from the companion root. Each command uses the locked environment.
 
 *   **Standard Demos:** Run directly with Python.
     ```bash
-    python demos/agent_communication_demo.py
-    python demos/task_allocation_cnp_demo.py
+    uv run --frozen python -m demos.agent_communication_demo
+    uv run --frozen python -m demos.task_allocation_cnp_demo
     # ... and others
     ```
 *   **API/Service Demos:** Use `uvicorn`.
     ```bash
-    uvicorn demos.inventory_api_demo:app --reload --port 8001
-    uvicorn demos.api_gateway_demo:app --reload --port 8000 
+    uv run --frozen --extra streaming uvicorn demos.inventory_api_demo:app --reload --port 8001
+    uv run --frozen --extra streaming --extra auth uvicorn demos.api_gateway_demo:app --reload --port 8000
     # ... etc. Requires dependencies like Redis to be running
     ```
 *   **Spark Demo:** Requires a Spark environment.
     ```bash
-    # Example spark-submit command (adjust master, packages as needed)
-    spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0 demos/spark_streaming_demo.py
+    # Candidate coordinates for locked Spark 4.2.0 / Scala 2.13; requires a qualified JVM and Kafka.
+    .venv/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.2.0 demos/stream_processing_sales_velocity_demo.py
     ```
 *   **Feedback Loop Demo:** Runs indefinitely until stopped (Ctrl+C).
     ```bash
-    python demos/dynamic_pricing_feedback_demo.py
+    uv run --frozen --extra streaming python -m demos.dynamic_pricing_feedback_demo
     ```
 
 Refer to the [Examples Overview](examples/index.md) for details on each demo.
@@ -89,7 +84,7 @@ Interactive notebooks explaining concepts and running demos are in the `notebook
 
 ```bash
 # Ensure venv is active
-marimo edit notebooks/multi-agent-systems-in-retail.py
+uv run --frozen marimo edit notebooks/multi-agent-systems-in-retail.py
 # Or run headlessly (less common for exploration)
 # marimo run notebooks/multi-agent-systems-in-retail.py --headless
 ```
@@ -98,9 +93,9 @@ marimo edit notebooks/multi-agent-systems-in-retail.py
 
 Use the Makefile for convenience (or run commands directly):
 
-*   **Run all tests:** `make test` (runs `pytest .`)
-*   **Check types:** `make typecheck` (runs `mypy .`)
-*   **Check formatting/linting:** `make lint` (runs `ruff check .` and `ruff format --check .`)
+*   **Run all tests:** `make test` (runs the `tests/` suite)
+*   **Check types:** `make type-check` (runs `mypy .`)
+*   **Check linting:** `make lint`. Check formatting separately with `make format-check`.
 *   **Apply formatting/linting fixes:** `make format` (runs `ruff check --fix .` and `ruff format .`)
 
 ## Building Documentation
@@ -116,4 +111,62 @@ make lint
 make test
 
 # Run a notebook (after activating)
-marimo edit notebooks/your_notebook.py
+uv run --frozen marimo edit notebooks/your_notebook.py
+```
+
+### Synthetic streaming fixture
+
+The book includes `demos/stream_processing_sales_velocity_demo.py`, not the older
+`spark_streaming_demo.py`. Create topics `sales-transactions` and
+`sales-velocity-metrics`; mount a writable `/checkpoints/sales-velocity`. Submit
+three events with the same SKU/store and UTC timestamps 00:00:00, 00:04:00, and
+00:16:00, quantities 2, 3, and 1, prices 10.0, and corresponding total values
+20.0, 30.0, and 10.0. Advance event time past the first window's end plus the
+one-minute watermark delay. The [00:00,00:15) window should report total quantity
+5, average quantity per transaction 2.5, and transaction count 2. Its sales rate
+is 5/15 units per minute; it is not uncensored demand.
+
+Watermarks advance with arriving event times; idle streams may delay finalization.
+Sufficiently late events may be omitted. Overlapping windows cannot be added,
+and absent zero-sale windows require explicit treatment by consumers.
+
+The locked fixture uses PySpark 4.2.0 and the Scala 2.13 connector. The
+[Spark runtime guide](https://spark.apache.org/docs/4.2.0/index.html) lists Java
+17, 21 and 25; the [Kafka integration guide](https://spark.apache.org/docs/4.2.0/streaming/structured-streaming-kafka-integration.html)
+specifies the matching connector coordinates. These are prerequisites, not
+evidence of a successful broker run.
+
+For a local qualification, use an existing JDK and Kafka installation. The demo
+resolves the broker as `kafka:9092`; run inside the broker's container network or
+configure that hostname in your test environment. From the companion root:
+
+```bash
+java -version
+.venv/bin/python -c 'import pyspark; print(pyspark.__version__)'
+kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic sales-transactions
+kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic sales-velocity-metrics
+# Provision a writable /checkpoints/sales-velocity before submitting.
+.venv/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.2.0 demos/stream_processing_sales_velocity_demo.py
+```
+
+In another terminal, publish the synthetic events described above using
+`kafka-console-producer.sh --bootstrap-server kafka:9092 --topic sales-transactions`.
+Consume the result with
+`kafka-console-consumer.sh --bootstrap-server kafka:9092 --topic sales-velocity-metrics --from-beginning`.
+Verify the exact first-window totals after replay from the same checkpoint.
+Kafka sinks can redeliver records, so downstream consumers must deduplicate by
+product, store and window. JVM startup, connector resolution, broker delivery
+and checkpoint recovery still require a live qualification.
+
+
+### Full offline companion suite
+
+The suite collects optional streaming, authentication, cloud, monitoring, GNN,
+and Spark examples even though service and provider calls are mocked. Select
+those extras when running the entire suite:
+
+```bash
+uv run --frozen --extra dev --extra auth --extra streaming --extra cloud --extra monitoring --extra gnn --extra spark python -m pytest
+```
+
+Service/broker/provider integration remains a separate qualification step.

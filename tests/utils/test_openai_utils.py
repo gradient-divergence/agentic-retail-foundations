@@ -326,10 +326,33 @@ def test_heavy_stacks_are_named_extras():
         "monitoring": "prometheus-client",
         "streaming": "redis",
         "cloud": "supabase",
-        "auth": "passlib",
+        "auth": "bcrypt",
         "explainability": "shap",
     }
     for extra, package in packages.items():
         assert package not in runtime
         assert any(re.match(r"[\w.-]+", requirement)[0] == package for requirement in extras[extra])
     assert {"jsonschema", "statsmodels"} <= runtime
+
+
+def test_make_install_syncs_locked_dependencies_and_extras(tmp_path):
+    (tmp_path / "pyproject.toml").touch()
+    venv = tmp_path / ".venv"
+    (venv / "bin").mkdir(parents=True)
+    (venv / "pyvenv.cfg").touch()
+    uv = venv / "bin" / "uv"
+    uv.write_text(
+        f"#!{sys.executable}\n"
+        "import json, sys\n"
+        "from pathlib import Path\n"
+        "Path('uv-arguments.json').write_text(json.dumps(sys.argv[1:]))\n"
+    )
+    uv.chmod(0o755)
+    result = subprocess.run(
+        ["make", "-f", str(PROJECT_ROOT / "Makefile"), "install", f"UV={uv}"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads((tmp_path / "uv-arguments.json").read_text()) == ["sync", "--locked", "--all-extras"]

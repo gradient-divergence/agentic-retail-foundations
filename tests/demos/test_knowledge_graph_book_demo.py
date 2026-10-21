@@ -19,7 +19,8 @@ def test_ontology_uses_owl_property_types():
     "filename", ["knowledge_graph_book_demo.py", "sensor_processor_demo.py", "promotion_causal_book_demo.py"]
 )
 def test_printed_regions_compile(filename):
-    path = Path(__file__).resolve().parents[2] / "demos" / filename
+    source = "agents/sensor.py" if filename == "sensor_processor_demo.py" else f"demos/{filename}"
+    path = Path(__file__).resolve().parents[2] / source
     regions = re.findall(
         r"(?ms)^ *# region book:[^\n]+\n(.*?)^ *# endregion(?: book:[^\n]+)?\n", path.read_text()
     )

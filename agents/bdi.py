@@ -13,7 +13,7 @@ logger = logging.getLogger("AgentFrameworks")
 # endregion book:bdi-agent-imports
 
 
-# region book:bdi-agent-class
+# region book:bdi-agent-class-joined
 class InventoryBDIAgent:
     """
     A Belief-Desire-Intention agent for inventory management.
@@ -60,10 +60,7 @@ class InventoryBDIAgent:
         self.active_intentions: list[dict] = []
         logger.info("Inventory BDI Agent initialized.")
 
-    # endregion book:bdi-agent-class
-
-    # region book:bdi-agent-update-beliefs
-    def update_beliefs(  # noqa: C901
+    def update_beliefs(
         self,
         new_inventory: dict[str, InventoryItem] | None = None,
         new_sales: dict[str, SalesData] | None = None,
@@ -105,7 +102,7 @@ class InventoryBDIAgent:
             msg += f", ProductItems: {len(new_products)}"
         logger.info(msg)
 
-    # endregion book:bdi-agent-update-beliefs
+    # endregion book:bdi-agent-class-joined
 
     # region book:bdi-agent-observe
     def observe(self, product_id: str) -> dict:
@@ -331,7 +328,7 @@ class InventoryBDIAgent:
             avg_s = sales_obj.average_daily_sales()
             tr = 1.0 + sales_obj.trend()
             proj_s = max(avg_s * tr, 0.1)
-            current_val = product.price * item.current_stock
+            current_val = product.current_price * item.current_stock
             total_value += current_val
             days_of_supply = item.current_stock / proj_s if proj_s > 0 else float("inf")
             if days_of_supply <= product.lead_time_days + 3:
@@ -375,11 +372,11 @@ class InventoryBDIAgent:
         for pid, product in self.products.items():
             if pid not in self.inventory:
                 continue
-            if product.price <= 0:
+            if product.current_price <= 0:
                 continue
 
             considered += 1
-            margin = (product.price - product.cost) / product.price
+            margin = (product.current_price - product.cost) / product.current_price
             item = self.inventory[pid]
 
             if margin > 0.4 and item.current_stock < item.optimal_stock:
@@ -390,6 +387,7 @@ class InventoryBDIAgent:
         return opportunities / considered
 
     def _evaluate_freshness(self) -> float:
+        """Fresh homogeneous stock only; discretionary waste risk, not lot expiry or saleability."""
         perishable_risk = 0.0
         total_perish_cost = 0.0
         if not self.inventory:
@@ -422,22 +420,21 @@ class InventoryBDIAgent:
                 continue
             if pid not in self.products or pid not in self.sales_data:
                 continue
-            if (
-                item.pending_order_quantity > 0
-                and item.expected_delivery_date
-                and item.expected_delivery_date.date() > self.current_date.date()
-            ):
-                continue
             product = self.products[pid]
             sales_obj = self.sales_data[pid]
             avg_s = sales_obj.average_daily_sales()
             tr = 1.0 + sales_obj.trend()
             proj_s = max(avg_s * tr, 0.1)
-            days_of_supply = item.current_stock / proj_s
             lead_time = product.lead_time_days
+            timely_receipts = sum(
+                qty
+                for eta, qty in item.pending_receipts
+                if eta <= self.current_date + timedelta(days=lead_time)
+            )
+            days_of_supply = (item.current_stock + timely_receipts) / proj_s
             buffer_days = 3
             if days_of_supply <= lead_time + buffer_days:
-                needed = item.optimal_stock - (item.current_stock + item.pending_order_quantity)
+                needed = item.optimal_stock - (item.current_stock + timely_receipts)
                 if needed <= 0:
                     continue
                 order_qty = int(round(max(needed, product.min_order_quantity)))
@@ -502,13 +499,13 @@ class InventoryBDIAgent:
                 continue
             if pid not in self.inventory:
                 continue
-            if product.price <= 0:
+            if product.current_price <= 0:
                 continue
             if any(i.get("product_id") == pid for i in self.active_intentions):
                 continue
 
             item = self.inventory[pid]
-            margin = (product.price - product.cost) / product.price
+            margin = (product.current_price - product.cost) / product.current_price
 
             if margin > 0.4 and item.current_stock < item.optimal_stock * 0.8:
                 priority = min(1.0, 0.2 * margin) * self.goals["maximize_profit_margin"]
@@ -560,8 +557,7 @@ class InventoryBDIAgent:
         product = self.products[pid]
         lead_time = product.lead_time_days
         delivery_date = self.current_date + timedelta(days=lead_time)
-        self.inventory[pid].pending_order_quantity += qty
-        self.inventory[pid].expected_delivery_date = delivery_date
+        self.inventory[pid].pending_receipts.append((delivery_date, qty))
         self.inventory[pid].last_reorder_date = self.current_date
         logger.info(f"EXECUTE: Reorder {qty} x {pid}. Delivery expected {delivery_date.date()}.")
         return True

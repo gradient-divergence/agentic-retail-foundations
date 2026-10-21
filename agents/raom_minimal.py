@@ -135,7 +135,7 @@ class MaxCostRule:
 
     def evaluate(self, action: ActionRequest) -> list[str]:
         if action.estimated_cost is None:
-            return []
+            return ["cost_unknown"]
         if action.estimated_cost > self.max_cost:
             return [f"cost_exceeded:{action.estimated_cost:.2f}>{self.max_cost:.2f}"]
         return []

@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 # Utils
-from agents.response_builder import build_response_prompt, extract_actions
+from agents.response_builder import build_response_messages, extract_actions
 
 # NLP helpers
 from utils import nlp
@@ -151,7 +151,10 @@ class RetailCustomerServiceAgent:
                 order_id = await self._extract_order_id(message, recent_orders)
                 if order_id:
                     self.logger.debug(f"Extracted order ID: {order_id} for order_status intent.")
-                    context_data["order_details"] = await self.order_system.get_order_details(order_id)
+                    details = await self.order_system.get_order_details(order_id)
+                    context_data["order_details"] = (
+                        details if details and details.get("customer_id") == customer_id else None
+                    )
                     if context_data["order_details"]:
                         self.logger.debug(f"Retrieved order details for {order_id}.")
                     else:
@@ -187,9 +190,14 @@ class RetailCustomerServiceAgent:
                 order_id = await self._extract_order_id(message, recent_orders)
                 if order_id:
                     self.logger.debug(f"Extracted order ID: {order_id} for return_request intent.")
-                    context_data["order_details"] = await self.order_system.get_order_details(order_id)
-                    context_data["return_eligibility"] = await self.order_system.check_return_eligibility(
-                        order_id
+                    details = await self.order_system.get_order_details(order_id)
+                    context_data["order_details"] = (
+                        details if details and details.get("customer_id") == customer_id else None
+                    )
+                    context_data["return_eligibility"] = (
+                        await self.order_system.check_return_eligibility(order_id)
+                        if context_data["order_details"]
+                        else None
                     )
                     context_data["return_policy"] = self.policies.get("returns", {})
                     if context_data["order_details"] and context_data["return_eligibility"]:
@@ -356,7 +364,7 @@ class RetailCustomerServiceAgent:
                 "error": "LLM client not available",
             }
 
-        final_system_prompt = build_response_prompt(
+        response_messages = build_response_messages(
             customer_info=customer_info,
             intent=intent,
             message=message,
@@ -368,7 +376,7 @@ class RetailCustomerServiceAgent:
             completion = await safe_chat_completion(
                 self.client,
                 model=self.response_model,
-                messages=[{"role": "system", "content": final_system_prompt}],  # Use messages
+                messages=response_messages,
                 logger=self.logger,
                 retry_attempts=self.retry_attempts,
                 retry_backoff=self.retry_backoff,

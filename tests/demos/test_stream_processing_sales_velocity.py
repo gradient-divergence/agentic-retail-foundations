@@ -9,7 +9,17 @@ from unittest.mock import MagicMock
 def test_book_stream_emits_kafka_key_and_value_columns(monkeypatch):
     # Fake client enforces the Kafka sink's column contract without Spark/JVM/Kafka.
     stream, aggregated, encoded = MagicMock(), MagicMock(), MagicMock()
-    for method in ["format", "option", "load", "selectExpr", "select", "withWatermark", "groupBy"]:
+    for method in [
+        "format",
+        "option",
+        "load",
+        "selectExpr",
+        "select",
+        "filter",
+        "withWatermark",
+        "dropDuplicatesWithinWatermark",
+        "groupBy",
+    ]:
         getattr(stream, method).return_value = stream
     stream.agg.return_value = aggregated
     aggregated.columns = ["product_id", "store_id", "window", "total_quantity"]
@@ -55,3 +65,7 @@ def test_book_stream_emits_kafka_key_and_value_columns(monkeypatch):
     path = Path(__file__).resolve().parents[2] / "demos/stream_processing_sales_velocity_demo.py"
     runpy.run_path(str(path))
     assert set(encoded.columns) == {"key", "value"}
+    # Input deduplication must run before quantities enter overlapping windows.
+    methods = [call[0] for call in stream.method_calls]
+    assert methods.index("dropDuplicatesWithinWatermark") < methods.index("groupBy")
+    stream.dropDuplicatesWithinWatermark.assert_called_once_with(["event_id"])

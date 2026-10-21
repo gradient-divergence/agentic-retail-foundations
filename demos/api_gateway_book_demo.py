@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# region book:api-gateway-imports
+# region book:api-gateway-imports-joined
 import logging
 import time
 import uuid
@@ -14,13 +14,9 @@ except ModuleNotFoundError:
     raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 
-# endregion book:api-gateway-imports
-
-
-# region book:api-gateway-config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("retail-api-gateway")
 
@@ -37,10 +33,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# endregion book:api-gateway-config
 
 
-# region book:api-gateway-redis-config
 redis_client = redis.Redis(host="redis", port=6379, db=0)
 
 SERVICE_REGISTRY = {
@@ -50,28 +44,20 @@ SERVICE_REGISTRY = {
     "customer-service": "http://customer-service:8003",
     "pricing-service": "http://pricing-service:8004",
 }
-# endregion book:api-gateway-redis-config
+# endregion book:api-gateway-imports-joined
 
 
-# region book:api-gateway-token
+# region book:api-gateway-token-joined
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 
-# endregion book:api-gateway-token
-
-
-# region book:api-gateway-token-data
 class TokenData(BaseModel):
     agent_id: str | None = None
     roles: list[str] = []
 
 
-# endregion book:api-gateway-token-data
-
-
-# region book:api-gateway-agent-model
 class Agent(BaseModel):
     agent_id: str
     agent_name: str
@@ -79,10 +65,10 @@ class Agent(BaseModel):
     is_active: bool = True
 
 
-# endregion book:api-gateway-agent-model
+# endregion book:api-gateway-token-joined
 
 
-# region book:api-gateway-request-log
+# region book:api-gateway-request-log-joined
 class RequestLogEntry(BaseModel):
     request_id: str
     timestamp: datetime
@@ -95,23 +81,44 @@ class RequestLogEntry(BaseModel):
     error: str | None = None
 
 
-# endregion book:api-gateway-request-log
-
-
-# region book:api-gateway-rate-limits
 RATE_LIMITS = {
     "default": 100,
     "inventory-agent": {"default": 200, "/api/inventory": 500},
     "pricing-agent": {"default": 300, "/api/pricing/batch-update": 50},
 }
-# endregion book:api-gateway-rate-limits
+# endregion book:api-gateway-request-log-joined
 
 
 async def log_request(entry: RequestLogEntry) -> None:
-    logger.info("Gateway request %s %s %s", entry.request_id, entry.method, entry.path)
+    logger.info("gateway.request_completed", extra={"outcome": entry.model_dump(mode="json")})
 
 
-# region book:api-gateway-proxy-signature
+def _hop_by_hop_headers(headers) -> set[str]:
+    blocked = {
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+    }
+    blocked.update(h.strip().lower() for h in headers.get("connection", "").split(","))
+    return blocked
+
+
+def _forward_request_headers(request: Request) -> tuple[set[str], dict[str, str]]:
+    blocked = _hop_by_hop_headers(request.headers) | {"host", "content-length"}
+    headers = {
+        k: v
+        for k, v in request.headers.items()
+        if k.lower() not in blocked and not k.lower().startswith("x-retail-")
+    }
+    return blocked, headers
+
+
+# region book:api-gateway-proxy-signature-joined
 async def proxy_request(
     request: Request,
     service: str,
@@ -119,72 +126,57 @@ async def proxy_request(
     agent: Agent,
     background_tasks: BackgroundTasks,
 ):
-    if service not in SERVICE_REGISTRY:
-        raise HTTPException(status_code=404, detail=f"Service {service} not found")
-
-    service_url = SERVICE_REGISTRY[service]
+    service_url = SERVICE_REGISTRY.get(service)
     target_url = f"{service_url}{path}"
-    # endregion book:api-gateway-proxy-signature
-
-    # region book:api-gateway-proxy-timing
     start_time = time.time()
     request_id = str(uuid.uuid4())
-    # endregion book:api-gateway-proxy-timing
-
-    # region book:api-gateway-proxy-headers
     method = request.method
-    headers = dict(request.headers)
+    _, headers = _forward_request_headers(request)
     headers["X-Retail-Gateway-RequestId"] = request_id
     headers["X-Retail-Agent-Id"] = agent.agent_id
     headers["X-Retail-Agent-Roles"] = ",".join(agent.roles)
-    # endregion book:api-gateway-proxy-headers
 
-    # region book:api-gateway-proxy-strip-headers
-    for header in ["host", "content-length"]:
-        if header in headers:
-            del headers[header]
-    # endregion book:api-gateway-proxy-strip-headers
-
-    # region book:api-gateway-proxy-body
     body = await request.body()
-
+    status_code, error = 502, None
     try:
+        if service_url is None:
+            status_code, error = 404, "unknown_service"
+            raise HTTPException(status_code=404, detail="Service not found")
         async with httpx.AsyncClient() as client:
-            response = await client.request(method, target_url, headers=headers, content=body, timeout=30.0)
-
-        request_time_ms = (time.time() - start_time) * 1000
-        log_entry = RequestLogEntry(
-            request_id=request_id,
-            timestamp=datetime.now(),
-            method=method,
-            path=path,
-            agent_id=agent.agent_id,
-            service=service,
-            status_code=response.status_code,
-            response_time_ms=request_time_ms,
+            async with client.stream(
+                method,
+                httpx.URL(target_url).copy_with(
+                    query=request.scope["query_string"],
+                ),
+                headers=headers,
+                content=body,
+                timeout=30.0,
+            ) as response:
+                status_code = response.status_code
+                raw_body = b"".join([chunk async for chunk in response.aiter_raw()])
+        blocked = _hop_by_hop_headers(response.headers) | {"content-length"}
+        forwarded = [(k, v) for k, v in response.headers.multi_items() if k.lower() not in blocked]
+        result = Response(content=raw_body, status_code=status_code)
+        result.raw_headers.extend((k.encode("latin-1"), v.encode("latin-1")) for k, v in forwarded)
+        return result
+    except httpx.HTTPError as exc:
+        status_code = 502
+        error = type(exc).__name__
+        raise HTTPException(status_code=502, detail="Upstream service unavailable") from exc
+    finally:
+        await log_request(
+            RequestLogEntry(
+                request_id=request_id,
+                timestamp=datetime.now(),
+                method=method,
+                path=path,
+                agent_id=agent.agent_id,
+                service=service,
+                status_code=status_code,
+                response_time_ms=(time.time() - start_time) * 1000,
+                error=error,
+            )
         )
-        background_tasks.add_task(log_request, log_entry)
-
-        return JSONResponse(
-            content=response.json() if response.content else None,
-            status_code=response.status_code,
-            headers=dict(response.headers),
-        )
-    except Exception as exc:
-        request_time_ms = (time.time() - start_time) * 1000
-        log_entry = RequestLogEntry(
-            request_id=request_id,
-            timestamp=datetime.now(),
-            method=method,
-            path=path,
-            agent_id=agent.agent_id,
-            service=service,
-            status_code=500,
-            response_time_ms=request_time_ms,
-            error=str(exc),
-        )
-        background_tasks.add_task(log_request, log_entry)
-        raise HTTPException(status_code=500, detail=f"Service error: {str(exc)}") from exc
 
 
-# endregion book:api-gateway-proxy-body
+# endregion book:api-gateway-proxy-signature-joined

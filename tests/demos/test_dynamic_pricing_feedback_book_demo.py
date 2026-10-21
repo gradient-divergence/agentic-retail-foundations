@@ -18,7 +18,7 @@ def agent(monkeypatch):
     spec = importlib.util.spec_from_file_location("pricing_book_under_test", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.DynamicPricingAgent("sku", 10, 1, 100)
+    return module.DynamicPricingAgent("sku", 10, 1, 100, marginal_cost=0.8)
 
 
 def test_redis_sales_samples_are_numeric(agent):
@@ -34,19 +34,54 @@ def test_first_sample_starts_price_and_demand_history(agent):
 
 def test_constant_elasticity_markup_multiplies_marginal_cost(agent):
     agent.price_history, agent.demand_history = [10], [10]
+    agent.observation_ids = [((500, 10),)]
     assert agent.compute_optimal_price([(1000, 10)]) == pytest.approx(2.4)
 
 
 def test_zero_previous_demand_does_not_divide_by_zero(agent):
     agent.price_history, agent.demand_history = [10, 9], [0, 1]
+    agent.observation_ids = ["one", "two"]
     agent.update_elasticity_model({"product_id": "sku"})
     assert agent.price_elasticity == -1.5
 
 
 def test_one_observation_pair_updates_elasticity_once_per_poll(agent):
     agent.price_history, agent.demand_history = [10, 11], [100, 80]
+    agent.observation_ids = ["one", "two"]
     agent.kafka_consumer.poll.return_value = {
         "partition": [SimpleNamespace(value={"product_id": "sku"}) for _ in range(3)]
     }
     agent.process_sales_feedback()
-    assert agent.price_elasticity == pytest.approx(-1.525)
+    assert agent.price_elasticity == pytest.approx(-1.5420617618035821)
+
+
+def test_distinct_closed_zero_sale_windows_are_observed_but_replays_are_not(agent):
+    agent.window_start_ms, agent.window_end_ms = 0, 3_600_000
+    assert agent.compute_optimal_price([]) == 10
+    assert agent.demand_history == [0]
+    agent.compute_optimal_price([])
+    assert agent.demand_history == [0]
+    agent.window_start_ms, agent.window_end_ms = 3_600_000, 7_200_000
+    assert agent.compute_optimal_price([]) == 10
+    assert agent.demand_history == [0, 0]
+
+
+def test_sales_rate_sums_unequal_transaction_counts_over_one_hour(agent):
+    agent.compute_optimal_price([(1000, 1), (2000, 1), (3000, 1)])
+    assert agent.demand_history == [3]
+
+
+def test_noiseless_power_demand_recovers_elasticity(agent):
+    agent.price_history = [30, 40]
+    agent.demand_history = [100, 100 * (40 / 30) ** -1.5]
+    agent.observation_ids = ["one", "two"]
+    agent.price_elasticity, agent.learning_rate = -2, 1
+    agent.update_elasticity_model({"product_id": "sku"})
+    assert agent.price_elasticity == pytest.approx(-1.5)
+
+
+def test_zero_current_demand_is_not_a_log_observation(agent):
+    agent.price_history, agent.demand_history = [30, 40], [100, 0]
+    agent.observation_ids = ["one", "two"]
+    agent.update_elasticity_model({"product_id": "sku"})
+    assert agent.price_elasticity == -1.5

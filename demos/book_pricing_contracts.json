@@ -1,0 +1,93 @@
+{
+  "approval_request": {
+    "intent": {
+      "action": "price_update",
+      "summary": "Propose price change for SKU-123"
+    },
+    "price": {
+      "current": 20,
+      "proposed": 22,
+      "currency": "USD"
+    },
+    "scope": {
+      "stores": [
+        "store-north"
+      ],
+      "channels": [
+        "store_pos",
+        "web"
+      ],
+      "price_type": "advertised"
+    },
+    "effective": {
+      "from": "2026-10-16T00:00:00Z",
+      "to": "2026-10-19T00:00:00Z"
+    },
+    "proposal": {
+      "id": "price-SKU-123",
+      "version": 1
+    },
+    "audit_trail_id": "audit_001",
+    "constraint_checked": {
+      "name": "unit_margin_floor",
+      "unit_cost_usd": 12,
+      "floor": 0.4,
+      "proposed_margin": 0.45454545454545453
+    },
+    "contribution": {
+      "other_variable_cost_usd": 4,
+      "current_per_unit_usd": 4,
+      "proposed_per_unit_usd": 6
+    },
+    "evidence": {
+      "signals": [
+        "demos/book_pricing_contracts.json#/evidence_records/inventory_low"
+      ],
+      "policy_refs": [
+        "demos/book_pricing_contracts.json#/evidence_records/pricing_floor",
+        "demos/book_pricing_contracts.json#/evidence_records/advertised_price_window"
+      ]
+    },
+    "risk": {
+      "level": "medium",
+      "confidence": 0.8,
+      "rationale": "A higher advertised price may reduce conversion during the committed promotion; human review is required."
+    },
+    "actions": [
+      "approve",
+      "edit",
+      "defer",
+      "escalate"
+    ],
+    "product": {
+      "sku": "SKU-123",
+      "pack_quantity": 1,
+      "pack_unit": "each"
+    }
+  },
+  "pricing_prompt": "Propose prices under this retailer's hypothetical policy.\nSupply a concise rationale and the constraint checks, in USD.\nProduct/pack: {product_details}; current price: {current_price_usd}.\nUnit cost/funding: {unit_cost_usd}/{supplier_funding_usd}.\nCompetitor offers: {comparable_offers}; private-label price: {private_label_price_usd}.\nSales: {units_sold} units in {observed_days} days; demand response: {elasticity_assumption}.\nOn-hand/reserved: {on_hand}/{reserved}; zone/channel: {zone}/{channel}.\nPrice type: {shelf_advertised_or_online}; effective UTC window: {from}/{to}.\nPolicy version: {policy_version}; approved price 30 days ago: {reference_price_usd}.\nKeep the price within 15% of that reference price.\nPremium price must be at least 1.15 times the comparable private-label price.\nRespect the advertised-price floor and committed promotion window.\nWith missing economics or policy inputs, request them and defer execution.",
+  "beauty_rationale": "Question: What beauty layout change should a pilot test?\nSynthetic fixture: North stores, in-store channel; policy layout.v1.\nEffective window: 2026-06-01 to 2026-08-31; currency USD.\nCurrent unit prices: skincare 12, fragrance 20, suncare 10; held fixed.\nTraffic: 78 of 100 shoppers visit skincare; 32 of 100 visit fragrance.\nAdjacency: of 100 skincare visitors, 67 visit cosmetics and 12 fragrance.\nSeasonality: suncare rises from 100 winter units to 315 summer units (+215%).\nFragrance falls from 100 winter units to 76 summer units (-24%).\nCompare equal periods and stores; these counts are illustrative.\nHypotheses: move fragrance toward skincare; test a Summer Beauty endcap.\nTest +15% skincare space and -10% fragrance space against current square meters.\nCheck contribution per square meter, stock cover, fixture and brand limits.\nHold prices, compare matched stores, and measure reset labor before adopting.",
+  "evidence_records": {
+    "inventory_low": {
+      "kind": "synthetic_signal",
+      "sku": "SKU-123",
+      "store": "store-north",
+      "on_hand": 35,
+      "reorder_point": 50,
+      "observed_at": "2026-10-16T00:00:00Z"
+    },
+    "pricing_floor": {
+      "kind": "illustrative_policy",
+      "policy_version": "pricing.v1",
+      "unit_margin_floor": 0.4,
+      "currency": "USD"
+    },
+    "advertised_price_window": {
+      "kind": "illustrative_policy",
+      "policy_version": "pricing.v1",
+      "from": "2026-10-16T00:00:00Z",
+      "to": "2026-10-19T00:00:00Z",
+      "approval_required": true
+    }
+  }
+}

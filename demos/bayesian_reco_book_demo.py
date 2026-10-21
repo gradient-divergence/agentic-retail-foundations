@@ -1,3 +1,8 @@
+"""Preference responses are conditionally independent and stationary in this teaching model.
+
+Purchases and returns are different targets, not preference observations.
+"""
+
 # region book:bayes-reco-imports
 import matplotlib.pyplot as plt
 import numpy as np
@@ -79,9 +84,9 @@ class BayesianRecommendationAgent:
 
     # region book:bayes-reco-update-preference
     def update_preference(self, customer_id: str, product_id: str, interaction: bool) -> None:
-        """
-        Update preference model based on customer interaction.
-        """
+        """One explicit positive/negative preference response per completed exposure."""
+        if not isinstance(interaction, bool):
+            raise ValueError("Preference feedback must be an explicit Boolean response")
         # If this is the first time we see this customer, create a new record
         if customer_id not in self.customer_preferences:
             self.customer_preferences[customer_id] = {}
@@ -168,6 +173,7 @@ class BayesianRecommendationAgent:
         product_scores.sort(key=lambda x: x[1], reverse=True)
         recommended_products = [p[0] for p in product_scores[:num_recommendations]]
 
+        self.last_sampled_scores = dict(product_scores)
         return recommended_products
 
     # endregion book:bayes-reco-recommend
@@ -269,9 +275,20 @@ class BayesianRecommendationAgent:
     # endregion book:bayes-reco-visualize
 
 
+def _print_recommendation(agent, customer_id, rank, product_id):
+    explain = agent.explain_recommendation(customer_id, product_id)
+    prod_name = agent.product_catalog[product_id].name
+    reason = explain.explanation
+    print(
+        f"  {rank}. {prod_name}: sampled selection score={agent.last_sampled_scores[product_id]:.3f}; "
+        f"posterior summary: {reason}"
+    )
+
+
 # region book:bayes-reco-demo-catalog
 # Example usage
 def demonstrate_bayesian_recommendations():
+    np.random.seed(7)
     # Create a simple product catalog
     product_catalog = {
         "P1": ProductCatalogItem(name="Casual T-Shirt", category="apparel"),
@@ -326,20 +343,14 @@ def demonstrate_bayesian_recommendations():
 
     print("\nTop 5 recommendations for customer C1:")
     for i, pid in enumerate(recommendations):
-        explain = agent.explain_recommendation("C1", pid)
-        prod_name = product_catalog[pid].name
-        reason = explain.explanation
-        print(f"  {i + 1}. {prod_name} -> {reason}")
+        _print_recommendation(agent, "C1", i + 1, pid)
     # endregion book:bayes-reco-demo-recommend
 
     # region book:bayes-reco-demo-cold-start
     print("\nGenerating recommendations for new customer C2...")
     recommendations_c2 = agent.recommend("C2", all_products, num_recommendations=5)
     for i, pid in enumerate(recommendations_c2):
-        explain = agent.explain_recommendation("C2", pid)
-        prod_name = product_catalog[pid].name
-        reason = explain.explanation
-        print(f"  {i + 1}. {prod_name} -> {reason}")
+        _print_recommendation(agent, "C2", i + 1, pid)
 
     print("\nVisualizing C1's preference distributions for top products:")
     agent.visualize_customer_preferences("C1")

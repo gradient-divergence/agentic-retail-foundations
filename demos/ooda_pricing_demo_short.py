@@ -2,6 +2,7 @@
 
 # region book:ooda-pricing-demo-short
 import logging
+import random
 
 from agents.ooda import OODAPricingAgent
 from models.pricing import PricingProduct
@@ -10,6 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 def demo_ooda_pricing() -> None:
+    random.seed(7)
     agent = OODAPricingAgent()
     product = PricingProduct(
         product_id="SKU-1001",
@@ -23,7 +25,6 @@ def demo_ooda_pricing() -> None:
         sales_last_7_days=[4, 5, 6, 5, 4, 3, 5],
     )
     agent.update_products({product.product_id: product})
-
     agent.run_cycle_for_product(product.product_id)
     updated_price = agent.products[product.product_id].current_price
     print(f"Updated price: ${updated_price:.2f}")

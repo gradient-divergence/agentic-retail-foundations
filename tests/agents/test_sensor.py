@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import AsyncMock, call, patch
 
@@ -54,6 +54,120 @@ def test_sensor_processor_initialization(sensor_processor, mock_inventory_system
 
 
 @pytest.mark.asyncio
+async def test_failed_sensor_delivery_can_retry_the_same_event(sensor_processor):
+    reading = dict(
+        sensor_id="rfid",
+        event_id="retry",
+        sensor_type="rfid",
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        confidence=0.9,
+        location={"zone": "A", "section": "1"},
+        detected_products=[],
+    )
+    handler = AsyncMock(side_effect=[RuntimeError("connector failed"), None])
+    with patch.object(sensor_processor, "_process_rfid_reading", handler):
+        with pytest.raises(RuntimeError, match="connector failed"):
+            await sensor_processor.process_sensor_message(reading)
+        assert "retry" not in sensor_processor.seen_events
+        assert await sensor_processor.process_sensor_message(reading)
+        assert not await sensor_processor.process_sensor_message(reading)
+    assert handler.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_concurrent_duplicate_sensor_events_deliver_once(sensor_processor):
+    reading = dict(
+        sensor_id="rfid",
+        event_id="concurrent",
+        sensor_type="rfid",
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        confidence=0.9,
+        location={"zone": "A", "section": "1"},
+        detected_products=[],
+    )
+
+    async def slow_delivery(payload):
+        await asyncio.sleep(0)
+
+    handler = AsyncMock(side_effect=slow_delivery)
+    with patch.object(sensor_processor, "_process_rfid_reading", handler):
+        results = await asyncio.gather(*(sensor_processor.process_sensor_message(reading) for _ in range(2)))
+    assert results == [True, False]
+    handler.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_alert_retry_preserves_successful_report_and_confirmation_count(
+    sensor_processor, mock_inventory_system, mock_alert_system
+):
+    mock_alert_system.send_alert.side_effect = [RuntimeError("alert failed"), None]
+    for event_id in ("one", "two"):
+        await sensor_processor._handle_inventory_discrepancy(
+            "A.1", ["P1"], "out_of_stock", "smart_shelf", event_id=event_id
+        )
+    with pytest.raises(RuntimeError, match="alert failed"):
+        await sensor_processor._handle_inventory_discrepancy(
+            "A.1", ["P1"], "out_of_stock", "smart_shelf", event_id="three"
+        )
+    await sensor_processor._handle_inventory_discrepancy(
+        "A.1", ["P1"], "out_of_stock", "smart_shelf", event_id="three"
+    )
+    assert mock_inventory_system.report_inventory_issue.await_count == 1
+    assert mock_alert_system.send_alert.await_count == 2
+    assert next(iter(sensor_processor.discrepancies.values()))["detection_count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_rfid_reappearance_resets_missing_confirmations(sensor_processor, mock_inventory_system):
+    mock_inventory_system.get_expected_products.return_value = {"P1"}
+    reading = dict(location={"zone": "A", "section": "1"}, confidence=0.9, timestamp="fixture")
+    for _ in range(3):
+        await sensor_processor._process_rfid_reading(dict(reading, detected_products=[]))
+        await sensor_processor._process_rfid_reading(dict(reading, detected_products=[{"product_id": "P1"}]))
+    assert sensor_processor.discrepancies == {}
+    assert all(
+        call.args[3] != "missing" for call in mock_inventory_system.report_inventory_issue.await_args_list
+    )
+
+
+@pytest.mark.asyncio
+async def test_stock_incident_changes_type_and_reports_each_transition_once(
+    sensor_processor, mock_inventory_system
+):
+    for _ in range(5):
+        await sensor_processor._handle_inventory_discrepancy("A.1", ["P1"], "out_of_stock", "smart_shelf")
+    assert mock_inventory_system.report_inventory_issue.await_count == 1
+    for _ in range(3):
+        await sensor_processor._handle_inventory_discrepancy("A.1", ["P1"], "low_stock", "smart_shelf")
+    assert len(sensor_processor.discrepancies) == 1
+    assert next(iter(sensor_processor.discrepancies.values()))["type"] == "low_stock"
+    assert mock_inventory_system.report_inventory_issue.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_failed_report_does_not_count_a_retry_as_new_evidence(sensor_processor, mock_inventory_system):
+    reading = dict(
+        sensor_id="rfid",
+        sensor_type="rfid",
+        confidence=0.9,
+        location={"zone": "A", "section": "1"},
+        detected_products=[],
+    )
+    mock_inventory_system.get_expected_products.return_value = {"P1"}
+    now = datetime.now(timezone.utc)
+    for i in range(2):
+        await sensor_processor.process_sensor_message(
+            dict(reading, event_id=str(i), timestamp=(now + timedelta(microseconds=i)).isoformat())
+        )
+    mock_inventory_system.report_inventory_issue.side_effect = [RuntimeError("delivery failed"), None]
+    third = dict(reading, event_id="third", timestamp=(now + timedelta(microseconds=2)).isoformat())
+    with pytest.raises(RuntimeError, match="delivery failed"):
+        await sensor_processor.process_sensor_message(third)
+    assert await sensor_processor.process_sensor_message(third)
+    assert next(iter(sensor_processor.discrepancies.values()))["detection_count"] == 3
+
+
+@pytest.mark.asyncio
 @patch.object(SensorDataProcessor, "_process_rfid_reading", new_callable=AsyncMock)
 @patch.object(SensorDataProcessor, "_process_smart_shelf_reading", new_callable=AsyncMock)
 @patch.object(SensorDataProcessor, "_process_environmental_reading", new_callable=AsyncMock)
@@ -66,51 +180,38 @@ async def test_process_sensor_message_dispatch(
     sensor_processor: SensorDataProcessor,
 ):
     """Test process_sensor_message calls the correct handler based on sensor_type."""
-    base_msg = {"sensor_id": "sensor123", "timestamp": datetime.now().isoformat()}
-
-    # RFID
-    msg_rfid = {**base_msg, "sensor_type": "rfid", "data": "..."}
-    await sensor_processor.process_sensor_message(msg_rfid)
-    mock_process_rfid.assert_awaited_once_with(msg_rfid)
-    mock_process_shelf.assert_not_awaited()
-    mock_process_env.assert_not_awaited()
-    mock_process_tag.assert_not_awaited()
-    mock_process_rfid.reset_mock()
-
-    # Smart Shelf
-    msg_shelf = {**base_msg, "sensor_type": "smart_shelf", "data": "..."}
-    await sensor_processor.process_sensor_message(msg_shelf)
-    mock_process_rfid.assert_not_awaited()
-    mock_process_shelf.assert_awaited_once_with(msg_shelf)
-    mock_process_env.assert_not_awaited()
-    mock_process_tag.assert_not_awaited()
-    mock_process_shelf.reset_mock()
-
-    # Environmental
-    msg_env = {**base_msg, "sensor_type": "environmental", "data": "..."}
-    await sensor_processor.process_sensor_message(msg_env)
-    mock_process_rfid.assert_not_awaited()
-    mock_process_shelf.assert_not_awaited()
-    mock_process_env.assert_awaited_once_with(msg_env)
-    mock_process_tag.assert_not_awaited()
-    mock_process_env.reset_mock()
-
-    # Digital Price Tag
-    msg_tag = {**base_msg, "sensor_type": "digital_price_tag", "data": "..."}
-    await sensor_processor.process_sensor_message(msg_tag)
-    mock_process_rfid.assert_not_awaited()
-    mock_process_shelf.assert_not_awaited()
-    mock_process_env.assert_not_awaited()
-    mock_process_tag.assert_awaited_once_with(msg_tag)
-    mock_process_tag.reset_mock()
-
-    # Unknown type
-    msg_unknown = {**base_msg, "sensor_type": "unknown_sensor", "data": "..."}
-    await sensor_processor.process_sensor_message(msg_unknown)
-    mock_process_rfid.assert_not_awaited()
-    mock_process_shelf.assert_not_awaited()
-    mock_process_env.assert_not_awaited()
-    mock_process_tag.assert_not_awaited()
+    now = datetime.now(timezone.utc)
+    payloads = {
+        "rfid": {"detected_products": []},
+        "smart_shelf": {
+            "shelf_id": "S",
+            "current_weight_grams": 100.0,
+            "expected_weight_grams": 100.0,
+            "tare_weight_grams": 0.0,
+            "product_info": {"product_id": "P", "unit_weight_grams": 10.0},
+        },
+        "environmental": {"environmental_type": "temperature", "value": 4.0, "unit": "C"},
+        "digital_price_tag": {"tag_id": "T", "product_id": "P", "price_displayed": 10.0},
+    }
+    handlers = [mock_process_rfid, mock_process_shelf, mock_process_env, mock_process_tag]
+    for (kind, payload), handler in zip(payloads.items(), handlers, strict=True):
+        reading = dict(
+            sensor_id=kind,
+            event_id=kind,
+            sensor_type=kind,
+            timestamp=now.isoformat(),
+            confidence=0.9,
+            location={"zone": "A", "section": "1"},
+            **payload,
+        )
+        assert await sensor_processor.process_sensor_message(reading)
+        handler.assert_awaited_once()
+        received = handler.await_args.args[0]
+        assert received["event_id"] == kind and received["sensor_type"] == kind
+        assert datetime.fromisoformat(received["timestamp"]) == now
+        handler.reset_mock()
+    assert not await sensor_processor.process_sensor_message(dict(sensor_id="unknown", sensor_type="unknown"))
+    assert all(handler.await_count == 0 for handler in handlers)
 
 
 @pytest.mark.asyncio
@@ -123,7 +224,7 @@ async def test_process_sensor_message_invalid_sensor_id(sensor_processor: Sensor
         msg_missing = {"sensor_type": "rfid", "timestamp": datetime.now().isoformat()}
         await sensor_processor.process_sensor_message(msg_missing)
         mock_process_rfid.assert_not_called()
-        assert "Invalid or missing sensor_id" in caplog.text
+        assert "sensor.reading_rejected" in caplog.text
         caplog.clear()
 
         # Invalid sensor_id type
@@ -134,7 +235,7 @@ async def test_process_sensor_message_invalid_sensor_id(sensor_processor: Sensor
         }
         await sensor_processor.process_sensor_message(msg_invalid)
         mock_process_rfid.assert_not_called()
-        assert "Invalid or missing sensor_id" in caplog.text
+        assert "sensor.reading_rejected" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -143,62 +244,25 @@ async def test_process_sensor_message_invalid_sensor_id(sensor_processor: Sensor
 async def test_process_sensor_message_recent_readings(mock_dt, sensor_processor: SensorDataProcessor):
     """Test that recent_readings list is updated and pruned."""
     sensor_id = "s1"
-    fixed_now = datetime(2024, 1, 12, 12, 0, 0)
+    fixed_now = datetime(2024, 1, 12, 12, 0, 0, tzinfo=timezone.utc)
     mock_dt.now.return_value = fixed_now
-    # Ensure fromisoformat still works
-    mock_dt.fromisoformat.side_effect = datetime.fromisoformat
-
-    # Messages with controlled timestamps relative to fixed_now
-    ts_now = fixed_now.isoformat()
-    ts_1h_ago = (fixed_now - timedelta(hours=1)).isoformat()
-    ts_2d_ago = (fixed_now - timedelta(days=2)).isoformat()
-
-    msg1 = {
-        "sensor_id": sensor_id,
-        "sensor_type": "rfid",
-        "timestamp": ts_1h_ago,
-        "data": 1,
-    }
-    msg2 = {
-        "sensor_id": sensor_id,
-        "sensor_type": "rfid",
-        "timestamp": ts_now,
-        "data": 2,
-    }
-    msg_old = {
-        "sensor_id": sensor_id,
-        "sensor_type": "rfid",
-        "timestamp": ts_2d_ago,
-        "data": 0,
-    }
-
-    # Process all messages
-    with patch.object(SensorDataProcessor, "_process_rfid_reading") as mock_process_rfid:
-        await sensor_processor.process_sensor_message(msg_old)
-        # Pruning happens here based on msg_old's timestamp vs fixed_now.
-        # msg_old is older than 24h; recent_readings is created inside this call.
-        # Trace: process(msg_old) -> recent_readings={'s1': [msg_old]} ->
-        # prune(cutoff=24h ago) -> recent_readings={'s1': []}
-        # msg_old ts is NOT > cutoff, so it should be removed.
-        # So after first call, recent_readings[s1] should be empty.
-
-        await sensor_processor.process_sensor_message(msg1)
-        # msg1 ts = 1h ago. cutoff = now - 24h. msg1 ts > cutoff. Should be kept.
-        # recent_readings={'s1': [msg1]}
-
-        await sensor_processor.process_sensor_message(msg2)
-        # msg2 ts = now. cutoff = now - 24h. msg2 ts > cutoff. Should be kept.
-        # Before adding msg2, list is [msg1]. Prune checks msg1 -> msg1 kept.
-        # Add msg2 -> recent_readings={'s1': [msg1, msg2]}
-
-    assert mock_process_rfid.call_count == 3
-
-    # Check final state
-    assert sensor_id in sensor_processor.recent_readings
-    assert len(sensor_processor.recent_readings[sensor_id]) == 2
-    assert msg_old not in sensor_processor.recent_readings[sensor_id]
-    assert msg1 in sensor_processor.recent_readings[sensor_id]
-    assert msg2 in sensor_processor.recent_readings[sensor_id]
+    base = dict(
+        sensor_id=sensor_id,
+        sensor_type="rfid",
+        confidence=0.9,
+        location={"zone": "A", "section": "1"},
+        detected_products=[],
+    )
+    old = dict(base, event_id="old", timestamp=(fixed_now - timedelta(days=2)).isoformat())
+    first = dict(base, event_id="first", timestamp=(fixed_now - timedelta(hours=1)).isoformat())
+    latest = dict(base, event_id="latest", timestamp=fixed_now.isoformat())
+    with patch.object(SensorDataProcessor, "_process_rfid_reading") as handler:
+        assert not await sensor_processor.process_sensor_message(old)
+        assert await sensor_processor.process_sensor_message(first)
+        assert await sensor_processor.process_sensor_message(latest)
+        assert handler.await_count == 2
+    assert len(sensor_processor.recent_readings[sensor_id]) == 1
+    assert sensor_processor.recent_readings[sensor_id][0]["event_id"] == "latest"
 
 
 # --- Test Specific Processors --- #
@@ -319,8 +383,8 @@ async def test_process_rfid_reading_missing_and_unexpected(
     assert mock_handle_disc.call_count == 2
     mock_handle_disc.assert_has_awaits(
         [
-            call(expected_location_str, ["P2"], "missing", "rfid"),  # Missing P2
-            call(expected_location_str, ["P3"], "unexpected", "rfid"),  # Unexpected P3
+            call(expected_location_str, ["P2"], "missing", "rfid", event_id=None),  # Missing P2
+            call(expected_location_str, ["P3"], "unexpected", "rfid", event_id=None),  # Unexpected P3
         ],
         any_order=True,
     )
@@ -363,6 +427,8 @@ async def test_process_smart_shelf_no_discrepancy(
 ):
     """Test smart shelf reading when weight difference is below threshold."""
     message = {
+        "confidence": 0.9,
+        "tare_weight_grams": 0.0,
         "sensor_id": "shelf01",
         "sensor_type": "smart_shelf",
         "timestamp": datetime.now().isoformat(),
@@ -394,6 +460,8 @@ async def test_process_smart_shelf_low_stock(
     product_id = "P_LOW"
     timestamp = datetime.now().isoformat()
     message = {
+        "confidence": 0.9,
+        "tare_weight_grams": 0.0,
         "sensor_id": "shelf01",
         "sensor_type": "smart_shelf",
         "timestamp": timestamp,
@@ -418,17 +486,14 @@ async def test_process_smart_shelf_low_stock(
         {
             "expected_units": expected_units,
             "estimated_units": estimated_units,
-            "confidence": 0.9,
         },
+        event_id=None,
     )
     # Verify inventory update call
-    mock_inventory_system.update_product_quantity.assert_awaited_once_with(
-        sensor_processor.store_id,
-        product_id,
-        estimated_units,
-        expected_location_str,
-        timestamp,
-        source="smart_shelf",
+    mock_inventory_system.update_product_quantity.assert_not_awaited()
+    assert (
+        sensor_processor.product_state[f"{product_id}:{expected_location_str}"]["estimated_units"]
+        == estimated_units
     )
 
 
@@ -445,6 +510,8 @@ async def test_process_smart_shelf_out_of_stock(
     product_id = "P_OOS"
     timestamp = datetime.now().isoformat()
     message = {
+        "confidence": 0.9,
+        "tare_weight_grams": 0.0,
         "sensor_id": "shelf01",
         "sensor_type": "smart_shelf",
         "timestamp": timestamp,
@@ -469,17 +536,14 @@ async def test_process_smart_shelf_out_of_stock(
         {
             "expected_units": expected_units,
             "estimated_units": estimated_units,
-            "confidence": 0.9,
         },
+        event_id=None,
     )
     # Verify inventory update call
-    mock_inventory_system.update_product_quantity.assert_awaited_once_with(
-        sensor_processor.store_id,
-        product_id,
-        estimated_units,
-        expected_location_str,
-        timestamp,
-        source="smart_shelf",
+    mock_inventory_system.update_product_quantity.assert_not_awaited()
+    assert (
+        sensor_processor.product_state[f"{product_id}:{expected_location_str}"]["estimated_units"]
+        == estimated_units
     )
 
 
@@ -497,8 +561,15 @@ async def test_process_smart_shelf_invalid_weights(sensor_processor: SensorDataP
         "expected_weight_grams": 1000.0,
         "product_info": {"product_id": "P_SHELF", "unit_weight_grams": 50.0},
     }
-    await sensor_processor._process_smart_shelf_reading(message)
-    assert "Invalid weight values" in caplog.text
+    message.update(
+        event_id="invalid",
+        confidence=0.9,
+        tare_weight_grams=0.0,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+    assert not await sensor_processor.process_sensor_message(message)
+    assert "sensor.reading_rejected" in caplog.text
+    assert any("current_weight_grams" in str(record.invalid_fields) for record in caplog.records)
 
 
 # --- Test Environmental Processing --- #
@@ -878,7 +949,7 @@ async def test_handle_inventory_discrepancy_first_detection(
     )
 
     # Verify record created
-    discrepancy_key = f"{product_id}:{location}:{discrepancy_type}"
+    discrepancy_key = f"{product_id}:{location}"
     assert discrepancy_key in sensor_processor.discrepancies
     record = sensor_processor.discrepancies[discrepancy_key]
     assert record["detection_count"] == 1
@@ -923,7 +994,7 @@ async def test_handle_inventory_discrepancy_subsequent_detection(
     await sensor_processor._handle_inventory_discrepancy(
         location, [product_id], discrepancy_type, source1, details1
     )
-    discrepancy_key = f"{product_id}:{location}:{discrepancy_type}"
+    discrepancy_key = f"{product_id}:{location}"
     record1 = sensor_processor.discrepancies[discrepancy_key].copy()
 
     # Ensure some time passes for timestamp check
@@ -972,7 +1043,7 @@ async def test_handle_inventory_discrepancy_reaches_confidence_threshold(
         location, [product_id], discrepancy_type, source, details
     )
 
-    discrepancy_key = f"{product_id}:{location}:{discrepancy_type}"
+    discrepancy_key = f"{product_id}:{location}"
     record = sensor_processor.discrepancies[discrepancy_key]
     assert record["detection_count"] == 1
 
@@ -1019,7 +1090,7 @@ async def test_handle_inventory_discrepancy_reaches_count_threshold(
         location, [product_id], discrepancy_type, source, details
     )
 
-    discrepancy_key = f"{product_id}:{location}:{discrepancy_type}"
+    discrepancy_key = f"{product_id}:{location}"
     record = sensor_processor.discrepancies[discrepancy_key]
     assert record["detection_count"] == 3
 

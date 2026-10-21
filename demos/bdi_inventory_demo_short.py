@@ -41,11 +41,15 @@ def run_short_demo() -> None:
         new_date=datetime(2025, 1, 15),
     )
 
-    actions = agent.run_cycle(prioritized_goals=["minimize_stockouts"])
+    print("Assumption: freshly received stock; aged lots are not modeled.")
+    print(f"Beliefs: stock=12, daily demand={sales['SKU-001'].average_daily_sales():.1f}")
+    print(f"Selected goals: {agent.deliberate()}")
+    actions = agent.run_cycle()
     print(f"Actions executed: {actions}")
+
+
+# endregion book:bdi-inventory-demo-short
 
 
 if __name__ == "__main__":
     run_short_demo()
-
-# endregion book:bdi-inventory-demo-short

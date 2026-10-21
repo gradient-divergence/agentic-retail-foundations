@@ -21,9 +21,7 @@ def test_import_without_supabase_config_is_offline(monkeypatch):
 
 
 def test_successful_response_needs_only_data(monkeypatch):
-    table = SimpleNamespace(
-        select=lambda query: SimpleNamespace(execute=lambda: SimpleNamespace(data=[{"agent_id": "demo"}]))
-    )
+    table = MetricsTable([{"agent_id": "demo"}])
     monkeypatch.setenv("SUPABASE_URL", "https://example.invalid")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
     monkeypatch.setitem(
@@ -33,6 +31,42 @@ def test_successful_response_needs_only_data(monkeypatch):
     )
     demo = load_demo(monkeypatch, "monitoring_dashboard_supabase_demo")
     assert demo.get_agent_metrics() == {"agents": [{"agent_id": "demo"}]}
+
+
+class MetricsTable:
+    """Emulate a REST row cap smaller than the requested page."""
+
+    def __init__(self, rows):
+        self.rows = rows
+        self.start, self.end = 0, 1
+
+    def select(self, query):
+        return self
+
+    def order(self, column):
+        assert column == "agent_id"
+        return self
+
+    def range(self, start, end):
+        self.start, self.end = start, min(end, start + 1)
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=self.rows[self.start : self.end + 1])
+
+
+def test_server_row_cap_does_not_truncate_metrics(monkeypatch):
+    rows = [{"agent_id": f"demo-{i}"} for i in range(5)]
+    table = MetricsTable(rows)
+    monkeypatch.setenv("SUPABASE_URL", "https://example.invalid")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setitem(
+        sys.modules,
+        "supabase",
+        SimpleNamespace(create_client=lambda *args: SimpleNamespace(table=lambda name: table)),
+    )
+    demo = load_demo(monkeypatch, "monitoring_dashboard_supabase_demo")
+    assert demo.get_agent_metrics() == {"agents": rows}
 
 
 def test_provider_error_does_not_expose_credentials(monkeypatch):

@@ -102,7 +102,7 @@ class ShelfMonitoringAgent:
 
     # endregion book:shelf-monitoring-class
 
-    # region book:shelf-monitoring-start-monitoring
+    # region book:shelf-monitoring-start-monitoring-joined
     async def start_monitoring(self, location_id: str, section_ids: list[str]):
         """Begin monitoring specified shelf sections at a location."""
         # Initialize monitoring for each section
@@ -120,9 +120,7 @@ class ShelfMonitoringAgent:
             # Initialize tracking for this section
             self.last_check_times[section_id] = 0
             self.detected_issues[section_id] = []
-        # endregion book:shelf-monitoring-start-monitoring
 
-        # region book:shelf-monitoring-monitor-loop
         # Begin the monitoring loop
         while self.active_streams:
             current_time = time.time()
@@ -135,7 +133,7 @@ class ShelfMonitoringAgent:
 
             # Small delay to prevent maxing out CPU
             await asyncio.sleep(1)
-        # endregion book:shelf-monitoring-monitor-loop
+        # endregion book:shelf-monitoring-start-monitoring-joined
 
     # region book:shelf-monitoring-check-section
     async def _check_section(self, location_id: str, section_id: str):
@@ -176,12 +174,13 @@ class ShelfMonitoringAgent:
         issues = self._compare_with_planogram(detected_products, planogram_model)
 
         # Update detected issues
-        self.detected_issues[section_id] = issues
-        if issues:
+        previous = self.detected_issues.get(section_id, [])
+        if issues or previous:
             timestamp = datetime.now().isoformat()
 
             # Report issues to inventory system for action
             await self._report_issues(location_id, section_id, issues, timestamp)
+        self.detected_issues[section_id] = issues  # A failed report leaves recovery eligible for retry.
         # endregion book:shelf-monitoring-check-section-process
 
     # region book:shelf-monitoring-preprocess-func
@@ -204,6 +203,21 @@ class ShelfMonitoringAgent:
 
     # endregion book:shelf-monitoring-preprocess-func
 
+    @staticmethod
+    def _valid_box(box) -> bool:
+        if not np.isfinite(box).all() or not ((box >= 0) & (box <= 1)).all():
+            return False
+        ymin, xmin, ymax, xmax = box
+        return not (ymin >= ymax or xmin >= xmax)
+
+    @staticmethod
+    def _duplicate_product(products, product_id, box_pixel) -> bool:
+        from utils.vision import box_overlap
+
+        return any(
+            p.product_id == product_id and box_overlap(p.bounding_box, box_pixel) > 0.5 for p in products
+        )
+
     # region book:shelf-monitoring-process-detections
     def _process_detections(
         self,
@@ -222,10 +236,12 @@ class ShelfMonitoringAgent:
 
         # region book:shelf-monitoring-process-detections-loop
         products: list[DetectedProduct] = []
-        for i in range(len(detection_scores)):
-            if detection_scores[i] >= self.confidence_threshold:
+        for i in np.argsort(-detection_scores):
+            if np.isfinite(detection_scores[i]) and self.confidence_threshold <= detection_scores[i] <= 1:
                 # Convert bounding box to pixel coordinates
                 box = detection_boxes[i]
+                if not self._valid_box(box):
+                    continue
                 ymin, xmin, ymax, xmax = box
                 box_pixel = [
                     int(ymin * image_height),
@@ -234,11 +250,11 @@ class ShelfMonitoringAgent:
                     int(xmax * image_width),
                 ]
 
-                # Map class ID to product ID
                 class_id = detection_classes[i]
                 if class_id in class_mapping:
                     product_id = class_mapping[class_id]
-
+                    if self._duplicate_product(products, product_id, box_pixel):
+                        continue
                     # Store detected product info
                     products.append(
                         DetectedProduct(
@@ -263,8 +279,8 @@ class ShelfMonitoringAgent:
         # and your actual retail product catalog IDs
         return {
             # Example mapping
-            1: "SKU123456",  # Class 1 -> SKU123456 (Coca-Cola 12oz)
-            2: "SKU789012",  # Class 2 -> SKU789012 (Pepsi 12oz)
+            1: "S4",  # Class 1 -> SEC002 fixture S4
+            2: "S5",  # Class 2 -> SEC002 fixture S5
             # ... more mappings
         }
 
@@ -276,95 +292,22 @@ class ShelfMonitoringAgent:
         detected_products: list[DetectedProduct],
         planogram: Planogram,
     ) -> list[ShelfIssue]:
-        """Compare detected products with expected planogram."""
-        issues: list[ShelfIssue] = []
+        from utils.vision import compare_placements
 
-        # Group detected products by ID
-        product_counts = {}
-        product_positions = {}
-
-        for product in detected_products:
-            product_id = product.product_id
-            if product_id in product_counts:
-                product_counts[product_id] += 1
-                product_positions[product_id].append(product.shelf_position)
-            else:
-                product_counts[product_id] = 1
-                product_positions[product_id] = [product.shelf_position]
-
-        # Check for missing products
-        for expected_product in planogram.products:
-            product_id = expected_product.product_id
-            expected_count = expected_product.expected_count
-            actual_count = product_counts.get(product_id, 0)
-
-            if actual_count < expected_count:
-                # Out of stock or low stock issue
-                gap_percentage = (expected_count - actual_count) / expected_count
-
-                issues.append(
-                    ShelfIssue(
-                        type="OUT_OF_STOCK" if actual_count == 0 else "LOW_STOCK",
-                        product_id=product_id,
-                        details={
-                            "expected_count": expected_count,
-                            "actual_count": actual_count,
-                            "gap_percentage": gap_percentage,
-                            "position": expected_product.position.model_dump(),
-                        },
-                    )
-                )
-
-            # Remove from counts so we can identify unexpected products
-            if product_id in product_counts:
-                del product_counts[product_id]
-
-        # Any remaining products are not in the planogram
-        for product_id, count in product_counts.items():
-            issues.append(
-                ShelfIssue(
-                    type="UNEXPECTED_PRODUCT",
-                    product_id=product_id,
-                    details={
-                        "count": count,
-                        "positions": [pos.model_dump() for pos in product_positions[product_id]],
-                    },
-                )
+        rows = compare_placements([p.model_dump() for p in detected_products], planogram.model_dump())
+        issues = [
+            ShelfIssue(
+                type=row["type"],
+                product_id=row["product_id"],
+                details={k: v for k, v in row.items() if k not in {"type", "product_id"}},
             )
+            for row in rows
+        ]
+        return issues
         # endregion book:shelf-monitoring-compare-planogram
 
         # region book:shelf-monitoring-compare-positions
-        # Check for position issues (products in wrong places)
-        for product in detected_products:
-            product_id = product.product_id
-
-            # Find this product in the planogram
-            for expected_product in planogram.products:
-                if expected_product.product_id == product_id:
-                    # Calculate position difference
-                    expected_pos = expected_product.position
-                    actual_pos = product.shelf_position
-
-                    # Calculate Euclidean distance as percentage of shelf
-                    distance = np.sqrt(
-                        (expected_pos.x - actual_pos.x) ** 2 + (expected_pos.y - actual_pos.y) ** 2
-                    )
-
-                    # If product is significantly out of place
-                    if distance > 0.15:  # 15% of shelf dimensions
-                        issues.append(
-                            ShelfIssue(
-                                type="MISPLACED_PRODUCT",
-                                product_id=product_id,
-                                details={
-                                    "expected_position": expected_pos.model_dump(),
-                                    "actual_position": actual_pos.model_dump(),
-                                    "distance": distance,
-                                },
-                            )
-                        )
-                    break
-        return issues
+        # Positions and gaps are returned together above.
         # endregion book:shelf-monitoring-compare-positions
 
     # region book:shelf-monitoring-report-issues

@@ -42,3 +42,38 @@ def test_missing_model_does_not_produce_false_stock_audits(monkeypatch):
     monkeypatch.setattr(torch.jit, "load", fail_load)
     with pytest.raises(OSError, match="model not found"):
         ShelfMonitoringAgent("missing", None, None, {})
+
+
+@pytest.mark.parametrize("agent_type", [ShelfMonitoringAgent, BookShelfAgent])
+def test_duplicate_boxes_do_not_count_as_two_visible_units(monkeypatch, agent_type):
+    monkeypatch.setattr(torch.jit, "load", lambda path: SimpleNamespace(eval=lambda: None))
+    agent = agent_type("fake", None, None, {})
+    detections = {
+        "detection_boxes": torch.tensor([[[0.1, 0.2, 0.6, 0.8], [0.1, 0.2, 0.6, 0.8]]]),
+        "detection_classes": torch.tensor([[1, 1]]),
+        "detection_scores": torch.tensor([[0.9, 0.8]]),
+    }
+    assert len(agent._process_detections(detections, 200, 100)) == 1
+
+
+def test_torchscript_fixture_runs_frame_to_catalog_and_planogram(tmp_path):
+    from connectors.dummy_planogram_db import DummyPlanogramDB
+
+    class FixtureDetector(torch.nn.Module):
+        def forward(self, frame):
+            marker = frame.sum() * 0
+            return {
+                "detection_boxes": torch.tensor([[[0.1, 0.2, 0.6, 0.8]]]) + marker,
+                "detection_classes": torch.tensor([[1]]),
+                "detection_scores": torch.tensor([[0.9]]),
+            }
+
+    artifact = tmp_path / "fixture.pt"
+    torch.jit.trace(FixtureDetector(), torch.zeros(1, 640, 640, 3), strict=False).save(str(artifact))
+    agent = ShelfMonitoringAgent(str(artifact), DummyPlanogramDB(), None, {})
+    frame = np.zeros((100, 200, 3), dtype=np.uint8)
+    detections = agent.detection_model(agent._preprocess_image(frame))
+    products = agent._process_detections(detections, 200, 100)
+    assert products[0]["product_id"] == "S4"
+    expected = {"products": [dict(product_id="S4", expected_count=1, position={"x": 0.5, "y": 0.35})]}
+    assert agent._compare_with_planogram(products, expected) == []

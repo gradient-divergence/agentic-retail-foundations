@@ -34,8 +34,7 @@ def inventory_item() -> InventoryItem:
         reorder_point=20,
         optimal_stock=60,
         last_reorder_date=datetime(2024, 1, 1),
-        pending_order_quantity=0,
-        expected_delivery_date=None,
+        pending_receipts=[],
     )
 
 

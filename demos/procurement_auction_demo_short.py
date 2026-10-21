@@ -1,6 +1,6 @@
 """Short, print-friendly reverse auction demo."""
 
-# region book:procurement-auction-setup
+# region book:procurement-auction-setup-joined
 import asyncio
 
 from agents.protocols.auction import AuctionType, ProcurementAuction
@@ -45,9 +45,6 @@ async def demo_procurement_auction() -> None:
     for supplier in suppliers:
         auction.register_supplier(supplier)
 
-    # endregion book:procurement-auction-setup
-
-    # region book:procurement-auction-run
     if not await auction.start_auction():
         print("Auction failed to start.")
         return
@@ -77,10 +74,11 @@ async def demo_procurement_auction() -> None:
         print("No winner.")
         return
 
+    assert winner.supplier_id == "sup-beta" and winner.price == 10800.0 and winner.delivery_days == 9
     print(f"Winner: {winner.supplier_id} price=${winner.price:.2f} days={winner.delivery_days}")
 
 
 if __name__ == "__main__":
     asyncio.run(demo_procurement_auction())
 
-# endregion book:procurement-auction-run
+# endregion book:procurement-auction-setup-joined

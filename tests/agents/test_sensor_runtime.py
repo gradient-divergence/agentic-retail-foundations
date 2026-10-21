@@ -124,11 +124,25 @@ def test_timezone_aware_sensor_timestamp_is_accepted(sensor_module):
         "sensor_type": "unknown",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    if "SensorMessage" in sensor_module:
+        reading.update(
+            event_id="one",
+            sensor_type="environmental",
+            confidence=0.9,
+            location={"zone": "Z", "section": "A", "zone_type": "refrigerated"},
+            environmental_type="temperature",
+            value=4.0,
+            unit="C",
+        )
     message = (
         sensor_module["SensorMessage"].from_dict(reading) if "SensorMessage" in sensor_module else reading
     )
     asyncio.run(processor.process_sensor_message(message))
-    assert processor.recent_readings == {"SENSOR1": [reading]}
+    stored = processor.recent_readings["SENSOR1"][0]
+    assert datetime.fromisoformat(stored["timestamp"]) == datetime.fromisoformat(reading["timestamp"])
+    assert {k: v for k, v in stored.items() if k != "timestamp"} == {
+        k: v for k, v in reading.items() if k != "timestamp"
+    }
 
 
 @pytest.mark.parametrize("timestamp", [None, "bad timestamp"])

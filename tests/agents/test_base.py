@@ -154,7 +154,7 @@ async def test_handle_exception_with_order_success(
     payload = call_args.args[1]
     error_details = payload.get("error_details", {})
 
-    assert event_type == "system.exception"
+    assert event_type == "order.exception"
     assert error_details["error_type"] == "TypeError"
     assert error_details["order_id"] == mock_order.order_id  # Check order_id is present
     assert error_details["context"] == context
@@ -197,7 +197,7 @@ async def test_handle_exception_with_order_update_fails(
     payload = call_args.args[1]
     error_details = payload.get("error_details", {})
 
-    assert event_type == "system.exception"
+    assert event_type == "order.exception"
     assert error_details["error_type"] == "KeyError"
     # order_id might or might not be present depending on exact execution flow before exception
     # Let's just check it doesn't contain the update_error details

@@ -47,17 +47,17 @@ def run_demo() -> None:
     pricing_agent = Agent(
         name="PricingAgent",
         instructions=(
-            "You are a pricing agent that optimizes product prices for profit while "
-            "avoiding stockouts. Use tools to check competitor pricing and inventory. "
-            "If our price is too low and stock is limited, consider raising it. "
-            "If stock is high or competitor price is lower, consider lowering our price "
-            "to boost sales."
+            "Demonstrate tool-calling repricing on this synthetic fixture. "
+            "Inspect the recorded competitor price and stock, then apply the requested candidate price. "
+            "These tools provide no demand or contribution model and cannot establish profit optimality."
         ),
         tools=[price_tool, stock_tool, update_tool],
     )
 
-    task = "Evaluate and adjust the price for product_456. Its current price is $100."
+    task = "Inspect product_456 and set the demonstration candidate price to $110. Its initial price is $100."
     result = Runner.run_sync(pricing_agent, task)
+    if current_prices.get("product_456") != 110.0:
+        raise RuntimeError("Price postcondition failed: product_456 is not at the demonstration candidate")
     print(result.final_output)
 
 

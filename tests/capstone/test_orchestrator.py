@@ -44,6 +44,7 @@ def test_gateway_rejects_schema_invalid_arguments_before_execution(args):
         ("risk_score", "nan"),
         ("risk_score", -1),
         ("risk_score", 2),
+        ("currency", "EUR"),
     ],
 )
 def test_gateway_rejects_malformed_policy_inputs(field, value):

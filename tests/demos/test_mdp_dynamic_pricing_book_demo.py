@@ -64,3 +64,16 @@ def test_module_runs_the_training_demo():
     )
     assert result.returncode == 0, result.stderr
     assert "Episode 500/500" in result.stdout
+
+
+def test_seeded_demo_training_and_evaluation_replay_independently_of_caller_randomness(capsys):
+    from demos.mdp_dynamic_pricing_book_demo import demonstrate_mdp_dynamic_pricing
+
+    outputs = []
+    for seed in (100, 200):
+        random.seed(seed)
+        np.random.seed(seed)
+        demonstrate_mdp_dynamic_pricing()
+        outputs.append(capsys.readouterr().out)
+    assert outputs[0] == outputs[1]
+    assert "mean discounted return=" in outputs[0]

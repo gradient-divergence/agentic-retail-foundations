@@ -8,7 +8,7 @@ import logging
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from math import isfinite
 
@@ -28,7 +28,7 @@ class SupplierBid:
 
     supplier_id: str
     purchase_order_id: str
-    price: float
+    price: float  # Total for the entire order in USD, not a per-unit price.
     delivery_days: int
     quality_guarantee: float  # Example: 0.95 means 95% quality
     timestamp: datetime = field(default_factory=datetime.now)
@@ -55,7 +55,7 @@ class PurchaseOrder:
     quantity: int
     # Using deadline_days to calculate required_delivery_date on init
     deadline_days: int
-    maximum_acceptable_price: float
+    maximum_acceptable_price: float  # Entire order's USD ceiling, in the bid's currency.
     quality_threshold: float = 0.90  # Default minimum quality
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     status: PurchaseOrderStatus = PurchaseOrderStatus.CREATED
@@ -74,7 +74,13 @@ class PurchaseOrder:
             raise ValueError("Quality threshold must be between 0 and 1.")
 
     def accepts_bid(self, bid: SupplierBid) -> bool:
-        """Check bid identity and the purchase order's hard constraints."""
+        """Delivery days start at bid submission; naive demo dates mean UTC."""
+        submitted = (
+            bid.timestamp.replace(tzinfo=timezone.utc) if bid.timestamp.tzinfo is None else bid.timestamp
+        )
+        deadline = self.required_delivery_date
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
         return (
             bid.purchase_order_id == self.id
             and isinstance(bid.price, int | float)
@@ -83,6 +89,7 @@ class PurchaseOrder:
             and 0 <= bid.price <= self.maximum_acceptable_price
             and type(bid.delivery_days) is int
             and 0 <= bid.delivery_days <= self.deadline_days
+            and submitted + timedelta(days=bid.delivery_days) <= deadline
             and isinstance(bid.quality_guarantee, int | float)
             and not isinstance(bid.quality_guarantee, bool)
             and self.quality_threshold <= bid.quality_guarantee <= 1

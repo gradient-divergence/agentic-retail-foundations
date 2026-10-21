@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # region book:hitl-approval-api-models
 from datetime import datetime, timezone
+from decimal import Decimal
 from itertools import count
 from threading import Lock
 from typing import Annotated, Literal
@@ -13,11 +14,23 @@ app = FastAPI()
 Actor = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
+def money_minor_units(value: float) -> float:
+    amount = Decimal(str(value))
+    if amount.as_tuple().exponent < -2 and amount != amount.quantize(Decimal("0.01")):
+        raise ValueError("Demo money requires a 0.01 currency minor unit")
+    return value
+
+
 class PriceProposal(BaseModel):
     product_id: int
     current_price: float = Field(gt=0, allow_inf_nan=False)
     suggested_price: float = Field(ge=0, allow_inf_nan=False)
     requester: Actor
+
+    @field_validator("current_price", "suggested_price")
+    @classmethod
+    def validate_money(cls, value: float) -> float:
+        return money_minor_units(value)
 
     @field_validator("requester")
     @classmethod
@@ -50,6 +63,11 @@ class PendingReviewsResponse(BaseModel):
 class ReviewAdjustment(BaseModel):
     new_price: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
+    @field_validator("new_price")
+    @classmethod
+    def validate_money(cls, value: float | None) -> float | None:
+        return money_minor_units(value) if value is not None else None
+
 
 class ReviewOutcome(BaseModel):
     status: Literal["approved", "modified", "rejected", "auto_approved"]
@@ -62,7 +80,6 @@ class ReviewOutcome(BaseModel):
 
 
 pending_reviews: dict[int, PendingReview] = {}
-# ponytail: process-local ledger and lock; use a transactional store before multi-worker deployment.
 review_outcomes: dict[int, ReviewOutcome] = {}
 review_ids = count(1)
 review_lock = Lock()
@@ -73,7 +90,9 @@ review_lock = Lock()
 # region book:hitl-approval-api-endpoints
 @app.post("/ai/propose_price", response_model=PriceProposalResponse)
 def propose_price(payload: PriceProposal) -> PriceProposalResponse:
-    change_percent = (payload.current_price - payload.suggested_price) / payload.current_price * 100
+    current = Decimal(str(payload.current_price))
+    proposed = Decimal(str(payload.suggested_price))
+    change_percent = (current - proposed) / current * 100
     review_id = next(review_ids)
     if change_percent > 20:
         pending_review = PendingReview(

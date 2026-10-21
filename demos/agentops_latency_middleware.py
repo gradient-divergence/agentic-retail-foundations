@@ -12,8 +12,8 @@ except ModuleNotFoundError:
     raise SystemExit("Install the monitoring extra: uv sync --extra monitoring") from None
 
 LATENCY = Histogram(
-    "agent_api_latency_seconds",
-    "Agent API latency",
+    "agent_api_response_start_latency_seconds",
+    "Time to response object; excludes streamed body delivery",
     ["endpoint"],
 )
 

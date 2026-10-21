@@ -3,7 +3,8 @@ from __future__ import annotations
 # region book:pricing-feedback-init
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
+from math import isfinite, log
 
 try:
     import redis
@@ -13,7 +14,15 @@ except ModuleNotFoundError:
 
 
 class DynamicPricingAgent:
-    def __init__(self, product_id, initial_price, min_price, max_price):
+    def __init__(self, product_id, initial_price, min_price, max_price, marginal_cost):
+        if not isfinite(marginal_cost) or marginal_cost < 0:
+            raise ValueError("Illustrative marginal cost must be finite and nonnegative")
+        self.marginal_cost = marginal_cost
+        self.observation_ids = []
+        self.last_learned_pair = None
+        self.last_price_change_ms = None
+        self.window_start_ms = None
+        self.window_end_ms = None
         self.product_id = product_id
         self.current_price = initial_price
         self.min_price = min_price
@@ -61,34 +70,64 @@ class DynamicPricingAgent:
     # region book:pricing-feedback-get-sales
     def get_recent_sales(self):
         """Get recent sales data from Redis time-series database"""
-        now = datetime.now()
-        one_hour_ago = now - timedelta(hours=1)
-        start_ts = int(one_hour_ago.timestamp() * 1000)
-        end_ts = int(now.timestamp() * 1000)
+        # Closed, non-overlapping UTC epoch hours give stable observation identities.
+        end_ts = (int(time.time() * 1000) // 3_600_000) * 3_600_000
+        start_ts = end_ts - 3_600_000
+        self.window_end_ms = end_ts
+        self.window_start_ms = start_ts
         try:
             sales_data = self.redis_client.execute_command(
-                "TS.RANGE", f"sales:{self.product_id}:quantity", start_ts, end_ts
+                "TS.RANGE", f"sales:{self.product_id}:quantity", start_ts, end_ts - 1
             )
             return [(int(entry[0]), float(entry[1])) for entry in sales_data]
         except Exception as exc:
             print(f"Error retrieving sales data: {exc}")
-            return []
+            self.last_learned_pair = tuple(self.observation_ids[-2:])
+            return None
 
     # endregion book:pricing-feedback-get-sales
+
+    def _validated_sales_window(self, recent_sales):
+        if recent_sales is None:
+            return None
+        if (
+            self.last_price_change_ms is not None
+            and self.window_start_ms is not None
+            and self.last_price_change_ms > self.window_start_ms
+        ):
+            return None  # Mixed-price windows cannot be attributed to one price.
+        identity = (self.product_id, self.window_start_ms, self.window_end_ms)
+        if identity in self.observation_ids:
+            return None
+        quantities = [q for _, q in recent_sales]
+        if any(not isfinite(q) or q < 0 for q in quantities):
+            raise ValueError("Per-sale quantities must be finite and nonnegative")
+        return identity, quantities
+
+    def _record_observation(self, identity, demand):
+        self.observation_ids.append(identity)
+        self.price_history.append(self.current_price)
+        self.demand_history.append(demand)
+        self.price_history = self.price_history[-120:]
+        self.demand_history = self.demand_history[-120:]
+        self.observation_ids = self.observation_ids[-120:]
 
     # region book:pricing-feedback-compute
     def compute_optimal_price(self, recent_sales):
         """Calculate optimal price based on elasticity model"""
-        if not recent_sales:
+        # Full helpers: demos/dynamic_pricing_feedback_book_demo.py.
+        # _validated_sales_window checks replay, mixed-price windows and quantities.
+        # _record_observation retains the bounded price/demand history.
+        observation = self._validated_sales_window(recent_sales)
+        if observation is None:
             return self.current_price
-
-        quantities = [q for _, q in recent_sales]
-        avg_hourly_demand = sum(quantities) / len(quantities) if quantities else 0
-        self.price_history.append(self.current_price)
-        self.demand_history.append(avg_hourly_demand)
-        if len(self.price_history) < 2:
+        identity, quantities = observation
+        # Redis samples are transaction quantities in the queried one-hour window, including zero sales.
+        avg_hourly_demand = sum(quantities)
+        self._record_observation(identity, avg_hourly_demand)
+        if len(self.price_history) < 2 or avg_hourly_demand == 0:
             return self.current_price
-        marginal_cost = self.min_price * 0.8
+        marginal_cost = self.marginal_cost
 
         if self.price_elasticity >= -1.0:
             optimal_price = self.current_price
@@ -107,6 +146,7 @@ class DynamicPricingAgent:
         """Apply the new price and publish price change event"""
         old_price = self.current_price
         self.current_price = new_price
+        self.last_price_change_ms = int(time.time() * 1000)
         price_change_event = {
             "product_id": self.product_id,
             "old_price": old_price,
@@ -136,18 +176,24 @@ class DynamicPricingAgent:
 
     # region book:pricing-feedback-update-elasticity
     def update_elasticity_model(self, sale):
-        """Update price elasticity estimate based on observed sales"""
+        """Log-ratio elasticity assumes positive, uncensored demand and constant demand scale."""
+        pair = tuple(self.observation_ids[-2:])
+        if len(pair) != 2 or pair == self.last_learned_pair:
+            return
+        self.last_learned_pair = pair
         if len(self.price_history) < 2 or len(self.demand_history) < 2:
             return
-        if self.price_history[-2] <= 0 or self.demand_history[-2] <= 0:
+        if any(value <= 0 for value in self.price_history[-2:] + self.demand_history[-2:]):
             return
 
-        price_pct_change = (self.price_history[-1] - self.price_history[-2]) / self.price_history[-2]
-        if price_pct_change == 0:
+        log_price_change = log(self.price_history[-1] / self.price_history[-2])
+        if log_price_change == 0:
             return
 
-        demand_pct_change = (self.demand_history[-1] - self.demand_history[-2]) / self.demand_history[-2]
-        observed_elasticity = demand_pct_change / price_pct_change
+        log_demand_change = log(self.demand_history[-1] / self.demand_history[-2])
+        observed_elasticity = log_demand_change / log_price_change
+        if not isfinite(observed_elasticity):
+            return
         self.price_elasticity = (
             1 - self.learning_rate
         ) * self.price_elasticity + self.learning_rate * observed_elasticity
@@ -173,6 +219,7 @@ if __name__ == "__main__":
         initial_price=29.99,
         min_price=19.99,
         max_price=39.99,
+        marginal_cost=15.0,  # Explicit illustrative cost; independent of the price floor.
     )
     agent.run_feedback_loop()
 

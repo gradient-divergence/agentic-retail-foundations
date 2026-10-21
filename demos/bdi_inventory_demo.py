@@ -214,8 +214,7 @@ def demonstrate_bdi_agent() -> None:
             current_stock=max(0, agent.inventory["P001"].current_stock - 13),
             reorder_point=agent.inventory["P001"].reorder_point,
             optimal_stock=agent.inventory["P001"].optimal_stock,
-            pending_order_quantity=agent.inventory["P001"].pending_order_quantity,
-            expected_delivery_date=agent.inventory["P001"].expected_delivery_date,
+            pending_receipts=list(agent.inventory["P001"].pending_receipts),
             last_reorder_date=agent.inventory["P001"].last_reorder_date,
         ),
         "P002": InventoryItem(
@@ -223,8 +222,7 @@ def demonstrate_bdi_agent() -> None:
             current_stock=max(0, agent.inventory["P002"].current_stock - 7),
             reorder_point=agent.inventory["P002"].reorder_point,
             optimal_stock=agent.inventory["P002"].optimal_stock,
-            pending_order_quantity=agent.inventory["P002"].pending_order_quantity,
-            expected_delivery_date=agent.inventory["P002"].expected_delivery_date,
+            pending_receipts=list(agent.inventory["P002"].pending_receipts),
             last_reorder_date=agent.inventory["P002"].last_reorder_date,
         ),
         "P003": InventoryItem(
@@ -232,8 +230,7 @@ def demonstrate_bdi_agent() -> None:
             current_stock=max(0, agent.inventory["P003"].current_stock - 2),
             reorder_point=agent.inventory["P003"].reorder_point,
             optimal_stock=agent.inventory["P003"].optimal_stock,
-            pending_order_quantity=agent.inventory["P003"].pending_order_quantity,
-            expected_delivery_date=agent.inventory["P003"].expected_delivery_date,
+            pending_receipts=list(agent.inventory["P003"].pending_receipts),
             last_reorder_date=agent.inventory["P003"].last_reorder_date,
         ),
     }

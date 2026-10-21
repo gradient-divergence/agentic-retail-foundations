@@ -16,6 +16,7 @@ except ModuleNotFoundError:
 
 schema = StructType(
     [
+        StructField("event_id", StringType(), False),
         StructField("product_id", StringType(), True),
         StructField("store_id", StringType(), True),
         StructField("timestamp", TimestampType(), True),
@@ -53,7 +54,11 @@ sales_stream = (
 
 # region book:spark-streaming-velocity
 sales_velocity = (
-    sales_stream.withWatermark("timestamp", "1 minute")
+    sales_stream.filter(col("event_id").isNotNull() & col("timestamp").isNotNull())
+    .withWatermark("timestamp", "1 minute")
+    .dropDuplicatesWithinWatermark(
+        ["event_id"]
+    )  # Spark 3.5+: stable transaction identity, bounded replay horizon.
     .groupBy(
         col("product_id"),
         col("store_id"),

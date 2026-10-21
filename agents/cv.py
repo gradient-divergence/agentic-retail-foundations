@@ -102,10 +102,11 @@ class ShelfMonitoringAgent:
         detections = self.detection_model(input_tensor)
         detected_products = self._process_detections(detections, frame.shape[1], frame.shape[0])
         issues = self._compare_with_planogram(detected_products, planogram)
-        self.detected_issues[section_id] = issues
-        if issues:
+        previous = self.detected_issues.get(section_id, [])
+        if issues or previous:
             timestamp = datetime.now().isoformat()
             await self._report_issues(location_id, section_id, issues, timestamp)
+        self.detected_issues[section_id] = issues
 
     def _preprocess_image(self, image: np.ndarray) -> torch.Tensor:
         """Convert image to the format required by the model."""
@@ -133,10 +134,17 @@ class ShelfMonitoringAgent:
         products = []
         # Loop through detections FOR THE FIRST IMAGE in the batch (index 0)
         num_detections = detection_scores_np.shape[0]  # Number of detections for this image
-        for i in range(num_detections):
-            if detection_scores_np[i] >= self.confidence_threshold:
+        for i in np.argsort(-detection_scores_np[:num_detections]):
+            if (
+                np.isfinite(detection_scores_np[i])
+                and self.confidence_threshold <= detection_scores_np[i] <= 1
+            ):
                 box = detection_boxes_np[i]
+                if not np.isfinite(box).all() or not ((box >= 0) & (box <= 1)).all():
+                    continue
                 ymin, xmin, ymax, xmax = box
+                if ymin >= ymax or xmin >= xmax:
+                    continue
                 box_pixel = [
                     int(ymin * img_h),
                     int(xmin * img_w),
@@ -146,6 +154,13 @@ class ShelfMonitoringAgent:
                 class_id = detection_classes_np[i]
                 if class_id in class_mapping:
                     product_id = class_mapping[class_id]
+                    from utils.vision import box_overlap
+
+                    if any(
+                        p["product_id"] == product_id and box_overlap(p["bounding_box"], box_pixel) > 0.5
+                        for p in products
+                    ):
+                        continue
                     products.append(
                         {
                             "product_id": product_id,
@@ -171,8 +186,8 @@ class ShelfMonitoringAgent:
     def _get_class_mapping(self) -> dict[int, str]:
         """Map model class IDs to product IDs."""
         return {
-            1: "SKU123456",
-            2: "SKU789012",
+            1: "S4",
+            2: "S5",
         }
 
     def _compare_with_planogram(  # noqa: C901
@@ -182,66 +197,9 @@ class ShelfMonitoringAgent:
         tol: float = 0.15,
     ) -> list[dict[str, Any]]:
         """Compare detected products with expected planogram."""
-        issues = []
-        product_counts: dict[str, int] = {}
-        product_positions: dict[str, list[dict[str, float]]] = {}
-        for product in detected_products:
-            product_id = product["product_id"]
-            if product_id in product_counts:
-                product_counts[product_id] += 1
-                product_positions[product_id].append(product["shelf_position"])
-            else:
-                product_counts[product_id] = 1
-                product_positions[product_id] = [product["shelf_position"]]
-        for expected_product in planogram["products"]:
-            product_id = expected_product["product_id"]
-            expected_count = expected_product["expected_count"]
-            actual_count = product_counts.get(product_id, 0)
-            if actual_count < expected_count:
-                gap_percentage = (expected_count - actual_count) / expected_count
-                issues.append(
-                    {
-                        "type": "OUT_OF_STOCK" if actual_count == 0 else "LOW_STOCK",
-                        "product_id": product_id,
-                        "expected_count": expected_count,
-                        "actual_count": actual_count,
-                        "gap_percentage": gap_percentage,
-                        "position": expected_product["position"],
-                    }
-                )
-            if product_id in product_counts:
-                del product_counts[product_id]
-        for product_id, count in product_counts.items():
-            issues.append(
-                {
-                    "type": "UNEXPECTED_PRODUCT",
-                    "product_id": product_id,
-                    "count": count,
-                    "positions": product_positions[product_id],
-                }
-            )
-        for product in detected_products:
-            product_id = product["product_id"]
-            for expected_product in planogram["products"]:
-                if expected_product["product_id"] == product_id:
-                    expected_pos = expected_product["position"]
-                    actual_pos = product["shelf_position"]
-                    distance = np.sqrt(
-                        (expected_pos["x"] - actual_pos["x"]) ** 2
-                        + (expected_pos["y"] - actual_pos["y"]) ** 2
-                    )
-                    if distance > tol:
-                        issues.append(
-                            {
-                                "type": "MISPLACED_PRODUCT",
-                                "product_id": product_id,
-                                "expected_position": expected_pos,
-                                "actual_position": actual_pos,
-                                "distance": distance,
-                            }
-                        )
-                    break
-        return issues
+        from utils.vision import compare_placements
+
+        return compare_placements(detected_products, planogram, tol)
 
     async def _report_issues(
         self,

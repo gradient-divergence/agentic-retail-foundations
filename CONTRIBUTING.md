@@ -42,7 +42,7 @@ This guide provides instructions on how to get started, the development workflow
 Ensure you have the following installed:
 
 *   Git
-*   Python 3.10 or later
+*   Python 3.13 (required by the current dependency stack)
 *   `uv` (Python package manager) - See installation instructions: [https://github.com/astral-sh/uv](https://github.com/astral-sh/uv)
 
 ### Fork and Clone

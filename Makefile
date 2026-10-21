@@ -18,9 +18,9 @@ VENV_DIR := .venv
 VENV_BIN := $(VENV_DIR)/bin
 
 # --- Tool Definitions ---
-# UV is assumed to be available globally for initial venv creation.
+# UV synchronizes the locked environment using the pinned Python version.
 # Other tools explicitly point to the versions inside the virtual environment.
-# The '?=' allows overriding from the command line if needed (e.g., make PYTHON=python3.11 venv)
+# The '?=' allows overriding tools from the command line.
 UV          ?= uv
 PYTHON      ?= $(VENV_BIN)/python
 RUFF        ?= $(VENV_BIN)/ruff
@@ -29,10 +29,6 @@ PYTEST      ?= $(PYTHON) -m pytest
 COVERAGE    ?= $(VENV_BIN)/coverage
 MKDOCS      ?= $(VENV_BIN)/mkdocs
 PRECOMMIT   ?= $(VENV_BIN)/pre-commit
-
-# Interpreter used to create the virtual environment.
-# Prefer a modern Python (>=3.10) if multiple are installed.
-PYTHON_FOR_VENV ?= $(shell command -v python3.12 2>/dev/null || command -v python3.11 2>/dev/null || command -v python3.10 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null)
 
 # Phony targets prevent conflicts with files of the same name
 .PHONY: venv install clean help lint format format-check type-check test coverage docs-build docs-serve precommit precommit-run ci check clean-venv default shell
@@ -52,30 +48,11 @@ help: ## Show this help message and exit
 # Environment & Dependency Management
 ###############################################################################
 
-# The main target to set up the environment and install dependencies.
-# It relies on the .venv/pyvenv.cfg target to do the initial creation.
-venv: $(VENV_DIR)/pyvenv.cfg ## Set up venv, install base tools, and project dependencies
+venv: ## Sync locked dependencies and optional demo stacks
 	@echo "--> Installing project dependencies into $(VENV_DIR)..."
-	$(VENV_BIN)/uv pip install --no-cache-dir .[dev,docs]
+	UV_PROJECT_ENVIRONMENT="$(VENV_DIR)" $(UV) sync --locked --all-extras
 	@echo "--> Virtual environment setup and dependencies installed in $(VENV_DIR)."
 	@echo "--> Activate it using: source $(VENV_BIN)/activate"
-
-# This target creates the virtual environment using the *global* uv command
-# and installs essential tools (pip, uv) into it.
-# It only runs if the marker file (.venv/pyvenv.cfg) doesn't exist or pyproject.toml is newer.
-$(VENV_DIR)/pyvenv.cfg: pyproject.toml
-	@echo "--> Creating virtual environment in $(VENV_DIR) using global uv..."
-	@command -v $(UV) >/dev/null 2>&1 || { echo >&2 "Error: '$(UV)' command not found in PATH. Please install uv (see https://github.com/astral-sh/uv)."; exit 1; }
-	@test -n "$(PYTHON_FOR_VENV)" || { echo >&2 "Error: No Python interpreter found (need Python >= 3.10)."; exit 1; }
-	@$(PYTHON_FOR_VENV) -c "import sys; assert sys.version_info >= (3, 10), f'Python >=3.10 required; found {sys.version.split()[0]}'" \
-		|| { echo >&2 "Error: Python >= 3.10 is required. Install python3.11+ (pyenv/asdf/system) or set PYTHON_FOR_VENV=..."; exit 1; }
-	# Create the venv using global uv
-	$(UV) venv $(VENV_DIR) --seed --python $(PYTHON_FOR_VENV)
-	@echo "--> Installing/upgrading pip and installing uv within $(VENV_DIR)..."
-	# Use global uv again, but target the venv's python to install packages INTO the venv
-	$(UV) pip install --python $(VENV_BIN)/python --no-cache-dir --upgrade pip uv
-	@touch $(VENV_DIR)/pyvenv.cfg # Create marker file to indicate venv is set up
-
 
 # Alias for venv, ensures dependencies are installed.
 install: venv ## Alias for 'make venv' - ensures environment and dependencies are set up.

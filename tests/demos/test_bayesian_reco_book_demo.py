@@ -11,7 +11,7 @@ def test_recommendation_demo_prints_both_customers(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "Top 5 recommendations for customer C1:" in output
     assert "Generating recommendations for new customer C2..." in output
-    assert output.count(" -> ") == 10
+    assert output.count("sampled selection score=") == 10
 
 
 def test_category_prior_gets_conjugate_positive_and_negative_updates():
@@ -21,3 +21,15 @@ def test_category_prior_gets_conjugate_positive_and_negative_updates():
         agent.update_preference("customer", "A", interaction)
     assert agent.customer_preferences["customer"]["A"] == {"alpha": 6, "beta": 2, "interactions": 3}
     assert agent.explain_recommendation("customer", "A").expected_preference == 0.75
+
+
+def test_seeded_demonstration_replays_independently_of_caller_randomness(monkeypatch, capsys):
+    import numpy as np
+
+    monkeypatch.setattr(BayesianRecommendationAgent, "visualize_customer_preferences", lambda *_: None)
+    outputs = []
+    for seed in (100, 200):
+        np.random.seed(seed)
+        demonstrate_bayesian_recommendations()
+        outputs.append(capsys.readouterr().out)
+    assert outputs[0] == outputs[1]

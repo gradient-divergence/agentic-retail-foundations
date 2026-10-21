@@ -56,6 +56,7 @@ class InventoryAgent(BaseAgent):
                 "order.allocated",
                 {
                     "order_id": order.order_id,
+                    "order_total": sum(item.quantity * item.price for item in order.items),
                     "allocation_details": self._get_allocation_details(order),
                 },
             )

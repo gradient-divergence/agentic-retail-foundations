@@ -35,7 +35,10 @@ async def handle_inquiry(agent: RetailCustomerServiceAgent, inquiry: Inquiry) ->
     if intent == "order_status":
         order_id = await agent._extract_order_id(inquiry.message, recent_orders)
         if order_id:
-            context_data["order_details"] = await agent.order_system.get_order_details(order_id)
+            order = await agent.order_system.get_order_details(order_id)
+            # inquiry.customer_id must come from the authenticated principal.
+            if order and order.get("customer_id") == inquiry.customer_id:
+                context_data["order_details"] = order
     elif intent == "product_question":
         identifier = await agent._extract_product_identifier(inquiry.message)
         product_id = await agent.product_db.resolve_product_id(identifier) if identifier else None

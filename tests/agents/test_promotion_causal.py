@@ -112,7 +112,8 @@ def test_lags_use_past_rows_of_the_same_store_and_product(implementation, sales)
         ("S1", "P2", [0, 201, 202]),
     ]:
         group = data[(data["store_id"] == store) & (data["product_id"] == product)].sort_values("date")
-        assert group["sales_lag_1"].tolist() == expected
+        assert pd.isna(group["sales_lag_1"].iloc[0])
+        assert group["sales_lag_1"].iloc[1:].tolist() == expected[1:]
 
 
 @pytest.fixture
@@ -176,7 +177,7 @@ def test_estimator_recovers_generator_known_effect(implementation, method):
     elif method == "regression_adjustment":
         effect = result.promotion_effect
     else:
-        effect = result.average_treatment_effect
+        effect = result.matched_treated_effect
     # E[Y(0)] = Poisson mean 12 * Tier1 multiplier 1.1; lift = 0.5 * 13.2.
     # Seed 42, 731 observations: tolerate count noise, not a halved/zero effect.
     assert effect == pytest.approx(6.6, abs=1.3)
@@ -301,8 +302,9 @@ def test_book_causal_forest_uses_effect_api_and_original_segments(monkeypatch, k
         def __init__(self, **kwargs):
             assert kwargs["discrete_treatment"] is True
 
-        def fit(self, Y, T, X, W):
+        def fit(self, Y, T, X):
             assert "price" not in X
+            assert "product_category_Cat2" in X
 
         def ate(self, X):
             return 8.0
@@ -360,7 +362,10 @@ def test_book_dowhy_receives_a_graph_object(monkeypatch, known_effect_sales):
         def estimate_effect(self, estimand, method_name):
             return SimpleNamespace(value=8)
 
-        def refute_estimate(self, estimand, estimate, method_name):
+        def refute_estimate(self, estimand, estimate, method_name, random_state, placebo_type=None):
+            assert random_state == 42
+            if method_name == "placebo_treatment_refuter":
+                assert placebo_type == "permute"
             return "refutation"
 
     monkeypatch.setitem(sys.modules, "dowhy", SimpleNamespace(CausalModel=Model))

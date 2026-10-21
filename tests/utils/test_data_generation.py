@@ -5,7 +5,7 @@ from pandas.api.types import (
     is_datetime64_any_dtype,
     is_float_dtype,
     is_integer_dtype,
-    is_object_dtype,
+    is_string_dtype,
 )
 
 # Function to test
@@ -54,14 +54,14 @@ def test_sales_df_columns_and_types(generated_data):
     sales_df, _, _ = generated_data
     expected_cols_types = {
         "date": is_datetime64_any_dtype,
-        "store_id": is_object_dtype,  # String/Object
-        "product_id": is_object_dtype,  # String/Object
+        "store_id": is_string_dtype,
+        "product_id": is_string_dtype,
         "sales_units": is_integer_dtype,  # Should be integer after Poisson
         "price": is_float_dtype,
         "on_promotion": is_bool_dtype,
         "store_traffic": is_integer_dtype,
-        "product_category": is_object_dtype,
-        "store_tier": is_object_dtype,
+        "product_category": is_string_dtype,
+        "store_tier": is_string_dtype,
     }
     assert set(sales_df.columns) == set(expected_cols_types.keys())
     for col, type_check_func in expected_cols_types.items():
@@ -72,8 +72,8 @@ def test_product_df_columns_and_types(generated_data):
     """Test the columns and data types in the product DataFrame."""
     _, product_df, _ = generated_data
     expected_cols_types = {
-        "product_id": is_object_dtype,
-        "product_category": is_object_dtype,
+        "product_id": is_string_dtype,
+        "product_category": is_string_dtype,
     }
     assert set(product_df.columns) == set(expected_cols_types.keys())
     for col, type_check_func in expected_cols_types.items():
@@ -86,8 +86,8 @@ def test_store_df_columns_and_types(generated_data):
     """Test the columns and data types in the store DataFrame."""
     _, _, store_df = generated_data
     expected_cols_types = {
-        "store_id": is_object_dtype,
-        "store_tier": is_object_dtype,
+        "store_id": is_string_dtype,
+        "store_tier": is_string_dtype,
     }
     assert set(store_df.columns) == set(expected_cols_types.keys())
     for col, type_check_func in expected_cols_types.items():

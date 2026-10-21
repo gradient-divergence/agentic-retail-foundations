@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -29,8 +28,12 @@ class SessionStore:
         return list(self.items)
 
 
-def plan_next_step(user_request: str) -> str:
+def plan_next_step(user_request: str, history: list[SessionItem]) -> str:
     if "return" in user_request.lower():
+        return "check_return_policy"
+    if "deadline" in user_request.lower() and any(
+        item.role == "assistant" and item.content == "Intent: check_return_policy" for item in history
+    ):
         return "check_return_policy"
     return "search_catalog"
 
@@ -44,7 +47,7 @@ class SessionSummary(BaseModel):
 def run_turn(session: SessionStore, user_request: str) -> SessionSummary:
     session.add(SessionItem(role="user", content=user_request))
 
-    intent = plan_next_step(user_request)
+    intent = plan_next_step(user_request, session.history())
     session.add(SessionItem(role="assistant", content=f"Intent: {intent}"))
     session.add(SessionItem(role="tool", content="ok", tool_name=intent))
 
@@ -56,7 +59,11 @@ def run_turn(session: SessionStore, user_request: str) -> SessionSummary:
 
 
 if __name__ == "__main__":
-    session = SessionStore(session_id=f"sess_{uuid4().hex[:8]}")
+    session = SessionStore(session_id="sess_demo")
     summary = run_turn(session, "Can I return these shoes?")
     print(summary.model_dump())
+    follow_up = run_turn(session, "What is the deadline?")
+    assert summary.last_intent == follow_up.last_intent == "check_return_policy"
+    assert follow_up.item_count == 6
+    print(follow_up.model_dump())
 # endregion book:session-state-demo

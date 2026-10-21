@@ -1,5 +1,7 @@
 # region book:knowledge-graph-imports
 
+import re
+
 from pydantic import BaseModel
 from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import OWL, RDFS, XSD
@@ -68,6 +70,8 @@ class RetailKnowledgeGraph:
         self.graph.bind("customer", self.CUSTOMER)
         # Load our retail ontology
         self._load_ontology()
+        # Endpoint queries read an independently populated remote store.
+        # Local additions are not uploaded; leave graph_uri unset for the local teaching demo.
         # Connect to external SPARQL endpoint if provided
         self.sparql_endpoint = None
         if graph_uri:
@@ -77,7 +81,7 @@ class RetailKnowledgeGraph:
             self.sparql_endpoint.setReturnFormat(JSON)
         # endregion book:knowledge-graph-init-bindings
 
-    # region book:knowledge-graph-load-ontology-classes
+    # region book:knowledge-graph-load-ontology-classes-joined
     def _load_ontology(self):
         """Load the retail domain ontology into the graph"""
         # Define core classes
@@ -86,8 +90,6 @@ class RetailKnowledgeGraph:
         self.graph.add((self.RETAIL.Store, RDF.type, RDFS.Class))
         self.graph.add((self.RETAIL.Customer, RDF.type, RDFS.Class))
         self.graph.add((self.RETAIL.Location, RDF.type, RDFS.Class))
-        # endregion book:knowledge-graph-load-ontology-classes
-        # region book:knowledge-graph-load-ontology-properties
         # Define properties
         self.graph.add((self.RETAIL.name, RDF.type, RDF.Property))
         self.graph.add((self.RETAIL.price, RDF.type, RDF.Property))
@@ -95,15 +97,11 @@ class RetailKnowledgeGraph:
         self.graph.add((self.RETAIL.locatedIn, RDF.type, RDF.Property))
         self.graph.add((self.RETAIL.hasBrand, RDF.type, RDF.Property))
         # Define relationship properties
-        # endregion book:knowledge-graph-load-ontology-properties
-        # region book:knowledge-graph-load-ontology-relations
         self.graph.add((self.RETAIL.isSubstituteFor, RDF.type, RDF.Property))
         self.graph.add((self.RETAIL.complementsWith, RDF.type, RDF.Property))
         self.graph.add((self.RETAIL.isAccessoryFor, RDF.type, RDF.Property))
         self.graph.add((self.RETAIL.isVariantOf, RDF.type, RDF.Property))
         self.graph.add((self.RETAIL.purchased, RDF.type, RDF.Property))
-        # endregion book:knowledge-graph-load-ontology-relations
-        # region book:knowledge-graph-load-ontology-definitions
         # Add property definitions
         self.graph.add((self.RETAIL.isSubstituteFor, RDFS.domain, self.RETAIL.Product))
         self.graph.add((self.RETAIL.isSubstituteFor, RDFS.range, self.RETAIL.Product))
@@ -113,9 +111,9 @@ class RetailKnowledgeGraph:
         self.graph.add((self.RETAIL.complementsWith, RDF.type, OWL.SymmetricProperty))
         # Define transitive properties
         self.graph.add((self.RETAIL.hasSubcategory, RDF.type, OWL.TransitiveProperty))
-        # endregion book:knowledge-graph-load-ontology-definitions
+        # endregion book:knowledge-graph-load-ontology-classes-joined
 
-    # region book:knowledge-graph-add-product
+    # region book:knowledge-graph-add-product-joined
     def add_product(
         self,
         product_id: str,
@@ -133,8 +131,6 @@ class RetailKnowledgeGraph:
         self.graph.add((product_uri, self.RETAIL.name, Literal(name)))
         self.graph.add((product_uri, self.RETAIL.price, Literal(price, datatype=XSD.decimal)))
         self.graph.add((product_uri, self.RETAIL.hasBrand, Literal(brand)))
-        # endregion book:knowledge-graph-add-product
-        # region book:knowledge-graph-add-product-categories
         # Add product categories
         for category_id in category_ids:
             category_uri = self.CATEGORY[category_id]
@@ -145,7 +141,7 @@ class RetailKnowledgeGraph:
             self.graph.add((product_uri, attr_property, Literal(attr_value)))
 
         return product_uri
-        # endregion book:knowledge-graph-add-product-categories
+        # endregion book:knowledge-graph-add-product-joined
 
     # region book:knowledge-graph-add-product-relationship
     def add_product_relationship(
@@ -247,7 +243,7 @@ class RetailKnowledgeGraph:
         self.graph.add((customer_uri, self.RETAIL.purchased, product_uri))
         # endregion book:knowledge-graph-add-customer-purchase-event
 
-    # region book:knowledge-graph-find-substitutes
+    # region book:knowledge-graph-find-substitutes-joined
     def find_substitutes(self, product_id: str, max_results: int = 5) -> list[SubstituteProduct]:
         """Find substitute products for a given product"""
         query = """
@@ -307,10 +303,9 @@ class RetailKnowledgeGraph:
         ORDER BY DESC(?strength) ?price
         LIMIT __LIMIT__
         """
+        self._validate_query_inputs(product_id, max_results)
         query = query.replace("__PRODUCT_ID__", product_id).replace("__LIMIT__", str(max_results))
-        # endregion book:knowledge-graph-find-substitutes
 
-        # region book:knowledge-graph-find-substitutes-results
         results = self._execute_query(query).rows
         substitutes = []
         for row in results:
@@ -327,9 +322,9 @@ class RetailKnowledgeGraph:
             )
 
         return substitutes
-        # endregion book:knowledge-graph-find-substitutes-results
+        # endregion book:knowledge-graph-find-substitutes-joined
 
-    # region book:knowledge-graph-find-complements
+    # region book:knowledge-graph-find-complements-joined
     def find_complementary_products(self, product_id: str, max_results: int = 5) -> list[ComplementProduct]:
         """Find products that complement a given product"""
         query = """
@@ -401,10 +396,9 @@ class RetailKnowledgeGraph:
             ORDER BY DESC(?strength) ?relation_type
             LIMIT __LIMIT__
         """
+        self._validate_query_inputs(product_id, max_results)
         query = query.replace("__PRODUCT_ID__", product_id).replace("__LIMIT__", str(max_results))
-        # endregion book:knowledge-graph-find-complements
 
-        # region book:knowledge-graph-find-complements-results
         results = self._execute_query(query).rows
         complements = []
         for row in results:
@@ -422,7 +416,14 @@ class RetailKnowledgeGraph:
             )
 
         return complements
-        # endregion book:knowledge-graph-find-complements-results
+        # endregion book:knowledge-graph-find-complements-joined
+
+    @staticmethod
+    def _validate_query_inputs(identifier: str, limit: int) -> None:
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", identifier):
+            raise ValueError("Query identifier must contain only letters, digits, underscores, or hyphens")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("Result limit must be an integer from 1 to 100")
 
     # region book:knowledge-graph-execute-query
     def _execute_query(self, query_str: str) -> QueryResults:
@@ -461,6 +462,7 @@ class RetailKnowledgeGraph:
     ) -> list[ProductRecommendation]:
         """Generate personalized recommendations for a customer"""
         # Base query using purchase history
+        self._validate_query_inputs(customer_id, max_results)
         query = """
         PREFIX retail: <http://retail.example.org/ontology#>
         PREFIX customer: <http://retail.example.org/customer/>

@@ -28,6 +28,7 @@ os.environ["OPENAI_AGENTS_DISABLE_TRACING"] = "1"
 from demos import {name} as demo
 from demos.openai_agents_sdk_import import import_openai_agents_sdk
 sdk = import_openai_agents_sdk()
+from agents.tool_context import ToolContext
 seen = []
 def run(agent, task):
     for tool in agent.tools:
@@ -36,7 +37,7 @@ def run(agent, task):
         assert schema["additionalProperties"] is False
         payloads = {{
             "check_inventory": {{"product_id": "product_123"}},
-            "order_product": {{"product_id": "product_123", "amount": 2}},
+            "order_product": {{"product_id": "product_123", "amount": 30}},
             "get_competitor_price": {{"product_id": "product_456"}},
             "get_inventory": {{"product_id": "product_456"}},
             "update_price": {{"product_id": "product_456", "new_price": 110.0}},
@@ -44,8 +45,12 @@ def run(agent, task):
                 "product_id": "SKU123", "current_price": 49.99, "discount_pct": 15,
             }}}},
         }}
-        context = sdk.RunContextWrapper(context=None)
-        result = asyncio.run(tool.on_invoke_tool(context, json.dumps(payloads[tool.name])))
+        arguments = json.dumps(payloads[tool.name])
+        context = ToolContext(
+            context=None, tool_name=tool.name, tool_call_id="offline-call", tool_arguments=arguments,
+            agent=agent,
+        )
+        result = asyncio.run(tool.on_invoke_tool(context, arguments))
         assert result is not None
         assert not (isinstance(result, str) and result.startswith("An error occurred"))
         seen.append(tool.name)

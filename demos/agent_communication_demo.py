@@ -7,7 +7,7 @@ This demo showcases:
 - reply correlation via conversation IDs.
 """
 
-# region book:agent-communication-setup
+# region book:agent-communication-setup-joined
 
 import asyncio
 
@@ -51,9 +51,6 @@ async def demo_retail_agent_communication() -> None:
     broker.register_agent("inventory", inventory_on_message)
     broker.register_agent("replenishment", replenishment_on_message)
 
-    # endregion book:agent-communication-setup
-
-    # region book:agent-communication-run
     await broker.deliver_message(
         AgentMessage(
             performative=Performative.QUERY,
@@ -87,4 +84,4 @@ async def demo_retail_agent_communication() -> None:
 if __name__ == "__main__":
     asyncio.run(demo_retail_agent_communication())
 
-# endregion book:agent-communication-run
+# endregion book:agent-communication-setup-joined

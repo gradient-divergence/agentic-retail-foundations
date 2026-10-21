@@ -20,10 +20,21 @@ def get_agent_metrics():
         raise HTTPException(status_code=503, detail="supabase is not installed") from exc
     try:
         supabase = create_client(url, key)
-        res = supabase.table("agent_metrics").select("*").execute()
+        agents = []
+        while True:
+            page = (
+                supabase.table("agent_metrics")
+                .select("*")
+                .order("agent_id")
+                .range(len(agents), len(agents) + 999)
+                .execute()
+            )
+            if not page.data:
+                break
+            agents.extend(page.data)  # Advance by returned rows, including server-capped pages.
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Agent metrics query failed") from exc
-    return {"agents": res.data}
+    return {"agents": agents}
 
 
 # endregion book:monitoring-dashboard-supabase-demo

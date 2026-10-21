@@ -9,7 +9,7 @@ Run with: uvicorn demos.api_gateway_demo:app --reload
 import logging
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx  # For making async requests to backend services
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
@@ -24,8 +24,8 @@ except ModuleNotFoundError:
     raise SystemExit("Install the streaming extra: uv sync --extra streaming") from None
 
 try:
+    import bcrypt
     from jose import JWTError, jwt  # For JWT handling
-    from passlib.context import CryptContext  # For password hashing (mocked)
 except ModuleNotFoundError:
     raise SystemExit("Install the auth extra: uv sync --extra auth") from None
 
@@ -62,9 +62,6 @@ SECRET_KEY = "a_very_secret_key_for_dev_only"  # CHANGE THIS IN PRODUCTION!
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Password Hashing Context (using bcrypt)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # OAuth2 Scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")  # Endpoint for token generation
 
@@ -88,14 +85,14 @@ FAKE_AGENTS_DB = {
     "inventory-agent-1": {
         "agent_id": "inventory-agent-1",
         "agent_name": "Inventory Manager Bot",
-        "hashed_password": pwd_context.hash("password123"),
+        "hashed_password": bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode(),
         "roles": ["inventory_read", "inventory_write"],
         "is_active": True,
     },
     "pricing-agent-1": {
         "agent_id": "pricing-agent-1",
         "agent_name": "Dynamic Pricer",
-        "hashed_password": pwd_context.hash("pass987"),
+        "hashed_password": bcrypt.hashpw(b"pass987", bcrypt.gensalt()).decode(),
         "roles": ["pricing_read", "pricing_write"],
         "is_active": True,
     },
@@ -129,7 +126,8 @@ async def shutdown_event():
 
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    password = plain_password.encode()
+    return len(password) <= 72 and bcrypt.checkpw(password, hashed_password.encode())
 
 
 def get_agent(agent_id: str) -> Agent | None:
@@ -155,9 +153,9 @@ class AccessTokenPayload(BaseModel):
 def create_access_token(data: AccessTokenPayload, expires_delta: timedelta | None = None) -> str:
     to_encode = data.model_dump()
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)  # Default expiry
+        expire = datetime.now(UTC) + timedelta(minutes=15)  # Default expiry
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt

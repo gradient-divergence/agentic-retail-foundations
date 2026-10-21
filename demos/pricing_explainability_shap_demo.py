@@ -16,9 +16,9 @@ data = pd.DataFrame(
         "days_to_season_end": [10, 5, 30, 20, 15],  # days until end-of-season
     }
 )
-target = np.array([45, 40, 60, 50, 35])  # historical optimal prices for those scenarios
+target = np.array([45, 40, 60, 50, 35])  # synthetic price targets for those scenarios
 
-# Train a simple model (Random Forest) to predict optimal price
+# Train a simple model (Random Forest) to predict a synthetic price target
 model = RandomForestRegressor(random_state=0).fit(data, target)
 
 # Suppose the agent suggests a new price for a product with the following features:
@@ -31,11 +31,16 @@ product = pd.DataFrame(
 )
 
 predicted_price = model.predict(product)[0]
-print(f"AI-predicted optimal price: ${predicted_price:.2f}")
+print(f"Synthetic predicted price: ${predicted_price:.2f}")
 
 # Use SHAP to explain the prediction
 explainer = shap.TreeExplainer(model)
 shap_values = explainer.shap_values(product)
+
+baseline = float(np.asarray(explainer.expected_value).reshape(-1)[0])
+reconstructed = baseline + float(shap_values[0].sum())
+assert np.isclose(reconstructed, predicted_price)
+print(f"SHAP baseline: {baseline:.2f}; reconstructed prediction: {reconstructed:.2f}")
 
 # Pair each feature with its SHAP contribution value
 explanation = {}

@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false # Don't cancel all jobs if one Python version fails
       matrix:
-        python-version: ["3.10", "3.11", "3.12"] # Test against multiple Python versions
+        python-version: ["3.13"] # Required by the current dependency stack
 
     steps:
     #----------------------------------------------
@@ -50,8 +50,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-uv-
 
-    - name: Install dependencies using make
-      run: make install # This should use uv to create .venv and install deps
+    - name: Install locked dependencies and optional demo stacks
+      run: uv sync --locked --all-extras
 
     #----------------------------------------------
     #              run checks & tests

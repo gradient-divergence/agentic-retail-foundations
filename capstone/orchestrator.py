@@ -15,13 +15,47 @@ from capstone.tracing import TraceContext
 class CapstoneOrchestrator:
     """Minimal orchestrator and tool gateway for capstone demos."""
 
-    def __init__(self, tools: list[ToolSpec], policy: PolicyEvaluator) -> None:
+    def __init__(
+        self,
+        tools: list[ToolSpec],
+        policy: PolicyEvaluator,
+        *,
+        max_tool_calls: int = 10,
+        max_tokens: int = 4096,
+    ) -> None:
+        if (
+            type(max_tool_calls) is not int
+            or type(max_tokens) is not int
+            or min(max_tool_calls, max_tokens) < 0
+        ):
+            raise ValueError("Budgets must be nonnegative integers")
         self._tools = {tool.name: tool for tool in tools}
         self._policy = policy
+        self.max_tool_calls, self.max_tokens = max_tool_calls, max_tokens
 
     def handle_tool_call(
-        self, call: ToolCall, trace: TraceContext, actor: str = "capstone-agent"
+        self, call: ToolCall, trace: TraceContext, actor: str = "capstone-agent", *, token_count: int = 0
     ) -> tuple[ToolResult, AuditRecord]:
+        if type(token_count) is not int or token_count < 0:
+            raise ValueError("Token count must be a nonnegative integer from provider usage")
+        trace.tokens_used += token_count
+        if trace.tool_calls >= self.max_tool_calls or trace.tokens_used > self.max_tokens:
+            return (
+                ToolResult(
+                    name=call.name,
+                    status="error",
+                    output={"error": "budget_exhausted"},
+                    trace_id=trace.trace_id,
+                ),
+                AuditRecord(
+                    trace_id=trace.trace_id,
+                    actor=actor,
+                    action=call.name,
+                    decision="budget_exhausted",
+                    evidence=[],
+                ),
+            )
+        trace.tool_calls += 1
         spec = self._tools.get(call.name)
         if spec is None:
             return (
@@ -45,6 +79,7 @@ class CapstoneOrchestrator:
             policy_input = PolicyInput(
                 action=call.name,
                 amount=_extract_amount(call.args),
+                currency=call.args.get("currency", "USD"),
                 risk_score=_coerce_float(call.args.get("risk_score")) or 0.0,
                 evidence=[f"permission={spec.permission}"],
             )

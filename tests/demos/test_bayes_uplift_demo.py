@@ -28,5 +28,6 @@ def test_printed_region_runs_with_its_own_imports(capsys):
     )[0]
     exec(compile(snippet, "book:bayes-uplift-demo", "exec"), {"__name__": "__main__"})
     output = capsys.readouterr().out
+    assert "Control: 17/200; treatment: 19/200" in output
     assert "Posterior mean conversion rate:" in output
     assert "Estimated uplift:" in output

@@ -11,11 +11,11 @@ A modular, extensible Python framework and companion codebase for the third edit
       <br><br>
       <em>Retail is the most demanding proving ground for agentic AI: thin margins, live inventory, real customers, and constant change. This edition focuses on production-ready operating models, evaluation, and governance.</em>
       <br><br>
-      The third edition (October 2026) is being prepared for Amazon in paperback, hardcover and Kindle. <strong>The earlier edition on Amazon:</strong> <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">US</a> | <a href="https://www.amazon.ca/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">CA</a> | <a href="https://www.amazon.co.jp/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">JP</a> | <a href="https://www.amazon.co.uk/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">UK</a> | <a href="https://www.amazon.de/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">DE</a> | <a href="https://www.amazon.fr/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">FR</a> | <a href="https://www.amazon.in/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IN</a> | <a href="https://www.amazon.it/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IT</a> | <a href="https://www.amazon.es/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">ES</a>
+      The third edition (October 2026) is out in paperback and hardcover: <a href="https://www.amazon.com/dp/1069422649"><strong>get it on Amazon</strong></a>. The Kindle edition will follow. <strong>The earlier edition on Amazon:</strong> <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">US</a> | <a href="https://www.amazon.ca/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">CA</a> | <a href="https://www.amazon.co.jp/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">JP</a> | <a href="https://www.amazon.co.uk/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">UK</a> | <a href="https://www.amazon.de/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">DE</a> | <a href="https://www.amazon.fr/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">FR</a> | <a href="https://www.amazon.in/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IN</a> | <a href="https://www.amazon.it/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IT</a> | <a href="https://www.amazon.es/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">ES</a>
       <br>
     </td>
     <td width="40%" align="center" valign="center">
-      <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">
+      <a href="https://www.amazon.com/dp/1069422649">
         <img src="assets/book-cover-3rd-edition.jpg" alt="Book cover: Foundations of Agentic AI for Retail, third edition" width="300"/>
       </a>
     </td>
@@ -25,9 +25,9 @@ A modular, extensible Python framework and companion codebase for the third edit
 ## What's New in the Third Edition
 
 - **Repaired code.** The demos, agents and utilities were repaired for this edition, and the book's printed listings are drawn from this code.
-- **Regression tests.** Each repair came with a test; the suite grew from 36 test files to 106.
+- **Regression tests.** Each repair came with a test; the suite grew from 36 test files to 114 (1,029 tests pass; 5 more check the manuscript's extracted listings and run only beside the book's source).
 - **Demos that say what they need.** A demo that needs an API key or a running service now names it and stops, instead of failing midway.
-- **Tags.** `third-edition` marks the code as printed in the third edition; `v2.0.0` is the second edition's.
+- **Tags.** `third-edition` (and `v3.1.0`) marks the code as printed in the published third edition; `v3.0.0` is the 7 October pre-release state, and `v2.0.0` is the second edition's.
 
 ## What the Second Edition Added
 
@@ -104,7 +104,7 @@ agentic-retail-foundations/
 
 1.  **Prerequisites:**
     *   Git
-    *   Python 3.10+
+    *   Python 3.13 (the current dependency stack excludes 3.14)
     *   `uv` (recommended for fast environment/package management)
 
 2.  **Clone the repository:**
@@ -118,15 +118,16 @@ agentic-retail-foundations/
 
 4.  **Create Virtual Environment & Install Dependencies:**
     ```sh
-    make install
-    # or: make venv
+    uv sync --frozen
+    # Complete test environment:
+    uv sync --frozen --all-extras
     ```
 
 5.  **Activate the Virtual Environment:**
     ```sh
     source .venv/bin/activate
     ```
-    Alternatively, use `make shell` to start a sub-shell with the environment activated.
+    Run commands with `uv run --frozen` to use the locked environment without activation.
 
 6.  **Set up Environment Variables:**
     *   Copy the example environment file:
@@ -137,10 +138,7 @@ agentic-retail-foundations/
     *   **Important:** `.env` is listed in `.gitignore` and should **never** be committed.
 
 7.  **Optional: OpenAI Agents SDK demos**
-    *   Install the SDK dependencies:
-        ```sh
-        pip install --upgrade openai openai-agents python-dotenv
-        ```
+    *   The SDK dependencies are included in the frozen installation above.
     *   SDK-specific demos (for example, `demos/*_agents_sdk_demo.py`) import the SDK via
         `demos/openai_agents_sdk_import.py` to avoid collisions with this repo's local
         `agents/` package.
@@ -148,12 +146,12 @@ agentic-retail-foundations/
 8.  **Optional: Protocol SDKs and reference implementations**
     *   Install protocol SDK dependencies:
         ```sh
-        uv pip install -e ".[agent_protocols]"
+        uv sync --frozen --extra agent_protocols
         ```
     *   ACP is treated as a spec-only protocol reference (no SDK dependency).
     *   Other optional stacks have named extras: `streaming` (Redis/Kafka), `spark`,
         `gnn`, `monitoring` (Prometheus), `cloud` (Postgres/Supabase), `auth`, and `explainability` (SHAP).
-        Install one with `uv sync --extra <name>`; use `uv sync --all-extras` for the complete test environment.
+        Install one with `uv sync --frozen --extra <name>`; use `uv sync --frozen --all-extras` for the complete test environment.
 
 9.  **Install Pre-commit Hooks (Recommended):**
     ```sh
@@ -173,10 +171,22 @@ Common development tasks are streamlined using the `Makefile`. Ensure your virtu
     Use `marimo run ...` for a read-only view.
 
 *   **Run Demo Scripts:**
+    Run from the companion repository root:
     ```sh
-    python demos/<demo_name>.py
-    # e.g., python demos/task_allocation_cnp_demo.py
+    python -m demos.<demo_name>
+    # e.g., python -m demos.task_allocation_cnp_demo
     ```
+
+    Chapter 8's complete `approval_request` in `demos/book_pricing_contracts.json`
+    proposes ending SKU-123's discount from Friday 16 October 2026 at 00:00 UTC
+    until Monday 19 October at 00:00 UTC (exclusive), covering the promotion's
+    remaining Friday-to-Sunday window. Its unit-margin check is gross margin:
+    `(price - unit_cost_usd) / price`, about 45.45% at the proposed $22 price
+    against $12 merchandise cost, above the 40% floor. Contribution per unit
+    also deducts $4 in other variable selling costs: $20 - $12 - $4 = $4
+    currently, or $22 - $12 - $4 = $6 if approved. These per-unit contributions
+    exclude the transfer's $20 transport/handling cost and the donor's $8
+    expected contribution loss, deducted separately in the decision record.
 
 *   **Run Linters / Formatters / Type Checks:**
     ```sh

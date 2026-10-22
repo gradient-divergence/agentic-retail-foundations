@@ -1,35 +1,72 @@
-# Foundations of Agentic AI for Retail (Third Edition Companion Code)
+# Foundations of Agentic AI for Retail: Companion Code (Third Edition)
 
-A modular, extensible Python framework and companion codebase for the third edition of *Foundations of Agentic AI for Retail*. It includes agent architectures, coordination protocols, production guardrails, evaluation packs, and end-to-end demos that map to the book's operating model and capstone workflow.
-
-## Featured Book: Foundations of Agentic AI for Retail, Third Edition
+The runnable companion to *Foundations of Agentic AI for Retail*, Third Edition. Agent architectures, decision frameworks, coordination protocols, guardrails, evaluation and end-to-end demos, as the book prints them, with a regression test for each.
 
 <table>
   <tr>
     <td width="60%">
-      <a href="https://github.com/gradient-divergence/agentic-retail-foundations"><strong>Foundations of Agentic AI for Retail: Designing, Building, and Operating Retail AI Agents, from First Principles to Production (Third Edition)</strong></a> by Fatih Nayebi.
+      <a href="https://www.amazon.com/dp/1069422649"><strong>Foundations of Agentic AI for Retail: Designing, Building, and Operating Retail AI Agents, from First Principles to Production</strong></a>, Third Edition (October 2026), by Fatih Nayebi.
       <br><br>
-      <em>Retail is the most demanding proving ground for agentic AI: thin margins, live inventory, real customers, and constant change. This edition focuses on production-ready operating models, evaluation, and governance.</em>
+      <em>A pricing agent marks down a winter coat in one region, exactly as its rules allow, and by morning the brand owns the outcome. The book asks when a retailer should hand a decision to software, and what evidence and controls make the handover worthwhile, from first principles to production.</em>
       <br><br>
-      The third edition (October 2026) is out in paperback and hardcover: <a href="https://www.amazon.com/dp/1069422649"><strong>get it on Amazon</strong></a>. The Kindle edition will follow. <strong>The earlier edition on Amazon:</strong> <a href="https://www.amazon.com/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">US</a> | <a href="https://www.amazon.ca/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">CA</a> | <a href="https://www.amazon.co.jp/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">JP</a> | <a href="https://www.amazon.co.uk/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">UK</a> | <a href="https://www.amazon.de/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">DE</a> | <a href="https://www.amazon.fr/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">FR</a> | <a href="https://www.amazon.in/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IN</a> | <a href="https://www.amazon.it/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">IT</a> | <a href="https://www.amazon.es/Foundations-Agentic-Retail-Technologies-Architectures/dp/1069422606">ES</a>
-      <br>
+      In paperback and hardcover, in full color. The Kindle edition will follow.<br>
+      <strong>Buy on Amazon:</strong> <a href="https://www.amazon.com/dp/1069422649">US</a> | <a href="https://www.amazon.ca/dp/1069422649">CA</a> | <a href="https://www.amazon.co.uk/dp/1069422649">UK</a> | <a href="https://www.amazon.de/dp/1069422649">DE</a> | <a href="https://www.amazon.fr/dp/1069422649">FR</a> | <a href="https://www.amazon.it/dp/1069422649">IT</a> | <a href="https://www.amazon.es/dp/1069422649">ES</a> | <a href="https://www.amazon.co.jp/dp/1069422649">JP</a>
+      <br><br>
+      <sub>Earlier editions: <a href="https://www.amazon.com/dp/1069422622">second (2026)</a> | <a href="https://www.amazon.com/dp/1069422606">first (2025)</a></sub>
     </td>
     <td width="40%" align="center" valign="center">
       <a href="https://www.amazon.com/dp/1069422649">
-        <img src="assets/book-cover-3rd-edition.jpg" alt="Book cover: Foundations of Agentic AI for Retail, third edition" width="300"/>
+        <img src="assets/book-cover-3rd-edition.jpg" alt="Book cover: Foundations of Agentic AI for Retail, Third Edition" width="300"/>
       </a>
     </td>
   </tr>
 </table>
+
+## Start Here
+
+```sh
+git clone https://github.com/gradient-divergence/agentic-retail-foundations.git
+cd agentic-retail-foundations
+uv sync --frozen                                    # Python 3.13, the locked environment
+
+uv run --frozen python -m demos.intro_inventory_book_demo   # Chapter 1's reorder agent
+uv run --frozen python -m demos.capstone_scaffold_demo      # the capstone's approval-and-receipt record
+uv run --frozen python -m demos.capstone_gate_review_demo   # Chapter 14's simulated gate review
+```
+
+The tag `third-edition` is the code exactly as printed. For the full test suite, install every extra (`uv sync --frozen --all-extras`) and run `MPLBACKEND=Agg uv run --frozen python -m pytest`: 1,029 tests.
+
+## The Book, Chapter by Chapter
+
+Where each chapter's printed listings live. Every runnable listing in the book comes from this repository.
+
+| Ch. | Chapter | Main files |
+|---|---|---|
+| 1 | Introduction: The Age of Agency | `demos/intro_inventory_book_demo.py` |
+| 2 | Agent Architectures and Operating Models | `agents/raom_minimal.py`, `agents/bdi.py`, `agents/ooda.py`, `demos/bdi_inventory_demo_short.py` |
+| 3 | Decision Frameworks I: Probabilistic Reasoning and Optimization | `demos/bayesian_reco_book_demo.py`, `demos/bayes_uplift_demo.py` |
+| 4 | Decision Frameworks II: Sequential Decision-Making | `demos/mdp_dynamic_pricing_book_demo.py`, `demos/capstone_mdp_simulator_demo.py` |
+| 5 | Decision Frameworks III: Learning and Planning | `demos/agent_optimization_ladder_demo.py`, `demos/store_fulfillment_book_demo.py` |
+| 6 | Core Technologies Enabling Agentic Retail | `demos/structured_output_schema_demo.py`, `demos/tool_calling_rag_demo.py`, `demos/shelf_monitoring_book_demo.py` |
+| 7 | Physical Perception and Sensor Intelligence | `agents/sensor.py`, `demos/knowledge_graph_book_demo.py`, `demos/promotion_causal_book_demo.py` |
+| 8 | Multi-Agent Coordination and Interoperability | `demos/agent_communication_demo.py`, `demos/task_allocation_cnp_demo.py`, `demos/procurement_auction_demo_short.py`, `demos/inventory_sharing_demo_short.py` |
+| 9 | End-to-End Agent Integration | `demos/order_orchestration_demo.py`, `demos/inventory_event_api_demo.py`, `demos/api_gateway_book_demo.py`, `demos/inventory_crdt_demo.py` |
+| 10 | Building Production Agents | `demos/agent_session_state_demo.py`, `demos/inventory_agent_unit_test_demo.py`, `demos/monitoring_dashboard_api_demo.py` |
+| 11 | Operating Agents (AgentOps) | `demos/agent_eval_hook_demo.py`, `demos/agentops_latency_middleware.py`, `demos/preference_pair_builder_demo.py` |
+| 12 | Governance and Responsible Autonomy | `demos/hitl_approval_api_demo.py`, `demos/pricing_explainability_shap_demo.py` |
+| 13 | Playbooks and Case Studies | `demos/inventory_agents_sdk_demo.py`, `demos/dynamic_pricing_agents_sdk_demo.py`, `demos/virtual_shopping_responses_demo.py` |
+| 14 | Strategy, Maturity, and Futures | `demos/capstone_gate_review_demo.py` |
 
 ## What's New in the Third Edition
 
 - **Repaired code.** The demos, agents and utilities were repaired for this edition, and the book's printed listings are drawn from this code.
 - **Regression tests.** Each repair came with a test; the suite grew from 36 test files to 113, and all 1,029 tests pass.
 - **Demos that say what they need.** A demo that needs an API key or a running service now names it and stops, instead of failing midway.
+- **Current stack.** Python 3.13 and the latest compatible releases of every dependency, locked in `uv.lock`.
 - **Tags.** `third-edition` (and `v3.1.0`) marks the code as printed in the published third edition; `v3.0.0` is the 7 October pre-release state, and `v2.0.0` is the second edition's.
 
-## What the Second Edition Added
+<details>
+<summary><strong>What the second edition added</strong></summary>
 
 - **Retail Agent Operating Model (RAOM)** as the narrative spine across chapters and code.
 - **Capstone workflow** that accumulates across chapters (inventory risk → supplier outreach → price protection → customer messaging → audit trail).
@@ -39,21 +76,23 @@ A modular, extensible Python framework and companion codebase for the third edit
 - **Agent learning ladder**: prompt/tool tuning → SFT/PEFT → DPO/GRPO → RLHF/RLAIF → RFT.
 - **Interoperability & standards**: MCP, agent-to-agent messaging, and emerging commerce protocols (ACP, AP2).
 - **Context engineering** as a first-class design discipline (memory, retention boundaries, policies).
-- **Expanded SOTA coverage**: offline RL, constrained RL, conformal prediction, GNNs, Mamba/SSM.
+- **Expanded coverage**: offline RL, constrained RL, conformal prediction, GNNs, Mamba/SSM.
 - **Teaching assets**: case packets, notation guide, glossary, and companion resources.
+
+</details>
 
 ## Table of Contents
 
+- [Start Here](#start-here)
+- [The Book, Chapter by Chapter](#the-book-chapter-by-chapter)
 - [What's New in the Third Edition](#whats-new-in-the-third-edition)
-- [What the Second Edition Added](#what-the-second-edition-added)
 - [Companion Code Highlights](#companion-code-highlights)
 - [Directory Structure](#directory-structure)
 - [Setup Instructions](#setup-instructions)
 - [Usage](#usage)
 - [Development Best Practices](#development-best-practices)
 - [Contribution Guidelines](#contribution-guidelines)
-- [Documentation Website](#documentation-website)
-- [GitHub Repository](#github-repository)
+- [Documentation](#documentation)
 
 ## Companion Code Highlights
 
@@ -242,12 +281,12 @@ Common development tasks are streamlined using the `Makefile`. Ensure your virtu
 
 Please refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to contribute to this project.
 
-## Documentation Website
+## Documentation
 
-The MkDocs site is published at: https://gradient-divergence.github.io/agentic-retail-foundations
+Build and browse the MkDocs documentation locally:
 
-You can also build and serve the documentation locally using `make docs-serve`.
+```sh
+make docs-serve    # http://127.0.0.1:8000
+```
 
-## GitHub Repository
-
-*   Main repository: https://github.com/gradient-divergence/agentic-retail-foundations
+Repository: https://github.com/gradient-divergence/agentic-retail-foundations

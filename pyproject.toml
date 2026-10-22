@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agentic-retail-foundations"
 version = "0.1.0"
-description = "Code examples for Foundations of Agentic AI for Retail Book."
+description = "Companion code for Foundations of Agentic AI for Retail, Third Edition."
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 license = "MIT"

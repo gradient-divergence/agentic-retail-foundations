@@ -1,0 +1,41 @@
+name: Report an error in the book
+description: A mistake in the text, a figure, a table, a listing or a printed output of the third edition.
+title: "Erratum: "
+labels: ["erratum"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for taking the time to report it. Every report is read.
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition
+      options:
+        - Third edition, paperback
+        - Third edition, hardcover
+        - Third edition, Kindle
+        - An earlier edition
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The chapter and the page, or the Kindle location, and the figure, table or listing if there is one.
+      placeholder: "Chapter 8, page 212, Figure 8.4"
+    validations:
+      required: true
+  - type: textarea
+    id: says
+    attributes:
+      label: What the book says
+      description: Quote the passage, or describe the figure or output.
+    validations:
+      required: true
+  - type: textarea
+    id: should
+    attributes:
+      label: What it should say, and why
+      description: A source, a calculation or a run of the code helps.
+    validations:
+      required: true

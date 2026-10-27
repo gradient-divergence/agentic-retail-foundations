@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite it, and the book it accompanies."
+type: software
+title: "Foundations of Agentic AI for Retail: companion code, third edition"
+abstract: "The runnable companion to Foundations of Agentic AI for Retail, Third Edition: agent architectures, decision frameworks, coordination protocols, guardrails, evaluation and end-to-end demos, as the book prints them, with a regression test for each."
+authors:
+  - family-names: Nayebi
+    given-names: Fatih
+license: MIT
+repository-code: "https://github.com/gradient-divergence/agentic-retail-foundations"
+version: "3.1.0"
+date-released: 2026-10-21
+keywords:
+  - agentic AI
+  - retail
+  - AI agents
+  - multi-agent systems
+  - reinforcement learning
+references:
+  - type: book
+    title: "Foundations of Agentic AI for Retail: Designing, Building, and Operating Retail AI Agents, from First Principles to Production"
+    edition: "Third edition"
+    authors:
+      - family-names: Nayebi
+        given-names: Fatih
+    publisher:
+      name: Gradient Divergence
+      city: "Montréal"
+    year: 2026
+    isbn: "978-1-0694226-4-4"

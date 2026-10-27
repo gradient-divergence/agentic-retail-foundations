@@ -135,7 +135,7 @@ docs-build: venv ## Build static documentation site
 check: lint test ## Run Ruff and offline tests with installed tools (no installation)
 	@echo "--> All checks passed."
 
-ci: format-check type-check test coverage docs-build ## Full CI pipeline checks (lint implied by format-check)
+ci: format-check test coverage docs-build ## What CI runs (lint implied by format-check; mypy runs separately: make type-check)
 	@echo "--> CI checks passed."
 
 ###############################################################################

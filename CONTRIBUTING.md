@@ -119,7 +119,7 @@ make format
 # Check for linting errors (uses ruff check)
 make lint
 
-# Check for type errors (uses mypy)
+# Check for type errors (uses mypy; it still reports errors in code kept as printed, so CI doesn't run it)
 make type-check
 
 # Run the test suite (uses pytest)
@@ -251,6 +251,8 @@ Maintaining good documentation is crucial.
 
 ## Reporting Bugs and Suggesting Features
 
+*   **An error in the book** (text, figure, listing or output): check [`ERRATA.md`](ERRATA.md), then use the [erratum form](https://github.com/gradient-divergence/agentic-retail-foundations/issues/new?template=erratum.yml).
+*   **A problem running the code:** use the [code form](https://github.com/gradient-divergence/agentic-retail-foundations/issues/new?template=code-problem.yml), with the exact commands, what happened, and your operating system and Python version.
 *   Use the **GitHub Issues** tracker for the main repository:
     *   Check if a similar issue already exists.
     *   For bugs, provide detailed steps to reproduce, expected behavior, actual behavior, and your environment details.
@@ -258,7 +260,7 @@ Maintaining good documentation is crucial.
 
 ## Code of Conduct
 
-All contributors are expected to adhere to the project's **Code of Conduct** (link to be added - `CODE_OF_CONDUCT.md`). Please ensure you read and understand it.
+All contributors are expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Questions?
 

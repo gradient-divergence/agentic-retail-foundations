@@ -1,28 +1,32 @@
-# Foundations of Agentic AI for Retail: Companion Code (Third Edition)
+<div align="center">
+
+<a href="https://www.amazon.com/dp/1069422649"><img src="assets/book-cover-3rd-edition.jpg" width="260" alt="Cover of Foundations of Agentic AI for Retail, Third Edition, by Fatih Nayebi"></a>
+
+# Foundations of Agentic AI for Retail
+
+**The companion code of the third edition, by [Fatih Nayebi](https://fatihnayebi.com)**
+
+*A pricing agent marks down a winter coat in one region, exactly as its rules allow, and by morning the brand owns the outcome. The book asks when a retailer should hand a decision to software, and what evidence and controls make the handover worthwhile, from first principles to production.*
+
+[![CI](https://github.com/gradient-divergence/agentic-retail-foundations/actions/workflows/ci.yml/badge.svg)](https://github.com/gradient-divergence/agentic-retail-foundations/actions/workflows/ci.yml)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-0a6776?logo=python&logoColor=white)](.python-version)
+[![License: MIT](https://img.shields.io/badge/license-MIT-0a6776)](LICENSE)
+[![Chapters: 14](https://img.shields.io/badge/chapters-14-f79e0c)](#the-book-chapter-by-chapter)
+[![Tests: 1,029](https://img.shields.io/badge/tests-1%2C029-f79e0c)](tests/)
+
+In paperback and hardcover, in full color; the Kindle edition will follow.<br>
+**Buy on Amazon:** <a href="https://www.amazon.com/dp/1069422649">US</a> | <a href="https://www.amazon.ca/dp/1069422649">CA</a> | <a href="https://www.amazon.co.uk/dp/1069422649">UK</a> | <a href="https://www.amazon.de/dp/1069422649">DE</a> | <a href="https://www.amazon.fr/dp/1069422649">FR</a> | <a href="https://www.amazon.it/dp/1069422649">IT</a> | <a href="https://www.amazon.es/dp/1069422649">ES</a> | <a href="https://www.amazon.co.jp/dp/1069422649">JP</a><br>
+<sub>Earlier editions: <a href="https://www.amazon.com/dp/1069422622">second (2026)</a> | <a href="https://www.amazon.com/dp/1069422606">first (2025)</a></sub>
+
+[Quick start](#quick-start) · [With the book](#use-it-with-the-book) · [Figures](#four-figures-from-the-book) · [Chapters](#the-book-chapter-by-chapter) · [Setup](#setup-instructions) · [Tests and CI](#tests-and-ci) · [The series](#the-series) · [Report an error](#report-an-error) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+---
 
 The runnable companion to *Foundations of Agentic AI for Retail*, Third Edition. Agent architectures, decision frameworks, coordination protocols, guardrails, evaluation and end-to-end demos, as the book prints them, with a regression test for each.
 
-<table>
-  <tr>
-    <td width="60%">
-      <a href="https://www.amazon.com/dp/1069422649"><strong>Foundations of Agentic AI for Retail: Designing, Building, and Operating Retail AI Agents, from First Principles to Production</strong></a>, Third Edition (October 2026), by Fatih Nayebi.
-      <br><br>
-      <em>A pricing agent marks down a winter coat in one region, exactly as its rules allow, and by morning the brand owns the outcome. The book asks when a retailer should hand a decision to software, and what evidence and controls make the handover worthwhile, from first principles to production.</em>
-      <br><br>
-      In paperback and hardcover, in full color. The Kindle edition will follow.<br>
-      <strong>Buy on Amazon:</strong> <a href="https://www.amazon.com/dp/1069422649">US</a> | <a href="https://www.amazon.ca/dp/1069422649">CA</a> | <a href="https://www.amazon.co.uk/dp/1069422649">UK</a> | <a href="https://www.amazon.de/dp/1069422649">DE</a> | <a href="https://www.amazon.fr/dp/1069422649">FR</a> | <a href="https://www.amazon.it/dp/1069422649">IT</a> | <a href="https://www.amazon.es/dp/1069422649">ES</a> | <a href="https://www.amazon.co.jp/dp/1069422649">JP</a>
-      <br><br>
-      <sub>Earlier editions: <a href="https://www.amazon.com/dp/1069422622">second (2026)</a> | <a href="https://www.amazon.com/dp/1069422606">first (2025)</a></sub>
-    </td>
-    <td width="40%" align="center" valign="center">
-      <a href="https://www.amazon.com/dp/1069422649">
-        <img src="assets/book-cover-3rd-edition.jpg" alt="Book cover: Foundations of Agentic AI for Retail, Third Edition" width="300"/>
-      </a>
-    </td>
-  </tr>
-</table>
-
-## Start Here
+## Quick start
 
 ```sh
 git clone https://github.com/gradient-divergence/agentic-retail-foundations.git
@@ -35,6 +39,38 @@ uv run --frozen python -m demos.capstone_gate_review_demo   # Chapter 14's simul
 ```
 
 The tag `third-edition` is the code exactly as printed. For the full test suite, install every extra (`uv sync --frozen --all-extras`) and run `MPLBACKEND=Agg uv run --frozen python -m pytest`: 1,029 tests.
+
+## Use it with the book
+
+1. **Find the chapter's code** in [the table below](#the-book-chapter-by-chapter): every runnable listing in the book comes from this repository.
+2. **Run its demo** with `uv run --frozen python -m demos.<name>`. A demo that needs an API key or a running service names it and stops.
+3. **Explore it in a notebook.** The [`notebooks/`](notebooks/) folder holds Marimo notebooks aligned to the book: `marimo edit notebooks/<name>.py`.
+4. **Change the code and run its tests.** Each repair in this edition came with a regression test, so the tests show what your change moved.
+
+## Four figures from the book
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="assets/figures/figure-1-3-layered-reference-architecture.png" width="400" alt="Six numbered layers in three groups, core intelligence (foundation models, data operations, agent frameworks), engineering (development tools, deployment infrastructure) and ecosystem (agent ecosystem), with monitoring and observability and governance and security as cross-cutting columns.">
+<br><sub><b>Figure 1.3</b>, chapter 1, <i>Introduction: The Age of Agency</i>. Layered reference architecture with cross-cutting concerns.</sub>
+</td>
+<td width="50%" valign="top">
+<img src="assets/figures/figure-2-2-ooda-pricing-agent.png" width="400" alt="The pricing agent's loop: the market sends signals to observe (competitor prices, stock, seven-day sales), orient (price position, stock and sales status), decide (weigh the three signals, cap the price change) and act (update the price, log it in the history), which sends the new price back to the market.">
+<br><sub><b>Figure 2.2</b>, chapter 2, <i>Agent Architectures and Operating Models</i>. OODA loop of the dynamic pricing agent.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="assets/figures/figure-10-1-reference-architecture-cloud-edge.png" width="400" alt="Edge: IoT and POS store inputs feed an edge agent for store operations, which reports data to the cloud orchestrator (FastAPI, Agents SDK); the cloud also holds a SvelteKit dashboard, a Supabase database with logs, and an OpenAI LLM API.">
+<br><sub><b>Figure 10.1</b>, chapter 10, <i>Building Production Agents</i>. Reference architecture for a retail agentic system, cloud and edge.</sub>
+</td>
+<td width="50%" valign="top">
+<img src="assets/figures/figure-12-3-escalation-workflow.png" width="400" alt="An agent's proposal goes to a review check; routine actions execute, complex or high-risk ones go to human review, and decisions above that authority go to senior review, which approves or overrides; every outcome and reason is written to the audit log after execution.">
+<br><sub><b>Figure 12.3</b>, chapter 12, <i>Governance and Responsible Autonomy</i>. Escalation workflow: trigger, human review, approval or override, and audit logging.</sub>
+</td>
+</tr>
+</table>
 
 ## The Book, Chapter by Chapter
 
@@ -81,19 +117,6 @@ Where each chapter's printed listings live. Every runnable listing in the book c
 
 </details>
 
-## Table of Contents
-
-- [Start Here](#start-here)
-- [The Book, Chapter by Chapter](#the-book-chapter-by-chapter)
-- [What's New in the Third Edition](#whats-new-in-the-third-edition)
-- [Companion Code Highlights](#companion-code-highlights)
-- [Directory Structure](#directory-structure)
-- [Setup Instructions](#setup-instructions)
-- [Usage](#usage)
-- [Development Best Practices](#development-best-practices)
-- [Contribution Guidelines](#contribution-guidelines)
-- [Documentation](#documentation)
-
 ## Companion Code Highlights
 
 *   **Retail Agent Operating Model (RAOM):** Minimal RAOM implementation and examples (`agents/raom_minimal.py`).
@@ -132,6 +155,10 @@ agentic-retail-foundations/
 ├── .env.example          # Example environment variables template
 ├── .gitignore
 ├── .pre-commit-config.yaml
+├── CITATION.cff          # Citation metadata for GitHub's "Cite this repository"
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── ERRATA.md             # Confirmed errors in the book
 ├── LICENSE
 ├── Makefile
 ├── mkdocs.yml
@@ -264,11 +291,23 @@ Common development tasks are streamlined using the `Makefile`. Ensure your virtu
     make help
     ```
 
+## Tests and CI
+
+The [CI workflow](.github/workflows/ci.yml) runs `make ci` on every push and pull request, on macOS with Python 3.13 and every extra installed from the frozen lock: formatting and lint, the full test suite (1,029 tests), coverage (at least 70%) and the docs build. Run the same checks yourself:
+
+```sh
+uv sync --frozen --all-extras
+MPLBACKEND=Agg make ci        # what CI runs
+make check                    # quicker: Ruff and the offline tests
+```
+
+`make type-check` runs mypy, which still reports errors in code kept as the book prints it, so it isn't part of CI.
+
 ## Development Best Practices
 
 *   **Modularity:** Keep agent logic, data models, utilities, and connectors in their respective directories.
 *   **Configuration:** Use environment variables (`.env` file loaded via `python-dotenv`) for secrets and environment-specific settings.
-*   **Typing:** Use Python type hints extensively. Run `make type-check` (`mypy`) regularly.
+*   **Typing:** Use Python type hints extensively. `make type-check` (`mypy`) still reports errors in code kept as the book prints it, so it isn't part of CI; new code should pass it.
 *   **Linting & Formatting:** Adhere to styles enforced by `ruff`. Run `make format` and `make lint` frequently.
 *   **Testing:** Write unit tests (`pytest`) for individual functions/classes and integration tests for components working together.
     `make test` and `make check` use installed tools and never create an environment or install packages.
@@ -276,10 +315,6 @@ Common development tasks are streamlined using the `Makefile`. Ensure your virtu
     Coroutine tests with synchronous fixtures can run offline using `asyncio.run` when `pytest-asyncio` is absent.
     Coverage is opt-in (`make coverage`, requires `pytest-cov`); normal tests use the installed runtime dependencies.
 *   **Documentation:** Maintain docs in `docs/` and keep this README in sync with the book and code.
-
-## Contribution Guidelines
-
-Please refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to contribute to this project.
 
 ## Documentation
 
@@ -289,4 +324,70 @@ Build and browse the MkDocs documentation locally:
 make docs-serve    # http://127.0.0.1:8000
 ```
 
-Repository: https://github.com/gradient-divergence/agentic-retail-foundations
+## The series
+
+*Foundations of Agentic AI* is a series of three books by Fatih Nayebi, each with its own companion code.
+
+<table>
+<tr>
+<td width="33%" align="center" valign="top">
+<a href="https://www.amazon.com/dp/1069422665"><img src="assets/covers/systems-volume-1.jpg" width="150" alt="Cover of Foundations of Agentic AI Systems, Volume I"></a>
+<br><b>Foundations of Agentic AI Systems, Volume I</b>
+<br><sub><i>Models, Learning, and Decisions, from First Principles</i></sub>
+<br><a href="https://www.amazon.com/dp/1069422665">Amazon</a> · <a href="https://github.com/gradient-divergence/agentic-ai-systems">code</a>
+</td>
+<td width="33%" align="center" valign="top">
+<a href="https://www.amazon.com/dp/1069422681"><img src="assets/covers/systems-volume-2.jpg" width="150" alt="Cover of Foundations of Agentic AI Systems, Volume II"></a>
+<br><b>Foundations of Agentic AI Systems, Volume II</b>
+<br><sub><i>Agents, Operations, and Governance, in Production</i></sub>
+<br><a href="https://www.amazon.com/dp/1069422681">Amazon</a> · <a href="https://github.com/gradient-divergence/agentic-ai-systems">code</a>
+</td>
+<td width="33%" align="center" valign="top">
+<a href="https://www.amazon.com/dp/1069422649"><img src="assets/book-cover-3rd-edition.jpg" width="150" alt="Cover of Foundations of Agentic AI for Retail, Third Edition"></a>
+<br><b>Foundations of Agentic AI for Retail</b>
+<br><sub><i>Designing, Building, and Operating Retail AI Agents, from First Principles to Production</i>, third edition</sub>
+<br><a href="https://www.amazon.com/dp/1069422649">Amazon</a> · code: this repository
+</td>
+</tr>
+</table>
+
+The three books are published by [Gradient Divergence](https://gradientdivergence.com), Montréal.
+
+## About the author
+
+Fatih Nayebi teaches Agentic AI, Machine Learning Engineering, Deep Learning and Data Science at McGill University and founded OODARIS AI, which builds the Agentic Operating System for Retail Decisions.
+
+[fatihnayebi.com](https://fatihnayebi.com) · [OODARIS AI](https://oodaris.ai) · [GitHub](https://github.com/conqueror) · [McGill showcases](https://github.com/conqueror/mcgill-showcases), student-friendly machine-learning projects for his McGill courses
+
+## Report an error
+
+Known errors are listed in [`ERRATA.md`](ERRATA.md). Found one that isn't there, in the text, a figure, a listing or an output? Please [report it as an issue](https://github.com/gradient-divergence/agentic-retail-foundations/issues/new?template=erratum.yml), with the edition, the chapter and the page. For a problem running the code, [open a code issue](https://github.com/gradient-divergence/agentic-retail-foundations/issues/new?template=code-problem.yml).
+
+## Contributing
+
+Please refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to contribute to this project. Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+
+## Cite
+
+<details>
+<summary>BibTeX</summary>
+
+```bibtex
+@book{nayebi2026agenticretail,
+  author    = {Fatih Nayebi},
+  title     = {Foundations of Agentic AI for Retail: Designing, Building, and Operating Retail AI Agents, from First Principles to Production},
+  edition   = {Third},
+  publisher = {Gradient Divergence},
+  address   = {Montr{\'e}al},
+  year      = {2026},
+  isbn      = {978-1-0694226-4-4}
+}
+```
+
+</details>
+
+GitHub's *Cite this repository* button reads [`CITATION.cff`](CITATION.cff).
+
+## License
+
+The code is released under the MIT License; see [`LICENSE`](LICENSE). The cover images and the figures reproduced from the books, in `assets/`, are © 2026 Fatih Nayebi, all rights reserved, and are not covered by the MIT License.

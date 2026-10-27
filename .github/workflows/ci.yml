@@ -1,68 +1,34 @@
-name: Python CI
+name: CI
 
-# Controls when the workflow will run
+# Every push and pull request: formatting and lint, the full test suite, coverage and the docs build
+# (make ci), with every extra installed from the frozen lock. mypy (make type-check) still reports errors
+# in code kept as the book prints it, so it runs separately, not here.
+
 on:
   push:
-    branches: [ main ] # Run on pushes to the main branch
+    branches: [main]
   pull_request:
-    branches: [ main ] # Run on pull requests targeting the main branch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MPLBACKEND: Agg
 
 jobs:
-  build:
-    runs-on: ubuntu-latest # Use the latest Ubuntu runner
-    strategy:
-      fail-fast: false # Don't cancel all jobs if one Python version fails
-      matrix:
-        python-version: ["3.13"] # Required by the current dependency stack
-
+  ci:
+    name: Format, tests, coverage and docs (macOS, Python 3.13)
+    runs-on: macos-latest
+    timeout-minutes: 60
     steps:
-    #----------------------------------------------
-    #       check out repo & set up python
-    #----------------------------------------------
-    - name: Check out repository
-      uses: actions/checkout@v4 # Checks out your code
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    #----------------------------------------------
-    #           install uv & dependencies
-    #----------------------------------------------
-    - name: Install uv
-      run: curl -LsSf https://astral.sh/uv/install.sh | sh
-
-    - name: Add uv to PATH
-      run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-    # Optional: Cache uv environment to speed up builds
-    # Cache depends on the pyproject.toml hash
-    - name: Get uv cache directory
-      id: uv-cache-dir
-      run: echo "dir=$(uv cache dir)" >> $GITHUB_OUTPUT
-
-    - name: Cache uv environment
-      uses: actions/cache@v4
-      with:
-        path: ${{ steps.uv-cache-dir.outputs.dir }}
-        key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-uv-
-
-    - name: Install locked dependencies and optional demo stacks
-      run: uv sync --locked --all-extras
-
-    #----------------------------------------------
-    #              run checks & tests
-    #----------------------------------------------
-    # Note: The make targets should use the tools installed in .venv
-    - name: Run CI Checks (Format, Lint, Type Check, Test, Coverage, Docs Build)
-      run: make ci
-
-    # Optional: Upload coverage report (if 'make coverage' generates one)
-    # - name: Upload coverage reports to Codecov
-    #   uses: codecov/codecov-action@v4
-    #   with:
-    #     token: ${{ secrets.CODECOV_TOKEN }} # Requires setting a secret in GitHub repo settings
-    #     fail_ci_if_error: true
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - name: Install the pinned dependencies, every extra
+        run: uv sync --frozen --all-extras
+      - name: make ci
+        run: make ci

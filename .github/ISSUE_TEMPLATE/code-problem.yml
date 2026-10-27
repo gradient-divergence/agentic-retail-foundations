@@ -1,0 +1,35 @@
+name: A problem with the code
+description: A demo, a notebook, a test or an agent fails, or prints something other than the book.
+title: "Code: "
+labels: ["code"]
+body:
+  - type: input
+    id: chapter
+    attributes:
+      label: Chapter and script
+      placeholder: "Chapter 1, uv run --frozen python -m demos.intro_inventory_book_demo"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: What you ran
+      description: The exact commands, from a fresh clone if you can.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened, and what you expected
+      description: The error or the output that differs, and the page it differs from.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Python version, and uv or pip.
+      placeholder: "macOS 15, Python 3.13, uv 0.9"
+    validations:
+      required: true

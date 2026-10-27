@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.2
       - name: Install the pinned dependencies, every extra
         run: uv sync --frozen --all-extras
       - name: make ci
